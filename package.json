@@ -1,0 +1,30 @@
+{
+  "name": "economic-beginner-briefing",
+  "version": "0.1.0",
+  "description": "경제 초보자를 위한 일일 경제 뉴스 브리핑 자동화",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/ tests/"
+  },
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "eslint": "^9.5.0",
+    "@eslint/js": "^9.5.0",
+    "typescript-eslint": "^8.0.0",
+    "typescript": "^5.5.0",
+    "tsx": "^4.15.0",
+    "vitest": "^2.0.0"
+  }
+}
