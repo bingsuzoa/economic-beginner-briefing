@@ -1,17 +1,19 @@
-name: Daily Economic Briefing
+name: Weekly Economic Briefing
 
 on:
   schedule:
-    # 19:30 UTC = 04:30 Asia/Seoul. Runs before the 05:00 KST product target.
-    - cron: "30 19 * * *"
+    # 매주 월요일 04:30 KST = 일요일 19:30 UTC
+    # GitHub Actions cron은 UTC 기준입니다.
+    # 매일 실행이 필요하면 "30 19 * * *"로 변경하세요.
+    - cron: "30 19 * * 0"
   workflow_dispatch:
     inputs:
       target_date:
-        description: "Target news date in YYYY-MM-DD. Empty means yesterday in Asia/Seoul."
+        description: "수집 대상 날짜 (YYYY-MM-DD). 비워두면 어제 날짜(Asia/Seoul) 사용."
         required: false
         type: string
       dry_run:
-        description: "Run without publishing to external channels."
+        description: "외부 채널(Notion 등) 저장 없이 테스트 실행"
         required: true
         default: "true"
         type: choice
@@ -19,12 +21,13 @@ on:
           - "true"
           - "false"
 
+# 같은 workflow가 중복 실행되지 않도록 방지
 concurrency:
-  group: daily-economic-briefing-${{ github.workflow }}-${{ github.event.inputs.target_date || github.ref }}
+  group: weekly-briefing
   cancel-in-progress: false
 
 jobs:
-  run-daily-briefing:
+  briefing:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -36,16 +39,12 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
       NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
-      EMAIL_PROVIDER: ${{ secrets.EMAIL_PROVIDER }}
-      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-      EMAIL_TO: ${{ secrets.EMAIL_TO }}
-      EMAIL_API_KEY: ${{ secrets.EMAIL_API_KEY }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
