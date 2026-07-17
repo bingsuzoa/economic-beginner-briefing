@@ -7,6 +7,7 @@ import type { PipelineRecorder } from "../../pipeline/PipelineRecorder.js";
 import type { ApplicationDeps } from "../../app/createApplication.js";
 import { runPipeline } from "../../pipeline/runPipeline.js";
 import { ADMIN_DEFAULT_PAGE_SIZE } from "../../config/constants.js";
+import { validateISODate } from "../../utils/date.js";
 
 export interface RunRouteDeps {
   runRepo: PipelineRunRepository;
@@ -106,8 +107,25 @@ export function createRunRoutes(deps: RunRouteDeps): Router {
   });
 
   // Manual run (async)
-  router.post("/runs", async (_req, res, next) => {
+  router.post("/runs", async (req, res, next) => {
     try {
+      const body = (req.body ?? {}) as { targetDate?: string };
+      const targetDate = body.targetDate;
+
+      // Validate targetDate if provided
+      if (targetDate !== undefined) {
+        try {
+          validateISODate(targetDate);
+        } catch {
+          res.status(400).json({
+            success: false,
+            code: "INVALID_TARGET_DATE",
+            message: `유효하지 않은 날짜 형식입니다: ${targetDate}`,
+          });
+          return;
+        }
+      }
+
       const isLocked = await deps.lock.isLocked();
       if (isLocked) {
         const currentRunId = await deps.lock.getCurrentRunId();
@@ -128,6 +146,7 @@ export function createRunRoutes(deps: RunRouteDeps): Router {
         lock: deps.lock,
         recorder: deps.recorder,
         triggerType: "MANUAL",
+        targetDate,
       }).catch((err) => {
         console.error("Async pipeline execution failed:", err);
       });
