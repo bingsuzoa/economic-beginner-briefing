@@ -81,6 +81,23 @@ export { MockNewsCollector } from "./collectors/mock/MockNewsCollector.js";
 export { MockNewsAnalyzer } from "./analyzers/mock/MockNewsAnalyzer.js";
 export { MockBriefingPublisher } from "./publishers/mock/MockBriefingPublisher.js";
 
+// Real implementations
+export { RealNewsCollector, createDefaultAdapters } from "./collectors/RealNewsCollector.js";
+
+// Source adapters
+export type { SourceAdapter, SourceCollectionResult } from "./collectors/sources/SourceAdapter.js";
+export { YonhapSourceAdapter } from "./collectors/sources/YonhapSourceAdapter.js";
+export { HankyungSourceAdapter } from "./collectors/sources/HankyungSourceAdapter.js";
+export { MKSourceAdapter } from "./collectors/sources/MKSourceAdapter.js";
+export { SBSBizSourceAdapter } from "./collectors/sources/SBSBizSourceAdapter.js";
+export { KBSSourceAdapter } from "./collectors/sources/KBSSourceAdapter.js";
+
+// Filters
+export { filterByDate } from "./collectors/filters/dateFilter.js";
+export { classifyCategories, containsExcludedTopic } from "./collectors/filters/categoryClassifier.js";
+export { removeDuplicates, normalizeUrl } from "./collectors/filters/duplicateRemover.js";
+export { validateQuality } from "./collectors/filters/qualityValidator.js";
+
 // App
 export { createApplication } from "./app/createApplication.js";
 export type { ApplicationDeps } from "./app/createApplication.js";
