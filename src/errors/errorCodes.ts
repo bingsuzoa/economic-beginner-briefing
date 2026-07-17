@@ -19,6 +19,13 @@ export const ErrorCodes = {
   // System
   SYSTEM_CONFIG_ERROR: "SYSTEM_CONFIG_ERROR",
   SYSTEM_UNEXPECTED: "SYSTEM_UNEXPECTED",
+
+  // Admin / Pipeline
+  PIPELINE_ALREADY_RUNNING: "PIPELINE_ALREADY_RUNNING",
+  RUN_NOT_FOUND: "RUN_NOT_FOUND",
+  ITEM_NOT_FOUND: "ITEM_NOT_FOUND",
+  UNAUTHORIZED: "UNAUTHORIZED",
+  DB_CONNECTION_ERROR: "DB_CONNECTION_ERROR",
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

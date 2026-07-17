@@ -31,3 +31,7 @@ export const RETRY = {
   INITIAL_DELAY_MS: 1_000,
   NEXT_DELAY_MS: 2_000,
 } as const;
+
+export const PIPELINE_LOCK_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
+
+export const ADMIN_DEFAULT_PAGE_SIZE = 20;
