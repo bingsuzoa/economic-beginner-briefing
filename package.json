@@ -16,15 +16,17 @@
     "lint": "eslint src/ tests/"
   },
   "dependencies": {
+    "@notionhq/client": "^5.23.2",
+    "openai": "^6.47.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.5.0",
     "@types/node": "^20.14.0",
     "eslint": "^9.5.0",
-    "@eslint/js": "^9.5.0",
-    "typescript-eslint": "^8.0.0",
-    "typescript": "^5.5.0",
     "tsx": "^4.15.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.0.0",
     "vitest": "^2.0.0"
   }
 }

@@ -81,6 +81,12 @@ export { MockNewsCollector } from "./collectors/mock/MockNewsCollector.js";
 export { MockNewsAnalyzer } from "./analyzers/mock/MockNewsAnalyzer.js";
 export { MockBriefingPublisher } from "./publishers/mock/MockBriefingPublisher.js";
 
+// OpenAI analyzer
+export { OpenAINewsAnalyzer } from "./analyzers/openai/OpenAINewsAnalyzer.js";
+export type { OpenAINewsAnalyzerOptions } from "./analyzers/openai/OpenAINewsAnalyzer.js";
+export { OpenAIClient } from "./analyzers/openai/OpenAIClient.js";
+export type { AIClient, AIClientRequest, AIClientResponse } from "./analyzers/openai/OpenAIClient.js";
+
 // App
 export { createApplication } from "./app/createApplication.js";
 export type { ApplicationDeps } from "./app/createApplication.js";
