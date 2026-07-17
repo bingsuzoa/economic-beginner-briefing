@@ -16,6 +16,7 @@
     "lint": "eslint src/ tests/"
   },
   "dependencies": {
+    "@notionhq/client": "^5.23.2",
     "openai": "^6.47.0",
     "rss-parser": "^3.13.0",
     "zod": "^3.23.0"
