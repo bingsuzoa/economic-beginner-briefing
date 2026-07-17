@@ -1,0 +1,69 @@
+name: Weekly Economic Briefing
+
+on:
+  schedule:
+    # 매주 월요일 04:30 KST = 일요일 19:30 UTC
+    # GitHub Actions cron은 UTC 기준입니다.
+    # 매일 실행이 필요하면 "30 19 * * *"로 변경하세요.
+    - cron: "30 19 * * 0"
+  workflow_dispatch:
+    inputs:
+      target_date:
+        description: "수집 대상 날짜 (YYYY-MM-DD). 비워두면 어제 날짜(Asia/Seoul) 사용."
+        required: false
+        type: string
+      dry_run:
+        description: "외부 채널(Notion 등) 저장 없이 테스트 실행"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+# 같은 workflow가 중복 실행되지 않도록 방지
+concurrency:
+  group: weekly-briefing
+  cancel-in-progress: false
+
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TZ: Asia/Seoul
+      NODE_ENV: production
+      LOG_LEVEL: info
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run || 'false' }}
+      TARGET_DATE: ${{ github.event.inputs.target_date }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+      NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Run briefing pipeline
+        run: npm start
