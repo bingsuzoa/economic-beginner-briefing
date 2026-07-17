@@ -98,6 +98,12 @@ export { classifyCategories, containsExcludedTopic } from "./collectors/filters/
 export { removeDuplicates, normalizeUrl } from "./collectors/filters/duplicateRemover.js";
 export { validateQuality } from "./collectors/filters/qualityValidator.js";
 
+// OpenAI analyzer
+export { OpenAINewsAnalyzer } from "./analyzers/openai/OpenAINewsAnalyzer.js";
+export type { OpenAINewsAnalyzerOptions } from "./analyzers/openai/OpenAINewsAnalyzer.js";
+export { OpenAIClient } from "./analyzers/openai/OpenAIClient.js";
+export type { AIClient, AIClientRequest, AIClientResponse } from "./analyzers/openai/OpenAIClient.js";
+
 // App
 export { createApplication } from "./app/createApplication.js";
 export type { ApplicationDeps } from "./app/createApplication.js";
