@@ -6,7 +6,7 @@ Version: 1.0
 
 Document: QA Execution Report
 
-Status: Complete (Part 1 + Part 2 + Part 3)
+Status: Complete (Part 1 + Part 2 + Part 3 + E2E)
 
 QA Owner: Claude (QA Lead)
 
@@ -624,6 +624,56 @@ PASS
 ## 최종 판정
 
 **Production Ready**
+
+---
+
+# 19. E2E 실제 API 테스트 (DRY_RUN=false)
+
+01_qa_release_acceptance.md 섹션 7에 따라 Mock 데이터만이 아닌 실제 API 연동 테스트를 수행한다.
+
+## 테스트 환경
+
+- DRY_RUN=false
+- 실제 RSS 소스 수집
+- 실제 OpenAI API (gpt-4o)
+- 실제 Notion API 발행
+
+## E2E 테스트 결과
+
+| Test Case | Description | Result | Evidence |
+|-----------|-------------|--------|----------|
+| E2E-001 | 전체 Pipeline (실제 API) | PASS | RSS 19건 수집 → OpenAI 분석 3건 선별 → Notion 발행 성공, status: success |
+| E2E-002 | 실제 RSS 뉴스 수집 | PASS | 4/5 소스 정상, 249건 수집, 19건 accepted. KBS 빈 응답 (BUG-001) |
+| E2E-003 | 실제 OpenAI 분석 | PASS | AI Duration 4~8초, 뉴스 분석 완료, 모든 필드 valid |
+| E2E-004 | 실제 Notion 발행 | PASS | Notion Database에 페이지 생성 성공, 중복 방지 정상 동작 |
+| E2E-005 | DRY_RUN=true + 실제 AI | PASS | MockCollector 사용, 실제 AI 분석, status: success |
+| E2E-006 | AI 응답 품질 검증 | PASS | overallSummary 3단락, news 3건, glossary 3건, 모든 상세 필드 충분한 길이 |
+
+## E2E 수집 상세
+
+| 소스 | 상태 | 수집 | Accepted |
+|------|------|-----:|--------:|
+| 연합뉴스 | success | 120 | 12 |
+| 한국경제 | success | 50 | 8 |
+| 매일경제 | success | 50 | 13 |
+| SBS Biz | success | 29 | 2 |
+| KBS | failed | 0 | 0 |
+
+## E2E AI 분석 품질
+
+- 모든 뉴스 항목에 `representativeTitle`, `oneLineSummary`, `whatHappened`, `previousSituation`, `whatChanged`, `whyItChanged`, `householdImpact` 필드 포함
+- 각 필드 최소 10자 이상의 충분한 설명
+- `economicTerms` 용어 해설 포함
+- `sources`에 원본 기사 참조 정상 연결
+
+## E2E 발견 이슈
+
+| 이슈 | 원인 | 조치 | 상태 |
+|------|------|------|------|
+| Notion invalid_request_url | NOTION_DATABASE_ID에 URL 전체 입력 | 32자 UUID로 수정 | 환경 설정 이슈 (코드 정상) |
+| Notion property not found | Database에 필수 프로퍼티 미생성 | Briefing ID, Target Date 등 5개 프로퍼티 추가 | 환경 설정 이슈 (코드 정상) |
+
+두 이슈 모두 코드 버그가 아닌 **운영 환경 설정 이슈**이며, 설정 후 정상 동작 확인 완료.
 
 ---
 
