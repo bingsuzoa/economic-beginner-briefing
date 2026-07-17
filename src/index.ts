@@ -1,3 +1,6 @@
+import { pathToFileURL } from "node:url";
+import { main as runDailyBriefingCliMain } from "./cli/runDailyBriefingCli.js";
+
 // Domain types
 export type {
   ISODate,
@@ -84,6 +87,7 @@ export { MockBriefingPublisher } from "./publishers/mock/MockBriefingPublisher.j
 // App
 export { createApplication } from "./app/createApplication.js";
 export type { ApplicationDeps } from "./app/createApplication.js";
+export { createDefaultApplication } from "./app/createDefaultApplication.js";
 export { runDailyBriefing } from "./app/runDailyBriefing.js";
 
 // Config
@@ -100,3 +104,7 @@ export type { ErrorCode } from "./errors/errorCodes.js";
 export { getYesterdayDateInKST, getTargetDateStartKST, getTargetDateEndKST, validateISODate, nowISOStringKST } from "./utils/date.js";
 export { ok, err } from "./utils/result.js";
 export type { Result } from "./utils/result.js";
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  void runDailyBriefingCliMain();
+}
