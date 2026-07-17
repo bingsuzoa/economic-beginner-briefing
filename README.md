@@ -91,6 +91,67 @@ npm run lint
 npm run build
 ```
 
+## Admin Dashboard
+
+운영자가 브라우저에서 파이프라인 실행 상태를 확인하고 수동 실행할 수 있는 관리자 대시보드입니다.
+
+### 사전 요구사항
+
+- Node.js >= 20
+- PostgreSQL (Admin Dashboard 사용 시)
+
+### DB 설정
+
+```bash
+# .env 파일에 DB 정보 설정
+DATABASE_URL=postgresql://postgres:password@localhost:5432/economic_briefing
+# 또는 개별 변수 설정
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=economic_briefing
+DB_USER=postgres
+DB_PASSWORD=password
+
+# Admin 인증 토큰
+ADMIN_TOKEN=your-secret-admin-token
+ADMIN_PORT=3000
+```
+
+### DB 마이그레이션
+
+```bash
+npm run migrate        # 마이그레이션 적용
+npm run migrate down   # 마지막 마이그레이션 롤백
+```
+
+### Admin 서버 실행
+
+```bash
+npm run server
+# http://localhost:3000/admin 접속
+```
+
+### Admin Dashboard 기능
+
+- **메인 대시보드** (`/admin`): 서비스 상태, 수동 실행 버튼, 실행 이력 테이블
+- **실행 상세** (`/admin/run-detail.html?id=xxx`): 단계별 로그, 처리된 뉴스 목록
+- **뉴스 상세** (`/admin/item-detail.html?id=xxx`): 원문/AI 분석/Notion 결과 비교
+- **로그인** (`/admin/login.html`): ADMIN_TOKEN 기반 Bearer 토큰 인증
+
+### Admin API 엔드포인트
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | /api/admin/status | 서비스 상태 |
+| GET | /api/admin/runs | 실행 이력 목록 |
+| GET | /api/admin/runs/:runId | 실행 상세 |
+| GET | /api/admin/runs/:runId/logs | 실행 로그 |
+| GET | /api/admin/runs/:runId/items | 실행별 뉴스 |
+| POST | /api/admin/runs | 수동 실행 |
+| GET | /api/admin/items/:itemId | 뉴스 상세 |
+
+모든 API는 `Authorization: Bearer <ADMIN_TOKEN>` 헤더가 필요합니다.
+
 ## 완료 조건
 
 Foundation 브랜치는 다음 조건을 모두 만족해야 완료된 것으로 봅니다.
