@@ -86,6 +86,21 @@ export { createApplication } from "./app/createApplication.js";
 export type { ApplicationDeps } from "./app/createApplication.js";
 export { runDailyBriefing } from "./app/runDailyBriefing.js";
 
+// Pipeline validation
+export {
+  validateCollectResult,
+  validateAnalyzeResult,
+} from "./app/validatePipelineData.js";
+export type {
+  ValidationWarning,
+  CollectValidationResult,
+  AnalyzeValidationResult,
+} from "./app/validatePipelineData.js";
+
+// Execution tracking
+export type { ExecutionTracker } from "./app/ExecutionTracker.js";
+export { MockExecutionTracker } from "./app/ExecutionTracker.js";
+
 // Config
 export { loadEnv } from "./config/env.js";
 export type { AppEnv } from "./config/env.js";
