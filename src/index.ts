@@ -101,6 +101,12 @@ export { classifyCategories, containsExcludedTopic } from "./collectors/filters/
 export { removeDuplicates, normalizeUrl } from "./collectors/filters/duplicateRemover.js";
 export { validateQuality } from "./collectors/filters/qualityValidator.js";
 
+// Notion publisher
+export { NotionBriefingPublisher } from "./publishers/notion/NotionBriefingPublisher.js";
+export type { NotionBriefingPublisherOptions } from "./publishers/notion/NotionBriefingPublisher.js";
+export { NotionClientAdapter } from "./publishers/notion/NotionClientAdapter.js";
+export type { NotionBriefingPageClient, NotionBlock, NotionRichText, CreateNotionPageInput, NotionPageSummary } from "./publishers/notion/notionTypes.js";
+
 // OpenAI analyzer
 export { OpenAINewsAnalyzer } from "./analyzers/openai/OpenAINewsAnalyzer.js";
 export type { OpenAINewsAnalyzerOptions } from "./analyzers/openai/OpenAINewsAnalyzer.js";
