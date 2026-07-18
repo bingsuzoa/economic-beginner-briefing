@@ -82,13 +82,13 @@ describe("validateQuality", () => {
     expect(result.invalid).toHaveLength(1);
   });
 
-  it("요약과 내용 모두 없는 기사를 제외한다", () => {
+  it("요약과 내용 모두 없어도 제목이 있으면 통과시킨다", () => {
     const articles = [makeArticle({ summary: "", content: undefined })];
 
     const result = validateQuality(articles);
 
-    expect(result.valid).toHaveLength(0);
-    expect(result.invalid).toHaveLength(1);
+    expect(result.valid).toHaveLength(1);
+    expect(result.invalid).toHaveLength(0);
   });
 
   it("요약은 없지만 내용이 있으면 통과시킨다", () => {

@@ -45,7 +45,9 @@ export const PIPELINE_LOCK_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
 export const ADMIN_DEFAULT_PAGE_SIZE = 20;
 
 export const DIVERSITY = {
-  MAX_ARTICLES_PER_SOURCE: 5,
-  MAX_ARTICLES_PER_CATEGORY: 4,
-  MIN_PERSONAL_FINANCE_RELEVANCE: 2,
+  MAX_ARTICLES_PER_SOURCE: 3,
+  MAX_ARTICLES_PER_CATEGORY: 3,
+  MIN_PERSONAL_FINANCE_RELEVANCE: 3,
+  /** When an article scores at or above this threshold, it can exceed the per-category soft cap */
+  SOFT_MAX_OVERRIDE_SCORE: 5,
 } as const;

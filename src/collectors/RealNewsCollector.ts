@@ -14,6 +14,8 @@ import { HankyungSourceAdapter } from "./sources/HankyungSourceAdapter.js";
 import { MKSourceAdapter } from "./sources/MKSourceAdapter.js";
 import { SBSBizSourceAdapter } from "./sources/SBSBizSourceAdapter.js";
 import { SedailySourceAdapter } from "./sources/SedailySourceAdapter.js";
+import { NewsisSourceAdapter } from "./sources/NewsisSourceAdapter.js";
+import { MoneyTodaySourceAdapter } from "./sources/MoneyTodaySourceAdapter.js";
 
 /**
  * Creates the default set of source adapters.
@@ -25,6 +27,8 @@ export function createDefaultAdapters(): SourceAdapter[] {
     new MKSourceAdapter(),
     new SBSBizSourceAdapter(),
     new SedailySourceAdapter(),
+    new NewsisSourceAdapter(),
+    new MoneyTodaySourceAdapter(),
   ];
 }
 

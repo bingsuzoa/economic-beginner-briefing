@@ -7,6 +7,8 @@ export interface DiversitySelectionOptions {
   maxArticlesPerCategory?: number;
   minRelevanceScore?: number;
   maxTotal?: number;
+  /** Score threshold at or above which articles can exceed category soft cap */
+  softMaxOverrideScore?: number;
 }
 
 export interface DiversitySelectionResult {
@@ -27,10 +29,13 @@ export interface DiversitySelectionResult {
  * Selection priority:
  * 1. Relevance score (higher = better)
  * 2. Source diversity (cap per source)
- * 3. Category diversity (cap per category)
+ * 3. Category diversity (soft cap per category, overridable for high-score articles)
  *
  * Quality and relevance are prioritized; diversity acts as a tiebreaker
  * and prevents monopolization by a single source or category.
+ *
+ * Soft cap: The category limit is a soft cap. Articles with a relevance score
+ * at or above `softMaxOverrideScore` can exceed the category limit by 1.
  */
 export function selectWithDiversity(
   articles: Article[],
@@ -41,6 +46,7 @@ export function selectWithDiversity(
   const maxPerCategory = options.maxArticlesPerCategory ?? DIVERSITY.MAX_ARTICLES_PER_CATEGORY;
   const minRelevance = options.minRelevanceScore ?? DIVERSITY.MIN_PERSONAL_FINANCE_RELEVANCE;
   const maxTotal = options.maxTotal ?? Infinity;
+  const softMaxOverride = options.softMaxOverrideScore ?? DIVERSITY.SOFT_MAX_OVERRIDE_SCORE;
 
   const scoreMap = new Map<string, number>();
   for (const s of scores) {
@@ -79,7 +85,7 @@ export function selectWithDiversity(
       continue;
     }
 
-    // Check source limit
+    // Check source limit (hard cap)
     const sourceCount = sourceCounts[article.sourceName] ?? 0;
     if (sourceCount >= maxPerSource) {
       excluded.push(article);
@@ -87,11 +93,15 @@ export function selectWithDiversity(
       continue;
     }
 
-    // Check category limit - article passes if at least one category has room
+    // Check category limit - soft cap with override for high-score articles
     const articleCategories = article.categories.length > 0 ? article.categories : ["other" as NewsCategory];
-    const allCategoriesFull = articleCategories.every(
-      (cat) => (categoryCounts[cat] ?? 0) >= maxPerCategory,
-    );
+
+    const allCategoriesFull = articleCategories.every((cat) => {
+      const count = categoryCounts[cat] ?? 0;
+      // Soft cap: allow +1 overflow for high-score articles
+      const effectiveMax = relevance >= softMaxOverride ? maxPerCategory + 1 : maxPerCategory;
+      return count >= effectiveMax;
+    });
 
     if (allCategoriesFull) {
       excluded.push(article);

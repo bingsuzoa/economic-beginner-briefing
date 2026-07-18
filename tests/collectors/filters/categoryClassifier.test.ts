@@ -119,6 +119,42 @@ describe("classifyCategories", () => {
 
     expect(categories).toContain("government_support");
   });
+
+  it("재테크 키워드를 investment로 분류한다", () => {
+    const categories = classifyCategories(
+      "재테크 초보자를 위한 자산배분 전략",
+      "금융상품 비교 가이드",
+    );
+
+    expect(categories).toContain("investment");
+  });
+
+  it("생활비 관련 키워드를 cost_of_living으로 분류한다", () => {
+    const categories = classifyCategories(
+      "통신비 인상 소식",
+      "카드혜택 변경 안내",
+    );
+
+    expect(categories).toContain("cost_of_living");
+  });
+
+  it("부동산 공급 키워드를 housing으로 분류한다", () => {
+    const categories = classifyCategories(
+      "입주물량 감소로 주택공급 부족 우려",
+      "분양가 상승세 지속",
+    );
+
+    expect(categories).toContain("housing");
+  });
+
+  it("청년 지원 키워드를 government_support로 분류한다", () => {
+    const categories = classifyCategories(
+      "청년도약계좌 가입 자격 확대",
+      "주거급여 대상 넓어진다",
+    );
+
+    expect(categories).toContain("government_support");
+  });
 });
 
 describe("containsExcludedTopic", () => {

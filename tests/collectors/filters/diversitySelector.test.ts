@@ -182,4 +182,57 @@ describe("selectWithDiversity", () => {
 
     expect(result.selected[0].id).toBe("new");
   });
+
+  it("softMax: 높은 점수의 기사는 카테고리 제한을 1개 초과할 수 있다", () => {
+    // Create articles that fill the category limit
+    const articles = [
+      makeArticle({ id: "high-1", sourceName: "A", categories: ["housing"] }),
+      makeArticle({ id: "high-2", sourceName: "B", categories: ["housing"] }),
+      // This article has score 5 and should be allowed to exceed the limit by 1
+      makeArticle({ id: "critical", sourceName: "C", categories: ["housing"] }),
+      // This article has score 4 and should be excluded by the limit
+      makeArticle({ id: "normal", sourceName: "D", categories: ["housing"] }),
+    ];
+    const scores = [
+      makeScore("high-1", 5),
+      makeScore("high-2", 5),
+      makeScore("critical", 5),  // Should pass via soft max override
+      makeScore("normal", 4),     // Should be excluded
+    ];
+
+    const result = selectWithDiversity(articles, scores, {
+      maxArticlesPerCategory: 2,
+      maxArticlesPerSource: 10,
+      minRelevanceScore: 3,
+      softMaxOverrideScore: 5,
+    });
+
+    expect(result.selected).toHaveLength(3);
+    expect(result.selected.map((a) => a.id)).toContain("critical");
+    expect(result.excluded.map((a) => a.id)).toContain("normal");
+    expect(result.stats.excludedByCategoryLimit).toBe(1);
+  });
+
+  it("softMax: 일반 점수 기사는 카테고리 제한을 초과할 수 없다", () => {
+    const articles = [
+      makeArticle({ id: "a1", sourceName: "A", categories: ["loan"] }),
+      makeArticle({ id: "a2", sourceName: "B", categories: ["loan"] }),
+      makeArticle({ id: "a3", sourceName: "C", categories: ["loan"] }),
+    ];
+    const scores = [
+      makeScore("a1", 4),
+      makeScore("a2", 4),
+      makeScore("a3", 4),
+    ];
+
+    const result = selectWithDiversity(articles, scores, {
+      maxArticlesPerCategory: 2,
+      maxArticlesPerSource: 10,
+      minRelevanceScore: 3,
+      softMaxOverrideScore: 5,
+    });
+
+    expect(result.selected).toHaveLength(2);
+    expect(result.stats.excludedByCategoryLimit).toBe(1);
+  });
 });
