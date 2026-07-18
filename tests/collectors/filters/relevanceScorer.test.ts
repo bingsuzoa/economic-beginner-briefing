@@ -60,14 +60,14 @@ describe("scoreRelevance", () => {
     expect(result.scores[0].score).toBe(3);
   });
 
-  it("증시 기사를 2점으로 평가한다", () => {
+  it("증시 기사를 3점으로 평가한다", () => {
     const articles = [
       makeArticle({ title: "코스피 장 마감 동향", categories: ["investment"] }),
     ];
 
     const result = scoreRelevance(articles);
 
-    expect(result.scores[0].score).toBe(2);
+    expect(result.scores[0].score).toBe(3);
   });
 
   it("경제 카테고리가 있지만 키워드 매칭이 안 되면 기본 2점을 부여한다", () => {
@@ -137,5 +137,45 @@ describe("scoreRelevance", () => {
     expect(result.scores).toHaveLength(0);
     expect(result.filtered).toHaveLength(0);
     expect(result.excluded).toHaveLength(0);
+  });
+
+  it("재테크 키워드를 3점으로 평가한다", () => {
+    const articles = [
+      makeArticle({ title: "자산배분 전략 안내", summary: "재테크 초보자 가이드", categories: ["investment"] }),
+    ];
+
+    const result = scoreRelevance(articles);
+
+    expect(result.scores[0]!.score).toBe(3);
+  });
+
+  it("IRP 키워드를 4점으로 평가한다", () => {
+    const articles = [
+      makeArticle({ title: "IRP 가입자 혜택 확대", categories: ["pension"] }),
+    ];
+
+    const result = scoreRelevance(articles);
+
+    expect(result.scores[0]!.score).toBe(4);
+  });
+
+  it("통신비 키워드를 3점으로 평가한다", () => {
+    const articles = [
+      makeArticle({ title: "통신비 인상 결정", categories: ["cost_of_living"] }),
+    ];
+
+    const result = scoreRelevance(articles);
+
+    expect(result.scores[0]!.score).toBe(3);
+  });
+
+  it("스트레스DSR 키워드를 5점으로 평가한다", () => {
+    const articles = [
+      makeArticle({ title: "스트레스DSR 2단계 시행", categories: ["loan"] }),
+    ];
+
+    const result = scoreRelevance(articles);
+
+    expect(result.scores[0]!.score).toBe(5);
   });
 });

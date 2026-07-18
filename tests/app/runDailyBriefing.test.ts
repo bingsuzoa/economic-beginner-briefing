@@ -35,7 +35,9 @@ describe("runDailyBriefing", () => {
     expect(log.targetDate).toBe("2026-07-16");
     expect(log.collectedArticleCount).toBeGreaterThan(0);
     expect(log.selectedNewsCount).toBeGreaterThan(0);
-    expect(log.errors).toHaveLength(0);
+    // Filtering stats are logged as an informational entry
+    const realErrors = log.errors.filter((e) => e.code !== "COLLECT_FILTERING_STATS");
+    expect(realErrors).toHaveLength(0);
     expect(log.completedAt).toBeDefined();
   });
 

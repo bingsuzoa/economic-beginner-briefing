@@ -159,6 +159,25 @@ export async function runDailyBriefing(
 
   const articlesForAnalysis = diversityResult.selected;
 
+  // Log filtering statistics for debugging
+  const filteringStats = [
+    `validated=${validArticles.length}`,
+    `relevance_passed=${relevanceResult.filtered.length}`,
+    `relevance_excluded=${relevanceResult.excluded.length}`,
+    `diversity_selected=${diversityResult.selected.length}`,
+    `source_limit_excluded=${diversityResult.stats.excludedBySourceLimit}`,
+    `category_limit_excluded=${diversityResult.stats.excludedByCategoryLimit}`,
+    `by_source={${Object.entries(diversityResult.stats.bySource).map(([k, v]) => `${k}:${v}`).join(",")}}`,
+    `by_category={${Object.entries(diversityResult.stats.byCategory).map(([k, v]) => `${k}:${v}`).join(",")}}`,
+  ].join(", ");
+
+  errors.push({
+    stage: "collect" as const,
+    code: "COLLECT_FILTERING_STATS",
+    message: filteringStats,
+    retryable: false,
+  });
+
   if (articlesForAnalysis.length === 0 && validArticles.length > 0) {
     // All articles filtered out by relevance/diversity - fallback to top valid articles
     // This prevents empty results when relevance thresholds are too strict

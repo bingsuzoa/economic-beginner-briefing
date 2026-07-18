@@ -71,7 +71,11 @@ export abstract class BaseRSSAdapter implements SourceAdapter {
     const categories = this.determineCategories(title, summary);
     if (categories.length === 0) return null;
 
-    const isoPublishedAt = new Date(publishedAt).toISOString().replace("Z", "+09:00");
+    const publishedDate = new Date(publishedAt);
+    const kstOffsetMs = 9 * 60 * 60 * 1000;
+    const kstDate = new Date(publishedDate.getTime() + kstOffsetMs);
+    const iso = kstDate.toISOString(); // e.g., "2026-07-19T07:23:07.000Z"
+    const isoPublishedAt = iso.replace("Z", "+09:00"); // "2026-07-19T07:23:07.000+09:00"
 
     const raw: RawArticleData = {
       title,

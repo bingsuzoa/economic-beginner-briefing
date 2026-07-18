@@ -19,7 +19,6 @@ const MIN_TITLE_LENGTH = 5;
  * - Title is empty or shorter than MIN_TITLE_LENGTH
  * - URL is empty or invalid
  * - publishedAt is empty or unparseable
- * - Both summary and content are empty
  * - Title contains ad keywords
  */
 export function validateQuality(articles: Article[]): QualityValidationResult {
@@ -47,10 +46,6 @@ function isValidArticle(article: Article): boolean {
   }
 
   if (!article.publishedAt || Number.isNaN(new Date(article.publishedAt).getTime())) {
-    return false;
-  }
-
-  if (!article.summary && !article.content) {
     return false;
   }
 
