@@ -21,6 +21,16 @@ export const NewsEvidenceStatusSchema = z.enum(NewsEvidenceStatusValues);
 
 export type NewsEvidenceStatus = z.infer<typeof NewsEvidenceStatusSchema>;
 
+// --- ImpactScore ---
+
+export const ImpactScoreSchema = z.object({
+  target: z.string().min(1),
+  score: z.number().int().min(0).max(5),
+  reason: z.string().min(1),
+});
+
+export type ImpactScore = z.infer<typeof ImpactScoreSchema>;
+
 // --- EconomicTerm ---
 
 export const EconomicTermSchema = z.object({
@@ -59,6 +69,7 @@ export const AnalyzedNewsSchema = z.object({
   ]),
   relevanceReason: z.string().min(1),
 
+  impactAssessment: z.array(ImpactScoreSchema).optional(),
   oneLineSummary: z.string().min(1),
   explanation: z.string().min(1),
   expectedNextEffects: z.array(z.string()),

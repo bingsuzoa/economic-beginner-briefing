@@ -66,6 +66,7 @@ function mapAINewsToAnalyzedNews(
     category: aiNews.category,
     importance: aiNews.importance,
     relevanceReason: aiNews.relevanceReason,
+    impactAssessment: aiNews.impactAssessment,
     oneLineSummary: aiNews.oneLineSummary,
     explanation: aiNews.explanation,
     expectedNextEffects: aiNews.expectedNextEffects,

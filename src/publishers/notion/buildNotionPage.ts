@@ -1,4 +1,4 @@
-import type { AnalyzedNews, EconomicTerm } from "../../domain/analyzedNews.js";
+import type { AnalyzedNews, EconomicTerm, ImpactScore } from "../../domain/analyzedNews.js";
 import type { Briefing } from "../../domain/briefing.js";
 import type { NotionBlock, NotionRichText } from "./notionTypes.js";
 
@@ -45,6 +45,11 @@ function buildNewsBlocks(news: AnalyzedNews): NotionBlock[] {
     paragraph(`왜 중요한가: ${news.relevanceReason}`),
   ];
 
+  if (news.impactAssessment && news.impactAssessment.length > 0) {
+    blocks.push(heading3("영향도 평가"));
+    blocks.push(...buildImpactBlocks(news.impactAssessment));
+  }
+
   for (const explanationParagraph of news.explanation.split("\n\n")) {
     const trimmed = explanationParagraph.trim();
     if (trimmed.length === 0) {
@@ -90,6 +95,12 @@ function buildGlossaryBlocks(terms: EconomicTerm[]): NotionBlock[] {
     const example = term.example === undefined ? "" : ` 예: ${term.example}`;
     return bulletedListItem(`${term.term}: ${term.explanation}${example}`);
   });
+}
+
+function buildImpactBlocks(impacts: ImpactScore[]): NotionBlock[] {
+  return impacts.map((impact) =>
+    bulletedListItem(`${impact.target}: ${impact.score}/5점 — ${impact.reason}`),
+  );
 }
 
 function toBulletList(values: string[]): NotionBlock[] {
