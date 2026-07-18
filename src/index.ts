@@ -93,13 +93,18 @@ export { YonhapSourceAdapter } from "./collectors/sources/YonhapSourceAdapter.js
 export { HankyungSourceAdapter } from "./collectors/sources/HankyungSourceAdapter.js";
 export { MKSourceAdapter } from "./collectors/sources/MKSourceAdapter.js";
 export { SBSBizSourceAdapter } from "./collectors/sources/SBSBizSourceAdapter.js";
-export { KBSSourceAdapter } from "./collectors/sources/KBSSourceAdapter.js";
+export { SedailySourceAdapter } from "./collectors/sources/SedailySourceAdapter.js";
 
 // Filters
 export { filterByDate } from "./collectors/filters/dateFilter.js";
 export { classifyCategories, containsExcludedTopic } from "./collectors/filters/categoryClassifier.js";
-export { removeDuplicates, normalizeUrl } from "./collectors/filters/duplicateRemover.js";
+export { removeDuplicates, normalizeUrl, calculateSimilarity } from "./collectors/filters/duplicateRemover.js";
+export type { EnhancedDeduplicationResult, NewsEventGroup } from "./collectors/filters/duplicateRemover.js";
 export { validateQuality } from "./collectors/filters/qualityValidator.js";
+export { scoreRelevance } from "./collectors/filters/relevanceScorer.js";
+export type { RelevanceScore, RelevanceScoringResult } from "./collectors/filters/relevanceScorer.js";
+export { selectWithDiversity } from "./collectors/filters/diversitySelector.js";
+export type { DiversitySelectionOptions, DiversitySelectionResult } from "./collectors/filters/diversitySelector.js";
 
 // Notion publisher
 export { NotionBriefingPublisher } from "./publishers/notion/NotionBriefingPublisher.js";
@@ -164,7 +169,7 @@ export type { DbPool } from "./db/pool.js";
 // Config
 export { loadEnv } from "./config/env.js";
 export type { AppEnv } from "./config/env.js";
-export { TIMEZONE, DEFAULT_MAX_SELECTED_NEWS, DEFAULT_AUDIENCE, TIMEOUTS, RETRY, PIPELINE_LOCK_MAX_AGE_MS, ADMIN_DEFAULT_PAGE_SIZE } from "./config/constants.js";
+export { TIMEZONE, DEFAULT_MAX_SELECTED_NEWS, DEFAULT_AUDIENCE, TIMEOUTS, RETRY, PIPELINE_LOCK_MAX_AGE_MS, ADMIN_DEFAULT_PAGE_SIZE, DIVERSITY } from "./config/constants.js";
 
 // Errors
 export { AppError } from "./errors/AppError.js";

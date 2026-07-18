@@ -10,7 +10,7 @@ export class SBSBizSourceAdapter extends BaseRSSAdapter {
       sourceName: "SBS Biz",
       sourceType: "news_media",
       feedUrls: [
-        "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER",
+        "https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=02&plink=RSSREADER",
       ],
     });
   }

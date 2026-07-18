@@ -4,6 +4,7 @@ const CATEGORY_KEYWORDS: Record<NewsCategory, string[]> = {
   interest_rate: [
     "기준금리", "금리 인상", "금리 인하", "금리 동결", "한국은행 금리",
     "기준 금리", "금통위", "금융통화위원회", "콜금리", "시장금리",
+    "통화정책", "금리 전망", "금리 변동",
   ],
   deposit_saving: [
     "예금", "적금", "정기예금", "정기적금", "파킹통장", "CMA",
@@ -12,7 +13,7 @@ const CATEGORY_KEYWORDS: Record<NewsCategory, string[]> = {
   loan: [
     "대출", "주택담보대출", "신용대출", "전세대출", "대출금리",
     "LTV", "DSR", "DTI", "대출 규제", "대출 한도",
-    "주담대", "가계대출",
+    "주담대", "가계대출", "변동금리", "고정금리", "대환대출",
   ],
   housing: [
     "아파트", "주택", "부동산", "매매가", "집값",
@@ -55,7 +56,7 @@ const CATEGORY_KEYWORDS: Record<NewsCategory, string[]> = {
   investment: [
     "ETF", "펀드", "주식", "채권", "투자",
     "ISA", "증시", "코스피", "코스닥", "배당",
-    "주가", "시가총액", "상장",
+    "주가", "시가총액", "상장", "공모주", "리츠", "REIT",
   ],
   government_support: [
     "정부 지원", "지원금", "보조금", "바우처", "출산지원",

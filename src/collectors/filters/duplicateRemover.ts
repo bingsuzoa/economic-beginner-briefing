@@ -5,18 +5,33 @@ export interface DeduplicationResult {
   duplicates: Article[];
 }
 
+export interface NewsEventGroup {
+  representative: Article;
+  relatedArticles: Article[];
+  sourceNames: string[];
+}
+
+export interface EnhancedDeduplicationResult extends DeduplicationResult {
+  eventGroups: NewsEventGroup[];
+}
+
 /**
  * Removes duplicate articles based on:
  * 1. Normalized URL matching (strips tracking parameters)
  * 2. Article ID matching
  * 3. Same-source title similarity
+ *
+ * Additionally groups cross-source articles covering the same event,
+ * selecting a representative article based on content quality.
  */
-export function removeDuplicates(articles: Article[]): DeduplicationResult {
-  const unique: Article[] = [];
+export function removeDuplicates(articles: Article[]): EnhancedDeduplicationResult {
   const duplicates: Article[] = [];
   const seenUrls = new Set<string>();
   const seenIds = new Set<string>();
   const seenTitlesBySource = new Map<string, string[]>();
+
+  // Phase 1: Remove exact duplicates (same URL, same ID, same-source similar title)
+  const afterExactDedup: Article[] = [];
 
   for (const article of articles) {
     const normalizedUrl = normalizeUrl(article.url);
@@ -41,10 +56,111 @@ export function removeDuplicates(articles: Article[]): DeduplicationResult {
     seenUrls.add(normalizedUrl);
     sourceTitles.push(article.title);
     seenTitlesBySource.set(article.sourceName, sourceTitles);
-    unique.push(article);
+    afterExactDedup.push(article);
   }
 
-  return { unique, duplicates };
+  // Phase 2: Group cross-source articles covering the same event
+  const eventGroups = groupByEvent(afterExactDedup);
+
+  // Select representative from each group and collect unique articles
+  const unique: Article[] = [];
+  for (const group of eventGroups) {
+    unique.push(group.representative);
+    duplicates.push(...group.relatedArticles);
+  }
+
+  return { unique, duplicates, eventGroups };
+}
+
+/**
+ * Groups articles from different sources that cover the same event.
+ * Uses title similarity to determine if articles from different sources
+ * are about the same event.
+ */
+function groupByEvent(articles: Article[]): NewsEventGroup[] {
+  const groups: NewsEventGroup[] = [];
+  const assigned = new Set<number>();
+
+  for (let i = 0; i < articles.length; i++) {
+    if (assigned.has(i)) continue;
+
+    const articleI = articles[i]!;
+    const group: Article[] = [articleI];
+    assigned.add(i);
+
+    for (let j = i + 1; j < articles.length; j++) {
+      if (assigned.has(j)) continue;
+
+      const articleJ = articles[j]!;
+
+      // Only group articles from different sources
+      if (articleI.sourceName === articleJ.sourceName) continue;
+
+      const titleA = cleanTitleText(articleI.title);
+      const titleB = cleanTitleText(articleJ.title);
+
+      if (calculateSimilarity(titleA, titleB) > 0.8) {
+        group.push(articleJ);
+        assigned.add(j);
+      }
+    }
+
+    if (group.length === 1) {
+      // Single article, no grouping needed
+      groups.push({
+        representative: articleI,
+        relatedArticles: [],
+        sourceNames: [articleI.sourceName],
+      });
+    } else {
+      // Multiple articles about the same event: pick best representative
+      const sorted = [...group].sort((a, b) => scoreArticleQuality(b) - scoreArticleQuality(a));
+      const representative = sorted[0]!;
+      const related = sorted.slice(1);
+
+      groups.push({
+        representative,
+        relatedArticles: related,
+        sourceNames: group.map((a) => a.sourceName),
+      });
+    }
+  }
+
+  return groups;
+}
+
+/**
+ * Scores an article's quality for representative selection.
+ * Higher score = better representative.
+ */
+function scoreArticleQuality(article: Article): number {
+  let score = 0;
+
+  // Prefer articles with longer summary (more informative)
+  const summaryLength = article.summary?.length ?? 0;
+  score += Math.min(summaryLength / 50, 5); // up to 5 points for summary length
+
+  // Prefer articles with content
+  if (article.content) {
+    score += Math.min(article.content.length / 200, 3); // up to 3 points
+  }
+
+  // Prefer titles with specific numbers (more concrete)
+  if (/\d/.test(article.title)) {
+    score += 2;
+  }
+
+  // Penalize clickbait-style titles
+  if (/[!?]{2,}|충격|경악|헐|대박/.test(article.title)) {
+    score -= 3;
+  }
+
+  // Penalize very short titles
+  if (article.title.length < 15) {
+    score -= 1;
+  }
+
+  return score;
 }
 
 /**
@@ -107,7 +223,7 @@ function cleanTitleText(title: string): string {
  * Calculates character-level similarity between two strings.
  * Returns a value between 0 and 1.
  */
-function calculateSimilarity(a: string, b: string): number {
+export function calculateSimilarity(a: string, b: string): number {
   if (a === b) return 1;
   if (a.length === 0 || b.length === 0) return 0;
 

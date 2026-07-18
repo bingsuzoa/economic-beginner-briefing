@@ -3,7 +3,9 @@ import type { ExecutionLog } from "../domain/execution.js";
 import type { ExecutionError } from "../domain/execution.js";
 import { getHourlyTimeRange, nowISOStringKST, formatHourlyBriefingTitle } from "../utils/date.js";
 import type { HourlyTimeRange } from "../utils/date.js";
-import { DEFAULT_MAX_SELECTED_NEWS } from "../config/constants.js";
+import { DEFAULT_MAX_SELECTED_NEWS, DIVERSITY } from "../config/constants.js";
+import { scoreRelevance } from "../collectors/filters/relevanceScorer.js";
+import { selectWithDiversity } from "../collectors/filters/diversitySelector.js";
 import { AppError } from "../errors/AppError.js";
 import {
   validateCollectResult,
@@ -148,6 +150,35 @@ export async function runDailyBriefing(
 
   collectedArticleCount = validArticles.length;
 
+  // 1.7 Apply relevance scoring and diversity selection
+  const relevanceResult = scoreRelevance(validArticles, DIVERSITY.MIN_PERSONAL_FINANCE_RELEVANCE);
+  const diversityResult = selectWithDiversity(
+    relevanceResult.filtered,
+    relevanceResult.scores,
+  );
+
+  const articlesForAnalysis = diversityResult.selected;
+
+  if (articlesForAnalysis.length === 0 && validArticles.length > 0) {
+    // All articles filtered out by relevance/diversity - fallback to top valid articles
+    // This prevents empty results when relevance thresholds are too strict
+    const fallbackArticles = validArticles.slice(0, DEFAULT_MAX_SELECTED_NEWS);
+    articlesForAnalysis.push(...fallbackArticles);
+  }
+
+  if (articlesForAnalysis.length === 0) {
+    return {
+      executionId,
+      targetDate: date,
+      startedAt,
+      completedAt: nowISOStringKST(),
+      status: "success",
+      collectedArticleCount,
+      selectedNewsCount: 0,
+      errors: [],
+    };
+  }
+
   // 2. Analyze
   const briefingTitle = timeRange
     ? formatHourlyBriefingTitle(timeRange.targetDate, timeRange.hour)
@@ -157,7 +188,7 @@ export async function runDailyBriefing(
     try {
       return await deps.analyzer.analyze({
         targetDate: date,
-        articles: validArticles,
+        articles: articlesForAnalysis,
         maxSelectedNews: DEFAULT_MAX_SELECTED_NEWS,
         audience: deps.audience,
         briefingTitle,
