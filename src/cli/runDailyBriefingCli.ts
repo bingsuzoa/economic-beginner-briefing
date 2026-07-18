@@ -1,7 +1,9 @@
 import { createDefaultApplication } from "../app/createDefaultApplication.js";
 import { runDailyBriefing } from "../app/runDailyBriefing.js";
+import type { RunBriefingOptions } from "../app/runDailyBriefing.js";
 import { loadEnv } from "../config/env.js";
 import { parseSchedulerOptions } from "../scheduler/schedulerOptions.js";
+import { getHourlyTimeRange } from "../utils/date.js";
 
 export async function runDailyBriefingCli(
   argv: string[] = process.argv.slice(2),
@@ -11,13 +13,18 @@ export async function runDailyBriefingCli(
   const env = loadEnv(envSource);
   const app = createDefaultApplication(env);
 
-  const log = await runDailyBriefing(app, schedulerOptions.targetDate);
+  const options: RunBriefingOptions = schedulerOptions.targetDate
+    ? { targetDate: schedulerOptions.targetDate }
+    : { timeRange: getHourlyTimeRange() };
+
+  const log = await runDailyBriefing(app, options);
 
   const result = {
     scheduler: {
       mode: schedulerOptions.mode,
       timezone: "Asia/Seoul",
       requestedTargetDate: schedulerOptions.targetDate ?? null,
+      timeRange: options.timeRange ?? null,
     },
     execution: log,
   };

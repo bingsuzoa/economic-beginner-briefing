@@ -126,7 +126,7 @@ describe("Integration: Collection Failure", () => {
     expect(log.errors.length).toBeGreaterThan(0);
   });
 
-  it("should fail when collector returns 0 articles", async () => {
+  it("should succeed gracefully when collector returns 0 articles", async () => {
     const emptyCollector: NewsCollector = {
       async collect(request: CollectNewsRequest): Promise<CollectNewsResult> {
         return {
@@ -143,9 +143,10 @@ describe("Integration: Collection Failure", () => {
     const deps = createDeps({ collector: emptyCollector });
     const log = await runDailyBriefing(deps, TARGET_DATE);
 
-    expect(log.status).toBe("failed");
+    expect(log.status).toBe("success");
     expect(log.collectedArticleCount).toBe(0);
-    expect(log.errors.some((e) => e.code === "COLLECT_NO_ARTICLES")).toBe(true);
+    expect(log.selectedNewsCount).toBe(0);
+    expect(log.errors).toHaveLength(0);
   });
 });
 

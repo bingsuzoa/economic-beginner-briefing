@@ -1,5 +1,13 @@
 export const TIMEZONE = "Asia/Seoul" as const;
 
+export const KST_OFFSET_HOURS = 9;
+
+/** Cron expression: every hour at minute 0 (UTC) */
+export const SCHEDULER_CRON = "0 * * * *";
+
+/** Duration of one collection window in milliseconds (1 hour) */
+export const COLLECTION_WINDOW_MS = 60 * 60 * 1000;
+
 export const DEFAULT_MAX_SELECTED_NEWS = 10;
 
 export const DEFAULT_AUDIENCE = {

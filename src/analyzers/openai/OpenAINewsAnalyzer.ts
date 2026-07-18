@@ -60,6 +60,7 @@ export class OpenAINewsAnalyzer implements NewsAnalyzer {
       articles: request.articles,
       modelName: this.modelName,
       promptVersion: this.promptVersion,
+      briefingTitle: request.briefingTitle,
     });
 
     const briefingValidation = BriefingSchema.safeParse(briefing);

@@ -40,8 +40,8 @@ export class RealNewsCollector implements NewsCollector {
   }
 
   async collect(request: CollectNewsRequest): Promise<CollectNewsResult> {
-    const startTime = getTargetDateStartKST(request.targetDate);
-    const endTime = getTargetDateEndKST(request.targetDate);
+    const startTime = request.startTime ?? getTargetDateStartKST(request.targetDate);
+    const endTime = request.endTime ?? getTargetDateEndKST(request.targetDate);
 
     const sourceReports: SourceCollectionReport[] = [];
     let allArticles: Article[] = [];

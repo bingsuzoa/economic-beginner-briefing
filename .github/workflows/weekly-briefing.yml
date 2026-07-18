@@ -2,13 +2,13 @@ name: Daily Economic Briefing
 
 on:
   schedule:
-    # 매일 04:30 KST = 19:30 UTC
-    # GitHub Actions cron은 UTC 기준입니다.
-    - cron: "30 19 * * *"
+    # 매시 정각 실행 (UTC). KST = UTC + 9.
+    # 예: UTC 00:00 실행 → KST 09:00 실행 → 08:00~08:59 뉴스 수집
+    - cron: "0 * * * *"
   workflow_dispatch:
     inputs:
       target_date:
-        description: "수집 대상 날짜 (YYYY-MM-DD). 비워두면 어제 날짜(Asia/Seoul) 사용."
+        description: "수집 대상 날짜 (YYYY-MM-DD). 비워두면 직전 1시간 자동 수집."
         required: false
         type: string
       dry_run:
@@ -22,7 +22,7 @@ on:
 
 # 같은 workflow가 중복 실행되지 않도록 방지
 concurrency:
-  group: weekly-briefing
+  group: hourly-briefing
   cancel-in-progress: false
 
 jobs:

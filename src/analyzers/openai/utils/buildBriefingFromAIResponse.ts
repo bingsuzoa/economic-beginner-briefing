@@ -10,12 +10,13 @@ export interface BuildBriefingOptions {
   articles: Article[];
   modelName: string;
   promptVersion: string;
+  briefingTitle?: string;
 }
 
 export function buildBriefingFromAIResponse(
   options: BuildBriefingOptions,
 ): Briefing {
-  const { aiResponse, targetDate, articles, modelName, promptVersion } = options;
+  const { aiResponse, targetDate, articles, modelName, promptVersion, briefingTitle } = options;
 
   const articleMap = new Map(articles.map((a) => [a.id, a]));
 
@@ -35,7 +36,7 @@ export function buildBriefingFromAIResponse(
     id: `briefing-${targetDate}`,
     targetDate,
     generatedAt: nowISOStringKST(),
-    title: `${targetDate} 경제 브리핑`,
+    title: briefingTitle ?? `${targetDate} 경제 브리핑`,
     overallSummary: aiResponse.overallSummary,
     news,
     glossary: aiResponse.glossary,

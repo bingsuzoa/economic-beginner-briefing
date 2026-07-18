@@ -4,6 +4,8 @@ import type { PipelineRecorder } from "./PipelineRecorder.js";
 import type { TriggerType } from "../db/repositories/PipelineRunRepository.js";
 import type { ExecutionLog } from "../domain/execution.js";
 import { runDailyBriefing } from "../app/runDailyBriefing.js";
+import type { RunBriefingOptions } from "../app/runDailyBriefing.js";
+import { getHourlyTimeRange } from "../utils/date.js";
 
 export interface RunPipelineOptions {
   deps: ApplicationDeps;
@@ -38,7 +40,11 @@ export async function runPipeline(options: RunPipelineOptions): Promise<RunPipel
     await recorder.updateStep(runId, "COLLECT");
     await recorder.log(runId, "INFO", "COLLECT", "Starting collection");
 
-    const executionLog = await runDailyBriefing(deps, targetDate);
+    const briefingOptions: RunBriefingOptions = targetDate
+      ? { targetDate }
+      : { timeRange: getHourlyTimeRange() };
+
+    const executionLog = await runDailyBriefing(deps, briefingOptions);
 
     const collectedCount = executionLog.collectedArticleCount;
     const selectedCount = executionLog.selectedNewsCount;

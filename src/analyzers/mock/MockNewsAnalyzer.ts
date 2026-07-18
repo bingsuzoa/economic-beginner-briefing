@@ -132,7 +132,7 @@ export class MockNewsAnalyzer implements NewsAnalyzer {
       id: `briefing-${request.targetDate}`,
       targetDate: request.targetDate,
       generatedAt: nowISOStringKST(),
-      title: `${request.targetDate} 경제 브리핑`,
+      title: request.briefingTitle ?? `${request.targetDate} 경제 브리핑`,
       overallSummary: [
         "한국은행이 기준금리를 인하하면서 대출금리와 예금금리 모두 영향을 받을 전망입니다.",
         "전세보증금 별도관리 제도가 검토되고 있어 전세 시장에 변화가 있을 수 있습니다.",

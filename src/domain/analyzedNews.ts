@@ -90,6 +90,7 @@ export const AnalyzeNewsRequestSchema = z.object({
   articles: z.array(ArticleSchema),
   maxSelectedNews: z.number().int().positive(),
   audience: AudienceProfileSchema,
+  briefingTitle: z.string().optional(),
 });
 
 export interface AnalyzeNewsRequest {
@@ -97,6 +98,8 @@ export interface AnalyzeNewsRequest {
   articles: Article[];
   maxSelectedNews: number;
   audience: AudienceProfile;
+  /** Optional custom title for the briefing (e.g., hourly title). */
+  briefingTitle?: string;
 }
 
 // --- AnalyzeNewsResult ---
