@@ -266,6 +266,25 @@ export async function runDailyBriefing(
     return log;
   }
 
+  // Record publish channel results as errors for visibility
+  for (const r of publishResult.results) {
+    if (r.status === "failed") {
+      errors.push({
+        stage: "publish",
+        code: r.errorCode ?? "PUBLISH_CHANNEL_ERROR",
+        message: r.errorMessage ?? `${r.channel} publish failed`,
+        retryable: false,
+      });
+    } else if (r.status === "skipped" && r.errorCode) {
+      errors.push({
+        stage: "publish",
+        code: r.errorCode,
+        message: r.errorMessage ?? `${r.channel} publish skipped`,
+        retryable: false,
+      });
+    }
+  }
+
   // Determine final status
   const allSucceeded = publishResult.results.every(
     (r) => r.status === "success" || r.status === "skipped",
