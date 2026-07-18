@@ -1,18 +1,70 @@
 import type { ApplicationDeps } from "./createApplication.js";
 import type { ExecutionLog } from "../domain/execution.js";
 import type { ExecutionError } from "../domain/execution.js";
-import { getYesterdayDateInKST, nowISOStringKST } from "../utils/date.js";
+import { getHourlyTimeRange, nowISOStringKST, formatHourlyBriefingTitle } from "../utils/date.js";
+import type { HourlyTimeRange } from "../utils/date.js";
 import { DEFAULT_MAX_SELECTED_NEWS } from "../config/constants.js";
 import { AppError } from "../errors/AppError.js";
+import {
+  validateCollectResult,
+  validateAnalyzeResult,
+} from "./validatePipelineData.js";
+import type { ValidationWarning } from "./validatePipelineData.js";
+
+function warningsToErrors(warnings: ValidationWarning[]): ExecutionError[] {
+  return warnings.map((w) => ({
+    stage: w.stage,
+    code: "ANALYZE_VALIDATION_ERROR",
+    message: w.message,
+    retryable: false,
+  }));
+}
+
+export interface RunBriefingOptions {
+  /** Override target date (YYYY-MM-DD). Used in daily/manual mode. */
+  targetDate?: string;
+  /** Explicit hourly time range. If provided, uses hourly mode. */
+  timeRange?: HourlyTimeRange;
+}
 
 export async function runDailyBriefing(
   deps: ApplicationDeps,
-  targetDate?: string,
+  targetDateOrOptions?: string | RunBriefingOptions,
 ): Promise<ExecutionLog> {
+  const options: RunBriefingOptions =
+    typeof targetDateOrOptions === "string"
+      ? { targetDate: targetDateOrOptions }
+      : targetDateOrOptions ?? {};
+
+  // When targetDate is explicitly set (manual mode), use full-day range (no timeRange).
+  // When timeRange is set, use hourly mode.
+  // Default (no options): compute hourly time range from current time.
+  const timeRange = options.targetDate ? undefined : (options.timeRange ?? getHourlyTimeRange());
+  const date = options.targetDate ?? (timeRange?.targetDate ?? getHourlyTimeRange().targetDate);
   const executionId = `exec-${Date.now()}`;
-  const date = targetDate ?? getYesterdayDateInKST();
   const startedAt = nowISOStringKST();
   const errors: ExecutionError[] = [];
+
+  // 0. Check duplicate execution
+  const dedupeKey = timeRange
+    ? `${timeRange.targetDate}T${String(timeRange.hour).padStart(2, "0")}`
+    : date;
+
+  if (deps.executionTracker) {
+    const decision = await deps.executionTracker.checkDuplicate(dedupeKey);
+    if (decision === "skip_already_published") {
+      return {
+        executionId,
+        targetDate: date,
+        startedAt,
+        completedAt: nowISOStringKST(),
+        status: "success",
+        collectedArticleCount: 0,
+        selectedNewsCount: 0,
+        errors: [],
+      };
+    }
+  }
 
   // 1. Collect
   let collectedArticleCount = 0;
@@ -21,6 +73,8 @@ export async function runDailyBriefing(
       return await deps.collector.collect({
         targetDate: date,
         timezone: "Asia/Seoul",
+        startTime: timeRange?.startTime,
+        endTime: timeRange?.endTime,
       });
     } catch (e) {
       const appErr =
@@ -38,7 +92,40 @@ export async function runDailyBriefing(
     }
   })();
 
+  // When no articles found in the hourly window, succeed gracefully
   if (!collectResult || collectResult.articles.length === 0) {
+    if (collectResult && collectResult.articles.length === 0) {
+      // No articles in this time window - this is normal for hourly mode
+      return {
+        executionId,
+        targetDate: date,
+        startedAt,
+        completedAt: nowISOStringKST(),
+        status: "success",
+        collectedArticleCount: 0,
+        selectedNewsCount: 0,
+        errors: [],
+      };
+    }
+    // Collection failed (exception was thrown)
+    return {
+      executionId,
+      targetDate: date,
+      startedAt,
+      completedAt: nowISOStringKST(),
+      status: "failed",
+      collectedArticleCount: 0,
+      selectedNewsCount: 0,
+      errors,
+    };
+  }
+
+  // 1.5 Validate collect result
+  const collectValidation = validateCollectResult(collectResult, date);
+  errors.push(...warningsToErrors(collectValidation.warnings));
+
+  const validArticles = collectValidation.validArticles;
+  if (validArticles.length === 0) {
     return {
       executionId,
       targetDate: date,
@@ -49,30 +136,31 @@ export async function runDailyBriefing(
       selectedNewsCount: 0,
       errors: [
         ...errors,
-        ...(collectResult && collectResult.articles.length === 0
-          ? [
-              {
-                stage: "collect" as const,
-                code: "COLLECT_NO_ARTICLES",
-                message: "No articles collected",
-                retryable: false,
-              },
-            ]
-          : []),
+        {
+          stage: "collect" as const,
+          code: "COLLECT_NO_ARTICLES",
+          message: "No valid articles after validation",
+          retryable: false,
+        },
       ],
     };
   }
 
-  collectedArticleCount = collectResult.articles.length;
+  collectedArticleCount = validArticles.length;
 
   // 2. Analyze
+  const briefingTitle = timeRange
+    ? formatHourlyBriefingTitle(timeRange.targetDate, timeRange.hour)
+    : undefined;
+
   const analyzeResult = await (async () => {
     try {
       return await deps.analyzer.analyze({
         targetDate: date,
-        articles: collectResult.articles,
+        articles: validArticles,
         maxSelectedNews: DEFAULT_MAX_SELECTED_NEWS,
         audience: deps.audience,
+        briefingTitle,
       });
     } catch (e) {
       const appErr =
@@ -91,7 +179,7 @@ export async function runDailyBriefing(
   })();
 
   if (!analyzeResult) {
-    return {
+    const log: ExecutionLog = {
       executionId,
       targetDate: date,
       startedAt,
@@ -101,6 +189,39 @@ export async function runDailyBriefing(
       selectedNewsCount: 0,
       errors,
     };
+    if (deps.executionTracker) {
+      await deps.executionTracker.recordExecution(log);
+    }
+    return log;
+  }
+
+  // 2.5 Validate analyze result
+  const analyzeValidation = validateAnalyzeResult(analyzeResult, date);
+  errors.push(...warningsToErrors(analyzeValidation.warnings));
+
+  if (!analyzeValidation.valid) {
+    const log: ExecutionLog = {
+      executionId,
+      targetDate: date,
+      startedAt,
+      completedAt: nowISOStringKST(),
+      status: "failed",
+      collectedArticleCount,
+      selectedNewsCount: 0,
+      errors: [
+        ...errors,
+        {
+          stage: "analyze" as const,
+          code: "ANALYZE_EMPTY_INPUT",
+          message: "No valid news in briefing after validation",
+          retryable: false,
+        },
+      ],
+    };
+    if (deps.executionTracker) {
+      await deps.executionTracker.recordExecution(log);
+    }
+    return log;
   }
 
   // 3. Publish
@@ -129,7 +250,7 @@ export async function runDailyBriefing(
   const selectedNewsCount = analyzeResult.briefing.news.length;
 
   if (!publishResult) {
-    return {
+    const log: ExecutionLog = {
       executionId,
       targetDate: date,
       startedAt,
@@ -139,6 +260,10 @@ export async function runDailyBriefing(
       selectedNewsCount,
       errors,
     };
+    if (deps.executionTracker) {
+      await deps.executionTracker.recordExecution(log);
+    }
+    return log;
   }
 
   // Determine final status
@@ -158,7 +283,7 @@ export async function runDailyBriefing(
     status = "partial_success";
   }
 
-  return {
+  const log: ExecutionLog = {
     executionId,
     targetDate: date,
     startedAt,
@@ -168,4 +293,10 @@ export async function runDailyBriefing(
     selectedNewsCount,
     errors,
   };
+
+  if (deps.executionTracker) {
+    await deps.executionTracker.recordExecution(log);
+  }
+
+  return log;
 }

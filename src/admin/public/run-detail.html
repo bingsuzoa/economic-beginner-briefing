@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>실행 상세 - Admin Dashboard</title>
+  <link rel="stylesheet" href="/admin/css/styles.css">
+</head>
+<body>
+  <div class="header">
+    <h1>실행 상세</h1>
+    <div class="header-actions">
+      <button class="btn btn-sm" onclick="refresh()">새로고침</button>
+      <button class="btn btn-sm" onclick="logout()">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <a href="/admin/" class="back-link">&larr; 대시보드로 돌아가기</a>
+
+    <div id="content">
+      <div class="loading"><div class="spinner"></div><p>로딩 중...</p></div>
+    </div>
+
+    <!-- Logs Section -->
+    <div class="card section" id="logs-section" style="display:none">
+      <div class="section-header">
+        <h2>실행 로그</h2>
+        <div class="filters">
+          <select id="log-level" onchange="loadLogs()">
+            <option value="">전체 레벨</option>
+            <option value="INFO">INFO</option>
+            <option value="WARN">WARN</option>
+            <option value="ERROR">ERROR</option>
+          </select>
+          <select id="log-step" onchange="loadLogs()">
+            <option value="">전체 단계</option>
+            <option value="INIT">INIT</option>
+            <option value="COLLECT">COLLECT</option>
+            <option value="DEDUPLICATE">DEDUPLICATE</option>
+            <option value="ANALYZE">ANALYZE</option>
+            <option value="PUBLISH">PUBLISH</option>
+            <option value="COMPLETE">COMPLETE</option>
+          </select>
+        </div>
+      </div>
+      <div id="logs-content"></div>
+    </div>
+
+    <!-- Items Section -->
+    <div class="card section" id="items-section" style="display:none">
+      <div class="section-header">
+        <h2>처리된 뉴스</h2>
+        <div class="filters">
+          <select id="item-analysis" onchange="loadItems()">
+            <option value="">전체 AI 상태</option>
+            <option value="SUCCESS">성공</option>
+            <option value="FAILED">실패</option>
+            <option value="PENDING">대기</option>
+            <option value="SKIPPED">건너뜀</option>
+          </select>
+          <select id="item-publish" onchange="loadItems()">
+            <option value="">전체 발행 상태</option>
+            <option value="SUCCESS">성공</option>
+            <option value="FAILED">실패</option>
+            <option value="PENDING">대기</option>
+            <option value="SKIPPED">건너뜀</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>제목</th>
+              <th>출처</th>
+              <th>중복</th>
+              <th>AI 상태</th>
+              <th>발행 상태</th>
+            </tr>
+          </thead>
+          <tbody id="items-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="/admin/js/api.js"></script>
+  <script src="/admin/js/utils.js"></script>
+  <script src="/admin/js/run-detail.js"></script>
+</body>
+</html>

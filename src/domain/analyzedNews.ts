@@ -60,13 +60,7 @@ export const AnalyzedNewsSchema = z.object({
   relevanceReason: z.string().min(1),
 
   oneLineSummary: z.string().min(1),
-  whatHappened: z.string().min(1),
-  previousSituation: z.string().min(1),
-  whatChanged: z.string().min(1),
-  whyItChanged: z.string().min(1),
-
-  householdImpact: z.string().min(1),
-  newlywedHousingImpact: z.string().min(1),
+  explanation: z.string().min(1),
   expectedNextEffects: z.array(z.string()),
   recommendedChecks: z.array(z.string()),
 
@@ -96,6 +90,7 @@ export const AnalyzeNewsRequestSchema = z.object({
   articles: z.array(ArticleSchema),
   maxSelectedNews: z.number().int().positive(),
   audience: AudienceProfileSchema,
+  briefingTitle: z.string().optional(),
 });
 
 export interface AnalyzeNewsRequest {
@@ -103,6 +98,8 @@ export interface AnalyzeNewsRequest {
   articles: Article[];
   maxSelectedNews: number;
   audience: AudienceProfile;
+  /** Optional custom title for the briefing (e.g., hourly title). */
+  briefingTitle?: string;
 }
 
 // --- AnalyzeNewsResult ---

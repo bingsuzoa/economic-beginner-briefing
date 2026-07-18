@@ -39,7 +39,7 @@ describe("runDailyBriefing", () => {
     expect(log.completedAt).toBeDefined();
   });
 
-  it("should fail safely when 0 articles collected", async () => {
+  it("should succeed gracefully when 0 articles collected (hourly mode)", async () => {
     const emptyCollector: NewsCollector = {
       async collect(request: CollectNewsRequest): Promise<CollectNewsResult> {
         return {
@@ -56,9 +56,10 @@ describe("runDailyBriefing", () => {
     const deps = createDeps({ collector: emptyCollector });
     const log = await runDailyBriefing(deps, "2026-07-16");
 
-    expect(log.status).toBe("failed");
+    expect(log.status).toBe("success");
     expect(log.collectedArticleCount).toBe(0);
-    expect(log.errors.some((e) => e.code === "COLLECT_NO_ARTICLES")).toBe(true);
+    expect(log.selectedNewsCount).toBe(0);
+    expect(log.errors).toHaveLength(0);
   });
 
   it("should handle collector error gracefully", async () => {

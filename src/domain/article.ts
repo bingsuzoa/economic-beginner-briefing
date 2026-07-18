@@ -84,6 +84,10 @@ export const CollectNewsRequestSchema = z.object({
   targetDate: ISODateSchema,
   timezone: z.literal("Asia/Seoul"),
   maxArticles: z.number().int().positive().optional(),
+  /** Explicit start of collection window (ISO datetime). Overrides targetDate-based range. */
+  startTime: ISODateTimeSchema.optional(),
+  /** Explicit end of collection window (ISO datetime). Overrides targetDate-based range. */
+  endTime: ISODateTimeSchema.optional(),
 });
 
 export type CollectNewsRequest = z.infer<typeof CollectNewsRequestSchema>;
