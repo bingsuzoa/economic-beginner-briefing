@@ -24,7 +24,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<RunPipel
   const { deps, lock, recorder, triggerType, targetDate } = options;
   const runId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const acquired = await lock.acquire(runId);
+  const acquired = await lock.acquire(runId, triggerType);
   if (!acquired) {
     return {
       success: false,

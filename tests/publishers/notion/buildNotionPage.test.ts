@@ -16,7 +16,7 @@ describe("buildNotionBriefingBlocks", () => {
     });
     expect(blocks.some((block) => block.type === "divider")).toBe(true);
     expect(JSON.stringify(blocks)).toContain("전세보증금 별도 관리 방안 검토");
-    expect(JSON.stringify(blocks)).toContain("신혼부부/주거 준비 가정 영향");
+    expect(JSON.stringify(blocks)).toContain("전세사기와 보증금 미반환 위험");
     expect(JSON.stringify(blocks)).toContain("https://example.com/news/1");
   });
 

@@ -166,13 +166,7 @@ export interface AnalyzedNews {
   relevanceReason: string;
 
   oneLineSummary: string;
-  whatHappened: string;
-  previousSituation: string;
-  whatChanged: string;
-  whyItChanged: string;
-
-  householdImpact: string;
-  newlywedHousingImpact: string;
+  explanation: string;
   expectedNextEffects: string[];
   recommendedChecks: string[];
 

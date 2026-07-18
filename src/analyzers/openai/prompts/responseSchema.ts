@@ -27,13 +27,7 @@ const AIAnalyzedNewsSchema = z.object({
   relevanceReason: z.string().min(1),
 
   oneLineSummary: z.string().min(1),
-  whatHappened: z.string().min(1),
-  previousSituation: z.string().min(1),
-  whatChanged: z.string().min(1),
-  whyItChanged: z.string().min(1),
-
-  householdImpact: z.string().min(1),
-  newlywedHousingImpact: z.string().min(1),
+  explanation: z.string().min(1),
   expectedNextEffects: z.array(z.string()),
   recommendedChecks: z.array(z.string()),
 

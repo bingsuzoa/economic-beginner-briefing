@@ -42,19 +42,14 @@ function buildNewsBlocks(news: AnalyzedNews): NotionBlock[] {
     divider(),
     heading3(`${news.representativeTitle} (중요도 ${news.importance}/5)`),
     paragraph(`한 줄 결론: ${news.oneLineSummary}`),
-    paragraph(`카테고리: ${news.category}`),
-    paragraph(`사실 상태: ${news.evidenceStatus}`),
     paragraph(`왜 중요한가: ${news.relevanceReason}`),
-    paragraph(`무슨 일이 있었나: ${news.whatHappened}`),
-    paragraph(`기존에는: ${news.previousSituation}`),
-    paragraph(`달라지는 점: ${news.whatChanged}`),
-    paragraph(`왜 바뀌었나: ${news.whyItChanged}`),
-    paragraph(`일반 가정 영향: ${news.householdImpact}`),
-    paragraph(`신혼부부/주거 준비 가정 영향: ${news.newlywedHousingImpact}`),
   ];
 
-  if (news.uncertaintyNote !== undefined) {
-    blocks.push(paragraph(`불확실한 점: ${news.uncertaintyNote}`));
+  for (const explanationParagraph of news.explanation.split("\n\n")) {
+    const trimmed = explanationParagraph.trim();
+    if (trimmed.length > 0) {
+      blocks.push(paragraph(trimmed));
+    }
   }
 
   blocks.push(heading3("앞으로 지켜볼 내용"));

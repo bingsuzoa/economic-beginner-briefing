@@ -22,12 +22,7 @@ async function loadItem(itemId) {
         <div class="detail-grid">
           ${r.representativeTitle ? `<div class="detail-item" style="grid-column:1/-1"><div class="label">AI 제목</div><div class="value">${escapeHtml(r.representativeTitle)}</div></div>` : ''}
           ${r.oneLineSummary ? `<div class="detail-item" style="grid-column:1/-1"><div class="label">한줄 요약</div><div class="value">${escapeHtml(r.oneLineSummary)}</div></div>` : ''}
-          ${r.whatHappened ? `<div class="detail-item" style="grid-column:1/-1"><div class="label">무슨 일이 발생했는지</div><div class="value">${escapeHtml(r.whatHappened)}</div></div>` : ''}
-          ${r.previousSituation ? `<div class="detail-item" style="grid-column:1/-1"><div class="label">기존 상황</div><div class="value">${escapeHtml(r.previousSituation)}</div></div>` : ''}
-          ${r.whatChanged ? `<div class="detail-item" style="grid-column:1/-1"><div class="label">변경사항</div><div class="value">${escapeHtml(r.whatChanged)}</div></div>` : ''}
-          ${r.whyItChanged ? `<div class="detail-item" style="grid-column:1/-1"><div class="label">변경 이유</div><div class="value">${escapeHtml(r.whyItChanged)}</div></div>` : ''}
-          ${r.householdImpact ? `<div class="detail-item"><div class="label">가정 영향</div><div class="value">${escapeHtml(r.householdImpact)}</div></div>` : ''}
-          ${r.newlywedHousingImpact ? `<div class="detail-item"><div class="label">신혼부부 영향</div><div class="value">${escapeHtml(r.newlywedHousingImpact)}</div></div>` : ''}
+          ${r.explanation ? `<div class="detail-item" style="grid-column:1/-1"><div class="label">해설</div><div class="value" style="white-space:pre-wrap">${escapeHtml(r.explanation)}</div></div>` : ''}
           ${r.importance ? `<div class="detail-item"><div class="label">중요도</div><div class="value">${r.importance}/5</div></div>` : ''}
           ${r.category ? `<div class="detail-item"><div class="label">카테고리</div><div class="value">${escapeHtml(r.category)}</div></div>` : ''}
         </div>

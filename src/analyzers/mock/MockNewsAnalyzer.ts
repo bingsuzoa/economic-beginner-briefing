@@ -8,12 +8,7 @@ function articleToAnalyzedNews(article: Article, index: number) {
   const analysisMap: Record<
     string,
     {
-      whatHappened: string;
-      previousSituation: string;
-      whatChanged: string;
-      whyItChanged: string;
-      householdImpact: string;
-      newlywedHousingImpact: string;
+      explanation: string;
       expectedNextEffects: string[];
       recommendedChecks: string[];
       evidenceStatus: "confirmed" | "proposed" | "expected";
@@ -21,18 +16,8 @@ function articleToAnalyzedNews(article: Article, index: number) {
     }
   > = {
     "mock-article-001": {
-      whatHappened:
-        "한국은행이 기준금리를 연 3.25%에서 3.00%로 0.25%포인트 내렸습니다.",
-      previousSituation:
-        "기준금리가 연 3.25%로 유지되고 있었습니다. 시중은행의 대출금리와 예금금리는 이 기준금리에 연동되어 움직입니다.",
-      whatChanged:
-        "기준금리가 0.25%포인트 내려 연 3.00%가 되었습니다. 이에 따라 은행들의 대출금리와 예금금리도 낮아질 가능성이 있습니다.",
-      whyItChanged:
-        "경기 둔화 우려와 물가 안정세를 고려한 한국은행의 판단입니다.",
-      householdImpact:
-        "변동금리 대출을 가진 가계는 이자 부담이 줄어들 수 있습니다. 반면 예금이나 적금에 돈을 넣어둔 경우 이자 수입이 줄어들 수 있습니다.",
-      newlywedHousingImpact:
-        "주택담보대출을 준비하는 신혼부부에게 유리할 수 있습니다. 대출금리가 낮아지면 같은 금액을 빌려도 매달 갚는 이자가 줄어들기 때문입니다.",
+      explanation:
+        "한국은행 금융통화위원회가 기준금리를 연 3.25%에서 3.00%로 0.25%포인트 내렸습니다. 경기 둔화 우려와 물가 안정세를 고려한 판단인데요, 쉽게 말해 경제가 좀 힘들어지고 있으니 돈을 빌리는 비용을 낮춰서 경기를 살려보자는 의도입니다.\n\n그동안 기준금리가 3.25%로 유지되면서 시중은행의 대출금리와 예금금리도 이에 맞춰 움직이고 있었습니다. 이번 인하로 은행들의 대출금리와 예금금리도 점진적으로 조정될 것으로 보입니다.\n\n일반 가정에서는 변동금리 대출을 가지고 계신 분들의 이자 부담이 줄어들 수 있습니다. 반면 예금이나 적금에 돈을 넣어두신 분들은 이자 수입이 줄어들 수 있어요. 대출이 있으신 분과 저축을 하시는 분 입장이 다른 셈이죠.\n\n주택담보대출을 준비하는 신혼부부에게는 유리한 소식입니다. 대출금리가 낮아지면 같은 금액을 빌려도 매달 갚는 이자가 줄어들기 때문입니다. 다만 부동산 시장에서 매수 심리가 되살아날 가능성도 있어서, 집값 변동도 함께 지켜봐야 합니다.",
       expectedNextEffects: [
         "시중은행 대출금리가 점진적으로 내려갈 가능성이 있습니다.",
         "정기예금 금리도 함께 내려갈 수 있습니다.",
@@ -54,18 +39,8 @@ function articleToAnalyzedNews(article: Article, index: number) {
       ],
     },
     "mock-article-002": {
-      whatHappened:
-        "금융위원회가 전세보증금을 집주인이 아닌 별도 기관에서 관리하는 방안을 검토하기 시작했습니다.",
-      previousSituation:
-        "기존에는 세입자가 집주인에게 전세보증금을 직접 지급하면, 집주인이 이 돈을 자유롭게 보유하고 활용할 수 있었습니다.",
-      whatChanged:
-        "새 제도가 도입되면 전세보증금이 별도 기관이나 계좌에서 관리될 가능성이 있습니다. 세입자의 보증금 반환 안전성이 높아질 수 있습니다.",
-      whyItChanged:
-        "전세 사기와 보증금 미반환 피해가 사회적 문제로 대두되었기 때문입니다.",
-      householdImpact:
-        "세입자는 보증금을 돌려받지 못할 위험이 줄어들 수 있습니다. 반면 집주인은 보증금을 다른 용도로 활용하기 어려워질 수 있습니다.",
-      newlywedHousingImpact:
-        "전세를 준비하는 신혼부부에게는 보증금 안전성이 높아지는 긍정적 변화일 수 있습니다. 다만 일부 집주인이 전세 대신 월세를 선택할 가능성도 있습니다.",
+      explanation:
+        "금융위원회가 전세보증금을 집주인이 아닌 별도 기관에서 관리하는 방안을 검토하기 시작했습니다. 최근 전세 사기와 보증금 미반환 피해가 사회적 문제로 대두되면서, 세입자의 보증금을 더 안전하게 보호할 방법을 찾고 있는 겁니다.\n\n기존에는 세입자가 집주인에게 전세보증금을 직접 지급하면, 집주인이 이 돈을 자유롭게 보유하고 활용할 수 있었습니다. 새 제도가 도입되면 전세보증금이 별도 기관이나 계좌에서 관리될 가능성이 있어요.\n\n세입자 입장에서는 보증금을 돌려받지 못할 위험이 줄어들 수 있습니다. 반면 집주인은 보증금을 다른 용도로 활용하기 어려워질 수 있고, 이에 따라 일부 집주인이 전세 대신 월세를 선택할 가능성도 있습니다.\n\n전세를 준비하는 신혼부부에게는 보증금 안전성이 높아지는 긍정적 변화일 수 있습니다. 다만 전세 물건의 공급이 줄어들 수도 있으니, 아직 확정된 제도는 아닌 만큼 정책 확정 전까지 계약 조건을 단정하지 않는 것이 좋겠습니다.",
       expectedNextEffects: [
         "전세 사기 피해가 줄어들 가능성이 있습니다.",
         "일부 집주인이 전세 대신 월세를 선호할 수 있습니다.",
@@ -87,18 +62,8 @@ function articleToAnalyzedNews(article: Article, index: number) {
       ],
     },
     "mock-article-003": {
-      whatHappened:
-        "KB국민, 신한, 우리 등 주요 시중은행이 정기예금 금리를 0.1~0.2%포인트 인하했습니다.",
-      previousSituation:
-        "주요 은행의 1년 만기 정기예금 금리는 약 3.5% 수준이었습니다.",
-      whatChanged:
-        "기준금리 인하 영향으로 정기예금 금리가 3.3~3.4% 수준으로 내려갔습니다.",
-      whyItChanged:
-        "한국은행이 기준금리를 인하하면서 은행들의 자금 조달 비용이 낮아졌기 때문입니다.",
-      householdImpact:
-        "예금으로 이자 수입을 얻고 있는 가계는 수익이 줄어들 수 있습니다. 반면 대출금리도 함께 내려갈 수 있어 대출자에게는 유리합니다.",
-      newlywedHousingImpact:
-        "결혼 자금을 예금에 넣어둔 경우 이자 수입이 다소 줄어들 수 있습니다. 주택 구입용 대출 금리도 내려갈 수 있으니 비교 검토가 필요합니다.",
+      explanation:
+        "KB국민, 신한, 우리 등 주요 시중은행이 정기예금 금리를 0.1~0.2%포인트 인하했습니다. 한국은행이 기준금리를 내리면서 은행들의 자금 조달 비용이 낮아졌고, 이에 따라 예금금리도 함께 내려간 겁니다.\n\n그동안 주요 은행의 1년 만기 정기예금 금리는 약 3.5% 수준이었는데, 이번에 3.3~3.4% 수준으로 내려갔습니다. 기준금리와 예금금리는 보통 같은 방향으로 움직이기 때문에 예상된 변화라고 할 수 있습니다.\n\n예금으로 이자 수입을 얻고 있는 가계는 수익이 줄어들 수 있습니다. 반면 대출금리도 함께 내려갈 수 있어서, 대출을 가지고 계신 분들에게는 오히려 유리한 상황이에요.\n\n결혼 자금을 예금에 넣어둔 신혼부부라면 이자 수입이 다소 줄어들 수 있습니다. 하지만 주택 구입용 대출 금리도 내려갈 수 있으니, 저축과 대출 양쪽을 함께 비교해보시는 게 좋겠습니다.",
       expectedNextEffects: [
         "추가 기준금리 인하 시 예금금리가 더 내려갈 수 있습니다.",
         "적금 금리도 조정될 가능성이 있습니다.",
@@ -128,14 +93,7 @@ function articleToAnalyzedNews(article: Article, index: number) {
     relevanceReason: "일반 가계에 직접적인 영향이 있는 경제 뉴스입니다.",
 
     oneLineSummary: article.summary,
-    whatHappened: detail?.whatHappened ?? article.summary,
-    previousSituation: detail?.previousSituation ?? "확인된 내용이 부족합니다.",
-    whatChanged: detail?.whatChanged ?? "확인된 내용이 부족합니다.",
-    whyItChanged: detail?.whyItChanged ?? "확인된 내용이 부족합니다.",
-
-    householdImpact: detail?.householdImpact ?? "확인된 내용이 부족합니다.",
-    newlywedHousingImpact:
-      detail?.newlywedHousingImpact ?? "확인된 내용이 부족합니다.",
+    explanation: detail?.explanation ?? article.summary,
     expectedNextEffects: detail?.expectedNextEffects ?? [],
     recommendedChecks: detail?.recommendedChecks ?? [],
 

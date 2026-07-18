@@ -1,11 +1,11 @@
 import type { PipelineLock } from "./PipelineLock.js";
-import type { PipelineRunRepository } from "../db/repositories/PipelineRunRepository.js";
+import type { PipelineRunRepository, TriggerType } from "../db/repositories/PipelineRunRepository.js";
 import { PIPELINE_LOCK_MAX_AGE_MS } from "../config/constants.js";
 
 export class DbPipelineLock implements PipelineLock {
   constructor(private readonly runRepo: PipelineRunRepository) {}
 
-  async acquire(runId: string): Promise<boolean> {
+  async acquire(runId: string, triggerType: TriggerType = "MANUAL"): Promise<boolean> {
     const running = await this.runRepo.findRunning();
     if (running) {
       const age = Date.now() - running.startedAt.getTime();
@@ -25,7 +25,7 @@ export class DbPipelineLock implements PipelineLock {
     await this.runRepo.create({
       id: runId,
       status: "RUNNING",
-      triggerType: "MANUAL",
+      triggerType,
       startedAt: new Date(),
       currentStep: "INIT",
     });
