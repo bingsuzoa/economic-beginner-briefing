@@ -47,7 +47,13 @@ function buildNewsBlocks(news: AnalyzedNews): NotionBlock[] {
 
   for (const explanationParagraph of news.explanation.split("\n\n")) {
     const trimmed = explanationParagraph.trim();
-    if (trimmed.length > 0) {
+    if (trimmed.length === 0) {
+      continue;
+    }
+    const sectionMatch = trimmed.match(/^\[(.+?)\]$/);
+    if (sectionMatch) {
+      blocks.push(heading3(sectionMatch[1]!));
+    } else {
       blocks.push(paragraph(trimmed));
     }
   }
