@@ -101,6 +101,11 @@ export const SourceCollectionReportSchema = z.object({
   acceptedCount: z.number().int().nonnegative(),
   errorCode: z.string().optional(),
   errorMessage: z.string().optional(),
+  rawCount: z.number().int().nonnegative().optional(),
+  dateFilteredCount: z.number().int().nonnegative().optional(),
+  qualityPassedCount: z.number().int().nonnegative().optional(),
+  deduplicatedCount: z.number().int().nonnegative().optional(),
+  durationMs: z.number().nonnegative().optional(),
 });
 
 export type SourceCollectionReport = z.infer<typeof SourceCollectionReportSchema>;

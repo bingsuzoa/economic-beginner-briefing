@@ -43,3 +43,9 @@ export const RETRY = {
 export const PIPELINE_LOCK_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
 
 export const ADMIN_DEFAULT_PAGE_SIZE = 20;
+
+export const DIVERSITY = {
+  MAX_ARTICLES_PER_SOURCE: 5,
+  MAX_ARTICLES_PER_CATEGORY: 4,
+  MIN_PERSONAL_FINANCE_RELEVANCE: 2,
+} as const;

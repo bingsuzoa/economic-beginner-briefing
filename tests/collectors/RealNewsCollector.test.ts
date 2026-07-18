@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { RealNewsCollector } from "../../src/collectors/RealNewsCollector.js";
+import { RealNewsCollector, createDefaultAdapters } from "../../src/collectors/RealNewsCollector.js";
 import type { SourceAdapter, SourceCollectionResult } from "../../src/collectors/sources/SourceAdapter.js";
 import type { Article } from "../../src/domain/article.js";
 import { AppError } from "../../src/errors/AppError.js";
@@ -53,10 +53,10 @@ function createFailingAdapter(sourceName: string): SourceAdapter {
 describe("RealNewsCollector", () => {
   it("여러 소스의 기사를 수집하여 반환한다", async () => {
     const adapter1 = createMockAdapter("출처A", [
-      makeArticle({ sourceName: "출처A" }),
+      makeArticle({ sourceName: "출처A", title: "기준금리 인하 결정 관련 기사" }),
     ]);
     const adapter2 = createMockAdapter("출처B", [
-      makeArticle({ sourceName: "출처B" }),
+      makeArticle({ sourceName: "출처B", title: "아파트 가격 상승세 지속 전망" }),
     ]);
 
     const collector = new RealNewsCollector([adapter1, adapter2]);
@@ -215,6 +215,36 @@ describe("RealNewsCollector", () => {
   it("소스 어댑터 없이 생성하면 기본 어댑터를 사용한다", () => {
     const collector = new RealNewsCollector();
     expect(collector).toBeDefined();
+  });
+
+  it("기본 어댑터에 올바른 소스가 포함된다", () => {
+    const adapters = createDefaultAdapters();
+    const sourceNames = adapters.map((a) => a.sourceName);
+
+    expect(sourceNames).toContain("연합뉴스");
+    expect(sourceNames).toContain("한국경제");
+    expect(sourceNames).toContain("매일경제");
+    expect(sourceNames).toContain("SBS Biz");
+    expect(sourceNames).toContain("서울경제");
+    expect(sourceNames).not.toContain("KBS");
+    expect(adapters).toHaveLength(5);
+  });
+
+  it("소스 리포트에 durationMs가 포함된다", async () => {
+    const adapter = createMockAdapter("출처A", [
+      makeArticle({ sourceName: "출처A" }),
+    ]);
+
+    const collector = new RealNewsCollector([adapter]);
+    const result = await collector.collect({
+      targetDate: "2026-07-16",
+      timezone: "Asia/Seoul",
+    });
+
+    const report = result.sourceReports[0];
+    expect(report.durationMs).toBeDefined();
+    expect(typeof report.durationMs).toBe("number");
+    expect(report.durationMs).toBeGreaterThanOrEqual(0);
   });
 
   it("Non-AppError 실패도 정상적으로 처리한다", async () => {

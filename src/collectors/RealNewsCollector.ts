@@ -13,7 +13,7 @@ import { YonhapSourceAdapter } from "./sources/YonhapSourceAdapter.js";
 import { HankyungSourceAdapter } from "./sources/HankyungSourceAdapter.js";
 import { MKSourceAdapter } from "./sources/MKSourceAdapter.js";
 import { SBSBizSourceAdapter } from "./sources/SBSBizSourceAdapter.js";
-import { KBSSourceAdapter } from "./sources/KBSSourceAdapter.js";
+import { SedailySourceAdapter } from "./sources/SedailySourceAdapter.js";
 
 /**
  * Creates the default set of source adapters.
@@ -24,7 +24,7 @@ export function createDefaultAdapters(): SourceAdapter[] {
     new HankyungSourceAdapter(),
     new MKSourceAdapter(),
     new SBSBizSourceAdapter(),
-    new KBSSourceAdapter(),
+    new SedailySourceAdapter(),
   ];
 }
 
@@ -50,14 +50,16 @@ export class RealNewsCollector implements NewsCollector {
     // Collect from all sources in parallel, tolerating individual failures
     const results = await Promise.allSettled(
       this.adapters.map(async (adapter) => {
+        const startMs = Date.now();
         const result = await adapter.collect(startTime, endTime);
-        return { adapter, result };
+        const durationMs = Date.now() - startMs;
+        return { adapter, result, durationMs };
       }),
     );
 
     for (const settled of results) {
       if (settled.status === "fulfilled") {
-        const { adapter, result } = settled.value;
+        const { adapter, result, durationMs } = settled.value;
         totalCollected += result.collectedCount;
         allArticles.push(...result.articles);
 
@@ -66,6 +68,8 @@ export class RealNewsCollector implements NewsCollector {
           status: "success",
           collectedCount: result.collectedCount,
           acceptedCount: result.acceptedCount,
+          rawCount: result.collectedCount,
+          durationMs,
         });
       } else {
         const adapter = this.adapters[results.indexOf(settled)];
