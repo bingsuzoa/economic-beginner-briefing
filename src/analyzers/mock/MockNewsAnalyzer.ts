@@ -92,6 +92,10 @@ function articleToAnalyzedNews(article: Article, index: number) {
     importance: (5 - index) as 3 | 4 | 5,
     relevanceReason: "일반 가계에 직접적인 영향이 있는 경제 뉴스입니다.",
 
+    impactAssessment: [
+      { target: "일반 가계", score: 4, reason: "가계 이자 부담 변화" },
+      { target: "신혼부부", score: 3, reason: "주거비용 영향" },
+    ],
     oneLineSummary: article.summary,
     explanation: detail?.explanation ?? article.summary,
     expectedNextEffects: detail?.expectedNextEffects ?? [],

@@ -13,6 +13,12 @@ const AISourceReferenceSchema = z.object({
   isPrimary: z.boolean(),
 });
 
+const AIImpactScoreSchema = z.object({
+  target: z.string().min(1),
+  score: z.number().int().min(0).max(5),
+  reason: z.string().min(1),
+});
+
 const AIAnalyzedNewsSchema = z.object({
   id: z.string().min(1),
   representativeTitle: z.string().min(1),
@@ -26,6 +32,7 @@ const AIAnalyzedNewsSchema = z.object({
   ]),
   relevanceReason: z.string().min(1),
 
+  impactAssessment: z.array(AIImpactScoreSchema).optional(),
   oneLineSummary: z.string().min(1),
   explanation: z.string().min(1),
   expectedNextEffects: z.array(z.string()),
