@@ -228,8 +228,11 @@ describe("RealNewsCollector", () => {
     expect(sourceNames).toContain("서울경제");
     expect(sourceNames).toContain("뉴시스");
     expect(sourceNames).toContain("머니투데이");
+    expect(sourceNames).toContain("세계일보");
+    expect(sourceNames).toContain("경향신문");
+    expect(sourceNames).toContain("동아일보");
     expect(sourceNames).not.toContain("KBS");
-    expect(adapters).toHaveLength(7);
+    expect(adapters).toHaveLength(10);
   });
 
   it("소스 리포트에 durationMs가 포함된다", async () => {

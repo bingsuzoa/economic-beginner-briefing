@@ -1,4 +1,4 @@
-import type { AnalyzedNews, EconomicTerm, ImpactScore, TargetAudience } from "../../domain/analyzedNews.js";
+import type { AnalyzedNews, EconomicTerm } from "../../domain/analyzedNews.js";
 import type { Briefing } from "../../domain/briefing.js";
 import type { NotionBlock, NotionRichText } from "./notionTypes.js";
 
@@ -45,14 +45,6 @@ function buildNewsBlocks(news: AnalyzedNews): NotionBlock[] {
     paragraph(`왜 중요한가: ${news.whyImportant}`),
   ];
 
-  // 누가 꼭 읽어야 하나?
-  blocks.push(heading3("누가 꼭 읽어야 하나?"));
-  blocks.push(...buildTargetAudienceBlocks(news.targetAudience));
-
-  if (news.impactAssessment && news.impactAssessment.length > 0) {
-    blocks.push(heading3("영향도 평가"));
-    blocks.push(...buildImpactBlocks(news.impactAssessment));
-  }
 
   for (const explanationParagraph of news.explanation.split("\n\n")) {
     const trimmed = explanationParagraph.trim();
@@ -84,28 +76,6 @@ function buildNewsBlocks(news: AnalyzedNews): NotionBlock[] {
   return blocks;
 }
 
-function buildTargetAudienceBlocks(targetAudience: TargetAudience): NotionBlock[] {
-  const blocks: NotionBlock[] = [];
-
-  if (targetAudience.mustRead.length > 0) {
-    for (const audience of targetAudience.mustRead) {
-      blocks.push(bulletedListItem(`✅ ${audience}`));
-    }
-  }
-
-  if (targetAudience.notRelevant.length > 0) {
-    blocks.push(paragraph("크게 신경 쓰지 않아도 되는 사람:"));
-    for (const audience of targetAudience.notRelevant) {
-      blocks.push(bulletedListItem(`• ${audience}`));
-    }
-  }
-
-  if (blocks.length === 0) {
-    return [paragraph("확인된 내용이 없습니다.")];
-  }
-
-  return blocks;
-}
 
 function buildGlossaryBlocks(terms: EconomicTerm[]): NotionBlock[] {
   if (terms.length === 0) {
@@ -118,11 +88,6 @@ function buildGlossaryBlocks(terms: EconomicTerm[]): NotionBlock[] {
   });
 }
 
-function buildImpactBlocks(impacts: ImpactScore[]): NotionBlock[] {
-  return impacts.map((impact) =>
-    bulletedListItem(`${impact.target}: ${impact.score}/5점 — ${impact.reason}`),
-  );
-}
 
 function toBulletList(values: string[]): NotionBlock[] {
   if (values.length === 0) {

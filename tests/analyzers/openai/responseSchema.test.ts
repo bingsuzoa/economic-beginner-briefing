@@ -117,7 +117,7 @@ describe("AIResponseSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("requires targetAudience with mustRead array", () => {
+  it("accepts missing targetAudience (optional)", () => {
     const newsWithoutAudience = {
       ...validResponse.news[0],
       targetAudience: undefined,
@@ -126,7 +126,7 @@ describe("AIResponseSchema", () => {
       ...validResponse,
       news: [newsWithoutAudience],
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it("accepts targetAudience with empty notRelevant", () => {

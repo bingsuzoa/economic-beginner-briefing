@@ -36,7 +36,7 @@ const AIAnalyzedNewsSchema = z.object({
     z.literal(5),
   ]),
   whyImportant: z.string().min(1),
-  targetAudience: AITargetAudienceSchema,
+  targetAudience: AITargetAudienceSchema.optional(),
 
   impactAssessment: z.array(AIImpactScoreSchema).optional(),
   oneLineSummary: z.string().min(1),

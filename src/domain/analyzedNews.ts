@@ -77,7 +77,7 @@ export const AnalyzedNewsSchema = z.object({
     z.literal(5),
   ]),
   whyImportant: z.string().min(1),
-  targetAudience: TargetAudienceSchema,
+  targetAudience: TargetAudienceSchema.optional(),
 
   impactAssessment: z.array(ImpactScoreSchema).optional(),
   oneLineSummary: z.string().min(1),
