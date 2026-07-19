@@ -19,6 +19,11 @@ const AIImpactScoreSchema = z.object({
   reason: z.string().min(1),
 });
 
+const AITargetAudienceSchema = z.object({
+  mustRead: z.array(z.string().min(1)),
+  notRelevant: z.array(z.string()),
+});
+
 const AIAnalyzedNewsSchema = z.object({
   id: z.string().min(1),
   representativeTitle: z.string().min(1),
@@ -30,13 +35,12 @@ const AIAnalyzedNewsSchema = z.object({
     z.literal(4),
     z.literal(5),
   ]),
-  relevanceReason: z.string().min(1),
+  whyImportant: z.string().min(1),
+  targetAudience: AITargetAudienceSchema,
 
   impactAssessment: z.array(AIImpactScoreSchema).optional(),
   oneLineSummary: z.string().min(1),
   explanation: z.string().min(1),
-  expectedNextEffects: z.array(z.string()),
-  recommendedChecks: z.array(z.string()),
 
   evidenceStatus: z.enum(NewsEvidenceStatusValues),
   uncertaintyNote: z.string().optional(),
@@ -54,3 +58,4 @@ export const AIResponseSchema = z.object({
 export type AIResponse = z.infer<typeof AIResponseSchema>;
 export type AIAnalyzedNews = z.infer<typeof AIAnalyzedNewsSchema>;
 export type AISourceReference = z.infer<typeof AISourceReferenceSchema>;
+export type AITargetAudience = z.infer<typeof AITargetAudienceSchema>;
