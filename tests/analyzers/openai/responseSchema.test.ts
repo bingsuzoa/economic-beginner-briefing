@@ -10,11 +10,13 @@ describe("AIResponseSchema", () => {
         representativeTitle: "기준금리 인하",
         category: "interest_rate",
         importance: 5,
-        relevanceReason: "가계 대출에 직접 영향",
+        whyImportant: "변동금리 대출을 보유한 가계의 이자 부담이 직접적으로 줄어들기 때문입니다.",
+        targetAudience: {
+          mustRead: ["변동금리 대출자", "주택담보대출 예정자", "신혼부부"],
+          notRelevant: ["고정금리 대출자"],
+        },
         oneLineSummary: "한국은행이 기준금리를 인하했습니다.",
-        explanation: "한국은행이 기준금리를 연 3.25%에서 3.00%로 인하했습니다. 경기 둔화 우려와 물가 안정세를 고려한 판단입니다.\n\n기존에는 3.25%로 유지되고 있었는데, 이번에 3.00%로 낮아졌습니다. 변동금리 대출을 가진 가계는 이자 부담이 줄어들 수 있고, 주택담보대출을 준비하는 신혼부부에게도 유리할 수 있습니다.",
-        expectedNextEffects: ["추가 인하 가능성"],
-        recommendedChecks: ["대출 금리 확인"],
+        explanation: "[무슨 일이 있었나]\n\n한국은행이 기준금리를 연 3.25%에서 3.00%로 인하했습니다. 기존에는 3.25%로 유지되고 있었는데, 이번에 3.00%로 낮아졌습니다.\n\n[왜 이런 일이 발생했나]\n\n경기 둔화 우려와 물가 안정세를 고려한 판단입니다.\n\n[우리에게 어떤 의미가 있나]\n\n변동금리 대출을 가진 가계는 이자 부담이 줄어들 수 있습니다. 주택담보대출을 준비하는 신혼부부에게도 유리할 수 있습니다.\n\n고정금리 대출자에게는 직접적인 영향이 거의 없습니다.",
         evidenceStatus: "confirmed",
         economicTerms: [
           { term: "기준금리", explanation: "중앙은행이 정하는 기본 금리" },
@@ -111,6 +113,33 @@ describe("AIResponseSchema", () => {
     const result = AIResponseSchema.safeParse({
       ...validResponse,
       news: [newsWithExample],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("requires targetAudience with mustRead array", () => {
+    const newsWithoutAudience = {
+      ...validResponse.news[0],
+      targetAudience: undefined,
+    };
+    const result = AIResponseSchema.safeParse({
+      ...validResponse,
+      news: [newsWithoutAudience],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts targetAudience with empty notRelevant", () => {
+    const newsWithEmptyNotRelevant = {
+      ...validResponse.news[0],
+      targetAudience: {
+        mustRead: ["신혼부부"],
+        notRelevant: [],
+      },
+    };
+    const result = AIResponseSchema.safeParse({
+      ...validResponse,
+      news: [newsWithEmptyNotRelevant],
     });
     expect(result.success).toBe(true);
   });

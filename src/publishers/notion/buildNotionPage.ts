@@ -1,4 +1,4 @@
-import type { AnalyzedNews, EconomicTerm, ImpactScore } from "../../domain/analyzedNews.js";
+import type { AnalyzedNews, EconomicTerm, ImpactScore, TargetAudience } from "../../domain/analyzedNews.js";
 import type { Briefing } from "../../domain/briefing.js";
 import type { NotionBlock, NotionRichText } from "./notionTypes.js";
 
@@ -42,8 +42,12 @@ function buildNewsBlocks(news: AnalyzedNews): NotionBlock[] {
     divider(),
     heading3(`${news.representativeTitle} (중요도 ${news.importance}/5)`),
     paragraph(`한 줄 결론: ${news.oneLineSummary}`),
-    paragraph(`왜 중요한가: ${news.relevanceReason}`),
+    paragraph(`왜 중요한가: ${news.whyImportant}`),
   ];
+
+  // 누가 꼭 읽어야 하나?
+  blocks.push(heading3("누가 꼭 읽어야 하나?"));
+  blocks.push(...buildTargetAudienceBlocks(news.targetAudience));
 
   if (news.impactAssessment && news.impactAssessment.length > 0) {
     blocks.push(heading3("영향도 평가"));
@@ -63,12 +67,6 @@ function buildNewsBlocks(news: AnalyzedNews): NotionBlock[] {
     }
   }
 
-  blocks.push(heading3("앞으로 지켜볼 내용"));
-  blocks.push(...toBulletList(news.expectedNextEffects));
-
-  blocks.push(heading3("지금 확인할 것"));
-  blocks.push(...toBulletList(news.recommendedChecks));
-
   blocks.push(heading3("뉴스 안의 경제용어"));
   blocks.push(...buildGlossaryBlocks(news.economicTerms));
 
@@ -81,6 +79,29 @@ function buildNewsBlocks(news: AnalyzedNews): NotionBlock[] {
         source.url,
       ),
     );
+  }
+
+  return blocks;
+}
+
+function buildTargetAudienceBlocks(targetAudience: TargetAudience): NotionBlock[] {
+  const blocks: NotionBlock[] = [];
+
+  if (targetAudience.mustRead.length > 0) {
+    for (const audience of targetAudience.mustRead) {
+      blocks.push(bulletedListItem(`✅ ${audience}`));
+    }
+  }
+
+  if (targetAudience.notRelevant.length > 0) {
+    blocks.push(paragraph("크게 신경 쓰지 않아도 되는 사람:"));
+    for (const audience of targetAudience.notRelevant) {
+      blocks.push(bulletedListItem(`• ${audience}`));
+    }
+  }
+
+  if (blocks.length === 0) {
+    return [paragraph("확인된 내용이 없습니다.")];
   }
 
   return blocks;

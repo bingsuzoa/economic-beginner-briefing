@@ -64,11 +64,13 @@ describe("AnalyzedNewsSchema", () => {
       representativeTitle: "기준금리 인하",
       category: "interest_rate" as const,
       importance: 5 as const,
-      relevanceReason: "가계에 영향",
+      whyImportant: "변동금리 대출자의 이자 부담이 직접적으로 줄어들기 때문입니다.",
+      targetAudience: {
+        mustRead: ["변동금리 대출자", "신혼부부"],
+        notRelevant: ["고정금리 대출자"],
+      },
       oneLineSummary: "기준금리 인하 결정",
       explanation: "한국은행이 기준금리를 연 3.25%에서 3.00%로 내렸습니다. 경기 둔화 우려 때문인데요, 대출 이자가 줄어들 수 있고 주택담보대출 금리도 낮아질 수 있습니다.",
-      expectedNextEffects: ["예금금리도 내려갈 수 있습니다."],
-      recommendedChecks: ["대출 금리 확인"],
       evidenceStatus: "confirmed" as const,
       economicTerms: [
         { term: "기준금리", explanation: "한국은행이 정하는 기준이 되는 금리" },

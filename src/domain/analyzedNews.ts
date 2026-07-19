@@ -54,6 +54,15 @@ export const SourceReferenceSchema = z.object({
 
 export type SourceReference = z.infer<typeof SourceReferenceSchema>;
 
+// --- TargetAudience ---
+
+export const TargetAudienceSchema = z.object({
+  mustRead: z.array(z.string().min(1)),
+  notRelevant: z.array(z.string()),
+});
+
+export type TargetAudience = z.infer<typeof TargetAudienceSchema>;
+
 // --- AnalyzedNews ---
 
 export const AnalyzedNewsSchema = z.object({
@@ -67,13 +76,12 @@ export const AnalyzedNewsSchema = z.object({
     z.literal(4),
     z.literal(5),
   ]),
-  relevanceReason: z.string().min(1),
+  whyImportant: z.string().min(1),
+  targetAudience: TargetAudienceSchema,
 
   impactAssessment: z.array(ImpactScoreSchema).optional(),
   oneLineSummary: z.string().min(1),
   explanation: z.string().min(1),
-  expectedNextEffects: z.array(z.string()),
-  recommendedChecks: z.array(z.string()),
 
   evidenceStatus: NewsEvidenceStatusSchema,
   uncertaintyNote: z.string().optional(),
