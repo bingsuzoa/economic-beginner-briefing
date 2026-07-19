@@ -21,9 +21,10 @@ on:
           - "false"
 
 # 같은 workflow가 중복 실행되지 않도록 방지
+# cancel-in-progress: true → 이전 실행이 hang되어도 새 스케줄이 즉시 실행됨
 concurrency:
   group: hourly-briefing
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   briefing:
@@ -67,4 +68,4 @@ jobs:
         run: npm run build
 
       - name: Run briefing pipeline
-        run: npm start
+        run: npm run briefing

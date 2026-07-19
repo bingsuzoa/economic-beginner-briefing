@@ -182,5 +182,6 @@ export { ok, err } from "./utils/result.js";
 export type { Result } from "./utils/result.js";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  void runDailyBriefingCliMain();
+  // main() handles its own error catching and calls process.exit() when done.
+  runDailyBriefingCliMain();
 }
