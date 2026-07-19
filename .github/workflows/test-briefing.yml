@@ -1,0 +1,119 @@
+name: Test Briefing Output
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: Asia/Seoul
+      NODE_ENV: production
+      LOG_LEVEL: info
+      DRY_RUN: "false"
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+      NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_ENV: development
+
+      - name: Build
+        run: npm run build
+
+      - name: Run briefing pipeline with full output
+        run: |
+          node --input-type=module -e "
+          import { createDefaultApplication } from './dist/app/createDefaultApplication.js';
+          import { runDailyBriefing } from './dist/app/runDailyBriefing.js';
+          import { loadEnv } from './dist/config/env.js';
+          import { getHourlyTimeRange } from './dist/utils/date.js';
+
+          const env = loadEnv(process.env);
+          const app = createDefaultApplication(env);
+          const timeRange = getHourlyTimeRange();
+
+          console.log('=== TIME RANGE ===');
+          console.log(JSON.stringify(timeRange, null, 2));
+
+          const log = await runDailyBriefing(app, { timeRange });
+          console.log('');
+          console.log('=== EXECUTION RESULT ===');
+          console.log(JSON.stringify(log, null, 2));
+          "
+
+      - name: Read latest Notion page content
+        run: |
+          node --input-type=module -e "
+          import { Client } from '@notionhq/client';
+
+          const notion = new Client({ auth: process.env.NOTION_API_KEY });
+          const dbId = process.env.NOTION_DATABASE_ID;
+
+          // Retrieve database to get data_source_id
+          const db = await notion.databases.retrieve({ database_id: dbId });
+          const dataSourceId = db.data_sources?.[0]?.id ?? dbId;
+
+          // Query most recent page
+          const response = await notion.dataSources.query({
+            data_source_id: dataSourceId,
+            page_size: 1,
+            result_type: 'page',
+            sorts: [{ timestamp: 'created_time', direction: 'descending' }],
+          });
+
+          if (response.results.length === 0) {
+            console.log('No pages found.');
+            process.exit(0);
+          }
+
+          const page = response.results[0];
+          console.log('=== NOTION PAGE INFO ===');
+          console.log('Page ID:', page.id);
+          console.log('URL:', page.url ?? 'N/A');
+          console.log('Created:', page.created_time);
+          console.log('');
+
+          // Read page blocks
+          const blocks = await notion.blocks.children.list({ block_id: page.id, page_size: 100 });
+          console.log('=== BRIEFING CONTENT ===');
+          console.log('');
+
+          for (const block of blocks.results) {
+            const type = block.type;
+            if (!block[type]) continue;
+
+            const getText = (richTextArr) => {
+              if (!richTextArr) return '';
+              return richTextArr.map(t => t.plain_text ?? t.text?.content ?? '').join('');
+            };
+
+            if (type === 'heading_2') {
+              console.log('');
+              console.log('## ' + getText(block.heading_2.rich_text));
+            } else if (type === 'heading_3') {
+              console.log('');
+              console.log('### ' + getText(block.heading_3.rich_text));
+            } else if (type === 'paragraph') {
+              const text = getText(block.paragraph.rich_text);
+              if (text) console.log(text);
+            } else if (type === 'bulleted_list_item') {
+              console.log('  • ' + getText(block.bulleted_list_item.rich_text));
+            } else if (type === 'divider') {
+              console.log('---');
+            }
+          }
+          "
