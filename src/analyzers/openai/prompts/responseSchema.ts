@@ -45,14 +45,14 @@ const AIAnalyzedNewsSchema = z.object({
   evidenceStatus: z.enum(NewsEvidenceStatusValues),
   uncertaintyNote: z.string().optional(),
 
-  economicTerms: z.array(AIEconomicTermSchema),
+  economicTerms: z.array(AIEconomicTermSchema).default([]),
   sources: z.array(AISourceReferenceSchema),
 });
 
 export const AIResponseSchema = z.object({
   overallSummary: z.array(z.string().min(1)),
   news: z.array(AIAnalyzedNewsSchema).min(1),
-  glossary: z.array(AIEconomicTermSchema),
+  glossary: z.array(AIEconomicTermSchema).default([]),
 });
 
 export type AIResponse = z.infer<typeof AIResponseSchema>;
