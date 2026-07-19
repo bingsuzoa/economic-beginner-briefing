@@ -6,6 +6,9 @@ on:
     # 정각 스케줄이 스킵되었을 때 최대 5분 내에 재시도
     - cron: "5,15,25,35,45,55 * * * *"
 
+permissions:
+  actions: write
+
 jobs:
   check-and-trigger:
     runs-on: ubuntu-latest
