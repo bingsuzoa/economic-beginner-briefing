@@ -1,0 +1,58 @@
+name: Briefing Watchdog
+
+on:
+  schedule:
+    # 매시 5, 15, 25, 35, 45, 55분에 실행 (UTC)
+    # 정각 스케줄이 스킵되었을 때 최대 5분 내에 재시도
+    - cron: "5,15,25,35,45,55 * * * *"
+
+jobs:
+  check-and-trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check if briefing ran this hour
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 현재 UTC 시간의 정각 계산
+          HOUR_START=$(date -u -d "$(date -u '+%Y-%m-%dT%H:00:00Z')" '+%Y-%m-%dT%H:%M:%SZ')
+          echo "Checking runs since: $HOUR_START"
+
+          # 이번 시간에 성공적으로 완료된 briefing workflow 실행이 있는지 확인
+          RUNS=$(gh run list \
+            --workflow=weekly-briefing.yml \
+            --status=completed \
+            --json conclusion,createdAt,event \
+            --jq "[.[] | select(.createdAt >= \"$HOUR_START\" and .conclusion == \"success\")] | length")
+
+          # 현재 실행 중인 것도 확인
+          IN_PROGRESS=$(gh run list \
+            --workflow=weekly-briefing.yml \
+            --status=in_progress \
+            --json status \
+            --jq 'length')
+
+          echo "Successful runs this hour: $RUNS"
+          echo "Currently in progress: $IN_PROGRESS"
+
+          if [ "$RUNS" -gt 0 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Briefing already ran successfully this hour."
+          elif [ "$IN_PROGRESS" -gt 0 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "⏳ Briefing is currently running."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "⚠️ No briefing run found this hour. Triggering..."
+          fi
+
+      - name: Trigger briefing workflow
+        if: steps.check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run weekly-briefing.yml \
+            -f dry_run=false
+          echo "🚀 Briefing workflow triggered."
