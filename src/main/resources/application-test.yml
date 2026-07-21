@@ -1,0 +1,21 @@
+briefing:
+  dry-run: true
+  scheduler:
+    enabled: false
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+  security:
+    user:
+      password: test
+
+admin:
+  token: test-admin-token
+  default-page-size: 20

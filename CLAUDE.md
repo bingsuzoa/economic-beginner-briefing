@@ -46,12 +46,10 @@
 작업 후 다음 명령을 실행합니다.
 
 ```bash
-npm run typecheck
-npm run lint
-npm test
-npm run build
-
+./gradlew clean build
 ```
+
+이 명령은 컴파일, 테스트, JAR 패키징을 모두 수행합니다.
 
 완료 보고에는 다음을 포함합니다.
 

@@ -1,0 +1,78 @@
+spring:
+  application:
+    name: economic-briefing
+  datasource:
+    url: jdbc:postgresql://localhost:5432/economic_briefing
+    username: postgres
+    password: ""
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${ADMIN_PORT:3000}
+
+briefing:
+  dry-run: ${DRY_RUN:true}
+  timeouts:
+    rss-http: 10s
+    ai-api: 60s
+    notion-api: 15s
+    email-api: 15s
+  retry:
+    max-attempts: 2
+    initial-delay: 1s
+    next-delay: 2s
+  diversity:
+    max-articles-per-source: 3
+    max-articles-per-category: 3
+    min-personal-finance-relevance: 3
+    soft-max-override-score: 5
+  audience:
+    economic-knowledge-level: beginner
+    interests:
+      - interest_rate
+      - loan
+      - housing
+      - jeonse_monthly_rent
+      - deposit_saving
+      - government_support
+    context-notes:
+      - "\uC2E0\uD63C\uBD80\uBD80"
+      - "\uC8FC\uD0DD \uAD6C\uC785\uACFC \uCD9C\uC0B0 \uC900\uBE44"
+      - "\uACBD\uC81C\uC6A9\uC5B4 \uC124\uBA85 \uD544\uC694"
+  cli:
+    enabled: ${BRIEFING_CLI_ENABLED:false}
+  scheduler:
+    enabled: ${SCHEDULER_ENABLED:false}
+    cron: "0 0 * * * *"
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  model: gpt-4o
+  temperature: 0.3
+  timeout: 60s
+  max-selected-news: 10
+
+notion:
+  api-key: ${NOTION_API_KEY:}
+  database-id: ${NOTION_DATABASE_ID:}
+  timeout: 15s
+
+admin:
+  token: ${ADMIN_TOKEN:}
+  default-page-size: 20
+
+logging:
+  level:
+    root: INFO
+    com.economicbriefing: ${LOG_LEVEL:INFO}
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
