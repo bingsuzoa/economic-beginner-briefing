@@ -6,11 +6,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.economicbriefing.domain.execution.ExecutionLog;
 import com.economicbriefing.domain.execution.ExecutionStatus;
 import com.economicbriefing.domain.execution.PublicationDecision;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnProperty(name = "briefing.dry-run", havingValue = "true", matchIfMissing = true)
 public class MockExecutionTracker implements ExecutionTracker {
 
     private final Map<String, ExecutionLog> executions = new ConcurrentHashMap<>();

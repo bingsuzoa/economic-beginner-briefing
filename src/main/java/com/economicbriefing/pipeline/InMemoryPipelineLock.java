@@ -4,11 +4,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnProperty(name = "briefing.dry-run", havingValue = "true", matchIfMissing = true)
 public class InMemoryPipelineLock implements PipelineLock {
 
     private static final Logger log = LoggerFactory.getLogger(InMemoryPipelineLock.class);
