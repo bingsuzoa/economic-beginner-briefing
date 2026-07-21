@@ -73,7 +73,8 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                 request.articles(),
                 openAiProperties.model(),
                 "v1",
-                request.briefingTitle()
+                request.briefingTitle(),
+                request.targetHour()
         );
 
         Set<String> selectedIds = aiResponse.news().stream()

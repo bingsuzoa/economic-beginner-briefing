@@ -17,6 +17,7 @@ import com.economicbriefing.domain.article.Article;
 import com.economicbriefing.domain.article.NewsCategory;
 import com.economicbriefing.domain.briefing.Briefing;
 import com.economicbriefing.domain.briefing.BriefingMetadata;
+import com.economicbriefing.util.IdGenerator;
 import com.economicbriefing.util.KstDateTimeUtil;
 
 public final class BriefingBuilder {
@@ -29,7 +30,8 @@ public final class BriefingBuilder {
             List<Article> articles,
             String modelName,
             String promptVersion,
-            String briefingTitle) {
+            String briefingTitle,
+            Integer targetHour) {
 
         Map<String, Article> articleMap = articles.stream()
                 .collect(Collectors.toMap(Article::id, Function.identity()));
@@ -56,8 +58,12 @@ public final class BriefingBuilder {
                 ? briefingTitle
                 : targetDate + " 경제 브리핑";
 
+        String briefingId = targetHour != null
+                ? IdGenerator.briefingId(targetDate, targetHour)
+                : IdGenerator.briefingId(targetDate);
+
         return new Briefing(
-                "briefing-" + targetDate,
+                briefingId,
                 targetDate,
                 KstDateTimeUtil.now(),
                 title,

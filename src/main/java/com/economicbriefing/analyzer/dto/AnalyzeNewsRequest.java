@@ -11,13 +11,14 @@ public record AnalyzeNewsRequest(
     LocalDate targetDate,
     int maxSelectedNews,
     AudienceProfile audience,
-    String briefingTitle
+    String briefingTitle,
+    Integer targetHour
 ) {
     public static AnalyzeNewsRequest of(
             List<Article> articles,
             LocalDate targetDate,
             int maxSelectedNews,
             AudienceProfile audience) {
-        return new AnalyzeNewsRequest(articles, targetDate, maxSelectedNews, audience, null);
+        return new AnalyzeNewsRequest(articles, targetDate, maxSelectedNews, audience, null, null);
     }
 }

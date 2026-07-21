@@ -21,6 +21,7 @@ import com.economicbriefing.domain.article.Article;
 import com.economicbriefing.domain.article.NewsCategory;
 import com.economicbriefing.domain.briefing.Briefing;
 import com.economicbriefing.domain.briefing.BriefingMetadata;
+import com.economicbriefing.util.IdGenerator;
 import com.economicbriefing.util.KstDateTimeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -147,8 +148,12 @@ public class MockNewsAnalyzer implements NewsAnalyzer {
                 ? request.briefingTitle()
                 : request.targetDate() + " 경제 브리핑";
 
+        String briefingId = request.targetHour() != null
+                ? IdGenerator.briefingId(request.targetDate(), request.targetHour())
+                : IdGenerator.briefingId(request.targetDate());
+
         Briefing briefing = new Briefing(
-                "briefing-" + request.targetDate(),
+                briefingId,
                 request.targetDate(),
                 KstDateTimeUtil.now(),
                 title,
