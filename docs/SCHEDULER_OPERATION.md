@@ -2,48 +2,35 @@
 
 ## Scope
 
-`feature/scheduler` schedules the existing daily briefing pipeline. It does not collect news, analyze news, or publish to Notion/email directly.
+The scheduler runs the briefing pipeline on a schedule via GitHub Actions. It does not collect news, analyze news, or publish to Notion/email directly.
 
-The scheduled command calls the same application entrypoint used for manual runs:
-
-```bash
-npm start
-```
-
-For local development before build:
+The scheduled command runs the Spring Boot application JAR:
 
 ```bash
-npm run briefing:run
+java -jar build/libs/economic-briefing-0.1.0.jar
 ```
 
 ## Schedule
 
-GitHub Actions runs daily at:
-
-```text
-04:30 Asia/Seoul
-19:30 UTC
-```
-
-This keeps the run before the product target of 05:00 KST while avoiding server-local timezone assumptions.
+GitHub Actions runs hourly at :00 (UTC).
 
 ## Target Date
 
-If no target date is provided, the application resolves the target date as yesterday in `Asia/Seoul`.
+If no target date is provided, the application resolves the target date based on the current hour in `Asia/Seoul`.
 
 Manual recovery runs can specify a date:
 
 ```bash
-npm run briefing:run -- --target-date 2026-07-16
+java -jar build/libs/economic-briefing-0.1.0.jar --target-date=2026-07-16
 ```
 
 In GitHub Actions, use `workflow_dispatch` and set `target_date` to `YYYY-MM-DD`.
 
 ## Duplicate Runs
 
-The workflow uses GitHub Actions `concurrency` with `cancel-in-progress: false`.
+The workflow uses GitHub Actions `concurrency` with `cancel-in-progress: true`.
 
-This prevents overlapping scheduled/manual executions for the same workflow group. Completed-run duplicate publication is still the responsibility of Integration and Publisher idempotency, especially Notion duplicate detection.
+This prevents overlapping scheduled/manual executions for the same workflow group.
 
 ## Secrets
 
@@ -52,10 +39,6 @@ The workflow reads external service settings only from GitHub Actions secrets:
 - `OPENAI_API_KEY`
 - `NOTION_API_KEY`
 - `NOTION_DATABASE_ID`
-- `EMAIL_PROVIDER`
-- `EMAIL_FROM`
-- `EMAIL_TO`
-- `EMAIL_API_KEY`
 
 Secrets must not be printed in logs.
 
@@ -63,22 +46,10 @@ Secrets must not be printed in logs.
 
 GitHub Actions marks the run failed when:
 
-- dependency installation fails
-- typecheck, lint, test, or build fails
+- Gradle build or test fails
 - the briefing command returns a non-zero exit code
 
-Check the failed workflow run logs in GitHub Actions. The briefing command prints a JSON execution result containing:
-
-- scheduler mode
-- timezone
-- requested target date
-- execution ID
-- resolved target date
-- start and completion time
-- status
-- collected article count
-- selected news count
-- structured errors
+Check the failed workflow run logs in GitHub Actions.
 
 ## Manual Dry Run
 

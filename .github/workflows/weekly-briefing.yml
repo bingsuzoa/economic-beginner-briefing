@@ -32,40 +32,39 @@ jobs:
     timeout-minutes: 30
     env:
       TZ: Asia/Seoul
-      NODE_ENV: production
       LOG_LEVEL: info
-      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run || 'false' }}
-      TARGET_DATE: ${{ github.event.inputs.target_date }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
-      NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
-          node-version: 20
-          cache: npm
+          distribution: 'temurin'
+          java-version: '21'
 
-      - name: Install dependencies
-        run: npm ci
-        env:
-          NODE_ENV: development
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm test
-
-      - name: Build
-        run: npm run build
+      - name: Build & Test
+        run: ./gradlew build
 
       - name: Run briefing pipeline
-        run: npm run briefing
+        run: |
+          TARGET_DATE_ARG=""
+          if [ -n "${{ github.event.inputs.target_date }}" ]; then
+            TARGET_DATE_ARG="--target-date=${{ github.event.inputs.target_date }}"
+          fi
+
+          java -jar build/libs/economic-briefing-0.1.0.jar \
+            $TARGET_DATE_ARG
+        env:
+          SPRING_PROFILES_ACTIVE: prod
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run || 'false' }}
+          TARGET_DATE: ${{ github.event.inputs.target_date }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          BRIEFING_CLI_ENABLED: "true"
+          GITHUB_EVENT_NAME: ${{ github.event_name }}

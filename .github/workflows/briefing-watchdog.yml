@@ -42,13 +42,13 @@ jobs:
 
           if [ "$RUNS" -gt 0 ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "✅ Briefing already ran successfully this hour."
+            echo "Briefing already ran successfully this hour."
           elif [ "$IN_PROGRESS" -gt 0 ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "⏳ Briefing is currently running."
+            echo "Briefing is currently running."
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "⚠️ No briefing run found this hour. Triggering..."
+            echo "No briefing run found this hour. Triggering..."
           fi
 
       - name: Trigger briefing workflow
@@ -58,4 +58,4 @@ jobs:
         run: |
           gh workflow run weekly-briefing.yml \
             -f dry_run=false
-          echo "🚀 Briefing workflow triggered."
+          echo "Briefing workflow triggered."

@@ -1,0 +1,9 @@
+briefing:
+  dry-run: false
+  scheduler:
+    enabled: true
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate

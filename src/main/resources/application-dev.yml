@@ -1,0 +1,14 @@
+briefing:
+  dry-run: true
+  scheduler:
+    enabled: false
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+logging:
+  level:
+    com.economicbriefing: DEBUG
