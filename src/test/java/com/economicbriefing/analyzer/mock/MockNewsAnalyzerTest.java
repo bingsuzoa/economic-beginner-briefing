@@ -35,7 +35,7 @@ class MockNewsAnalyzerTest {
     void shouldAnalyzeMockArticles() {
         List<Article> articles = createMockArticles();
         AnalyzeNewsRequest request = new AnalyzeNewsRequest(
-                articles, LocalDate.of(2025, 1, 15), 10, audience, null);
+                articles, LocalDate.of(2025, 1, 15), 10, audience, null, null);
 
         AnalyzeNewsResult result = analyzer.analyze(request);
 
@@ -49,7 +49,7 @@ class MockNewsAnalyzerTest {
     void shouldLimitToMaxSelectedNews() {
         List<Article> articles = createMockArticles();
         AnalyzeNewsRequest request = new AnalyzeNewsRequest(
-                articles, LocalDate.of(2025, 1, 15), 2, audience, null);
+                articles, LocalDate.of(2025, 1, 15), 2, audience, null, null);
 
         AnalyzeNewsResult result = analyzer.analyze(request);
 
@@ -61,7 +61,7 @@ class MockNewsAnalyzerTest {
     void shouldUseMockAnalysisDetailsForKnownArticles() {
         List<Article> articles = createMockArticles();
         AnalyzeNewsRequest request = new AnalyzeNewsRequest(
-                articles, LocalDate.of(2025, 1, 15), 10, audience, null);
+                articles, LocalDate.of(2025, 1, 15), 10, audience, null, null);
 
         AnalyzeNewsResult result = analyzer.analyze(request);
 
@@ -78,7 +78,7 @@ class MockNewsAnalyzerTest {
     void shouldIncludeOverallSummary() {
         List<Article> articles = createMockArticles();
         AnalyzeNewsRequest request = new AnalyzeNewsRequest(
-                articles, LocalDate.of(2025, 1, 15), 10, audience, null);
+                articles, LocalDate.of(2025, 1, 15), 10, audience, null, null);
 
         AnalyzeNewsResult result = analyzer.analyze(request);
 
@@ -90,7 +90,7 @@ class MockNewsAnalyzerTest {
     void shouldBuildGlossaryFromUniqueTerms() {
         List<Article> articles = createMockArticles();
         AnalyzeNewsRequest request = new AnalyzeNewsRequest(
-                articles, LocalDate.of(2025, 1, 15), 10, audience, null);
+                articles, LocalDate.of(2025, 1, 15), 10, audience, null, null);
 
         AnalyzeNewsResult result = analyzer.analyze(request);
 
@@ -106,7 +106,7 @@ class MockNewsAnalyzerTest {
     void shouldSetBriefingMetadata() {
         List<Article> articles = createMockArticles();
         AnalyzeNewsRequest request = new AnalyzeNewsRequest(
-                articles, LocalDate.of(2025, 1, 15), 10, audience, null);
+                articles, LocalDate.of(2025, 1, 15), 10, audience, null, null);
 
         AnalyzeNewsResult result = analyzer.analyze(request);
 
@@ -120,7 +120,7 @@ class MockNewsAnalyzerTest {
     void shouldUseCustomBriefingTitle() {
         List<Article> articles = createMockArticles();
         AnalyzeNewsRequest request = new AnalyzeNewsRequest(
-                articles, LocalDate.of(2025, 1, 15), 10, audience, "커스텀 제목");
+                articles, LocalDate.of(2025, 1, 15), 10, audience, "커스텀 제목", null);
 
         AnalyzeNewsResult result = analyzer.analyze(request);
 
@@ -137,7 +137,7 @@ class MockNewsAnalyzerTest {
                 List.of(NewsCategory.OTHER), "ko", null
         );
         AnalyzeNewsRequest request = new AnalyzeNewsRequest(
-                List.of(unknownArticle), LocalDate.of(2025, 1, 15), 10, audience, null);
+                List.of(unknownArticle), LocalDate.of(2025, 1, 15), 10, audience, null, null);
 
         AnalyzeNewsResult result = analyzer.analyze(request);
 

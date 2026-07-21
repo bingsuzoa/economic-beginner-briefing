@@ -161,11 +161,13 @@ public class BriefingPipeline {
                 ? KstDateTimeUtil.formatHourlyBriefingTitle(targetDate, timeRange.hour())
                 : null;
 
+        Integer targetHour = timeRange != null ? timeRange.hour() : null;
+
         AnalyzeNewsResult analyzeResult;
         try {
             analyzeResult = analyzer.analyze(new AnalyzeNewsRequest(
                     articlesForAnalysis, targetDate,
-                    openAiProperties.maxSelectedNews(), audience, briefingTitle));
+                    openAiProperties.maxSelectedNews(), audience, briefingTitle, targetHour));
         } catch (Exception e) {
             log.error("Analysis failed", e);
             executionLog.addError(toExecutionError("analyze", e));

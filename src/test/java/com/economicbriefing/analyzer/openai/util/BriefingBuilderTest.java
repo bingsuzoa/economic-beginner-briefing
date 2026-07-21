@@ -28,6 +28,7 @@ class BriefingBuilderTest {
                 articles,
                 "gpt-4o",
                 "v1",
+                null,
                 null
         );
 
@@ -44,7 +45,7 @@ class BriefingBuilderTest {
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                articles, "gpt-4o", "v1", null);
+                articles, "gpt-4o", "v1", null, null);
 
         assertEquals(1, briefing.news().size());
         var news = briefing.news().get(0);
@@ -73,7 +74,7 @@ class BriefingBuilderTest {
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                List.of(), "gpt-4o", "v1", null);
+                List.of(), "gpt-4o", "v1", null, null);
 
         assertEquals("Unknown", briefing.news().get(0).sources().get(0).sourceName());
     }
@@ -85,7 +86,7 @@ class BriefingBuilderTest {
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                articles, "gpt-4o", "v1", "커스텀 제목");
+                articles, "gpt-4o", "v1", "커스텀 제목", null);
 
         assertEquals("커스텀 제목", briefing.title());
     }
@@ -104,7 +105,7 @@ class BriefingBuilderTest {
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                createArticles(), "gpt-4o", "v1", null);
+                createArticles(), "gpt-4o", "v1", null, null);
 
         assertEquals(1, briefing.glossary().size());
         assertEquals("기준금리", briefing.glossary().get(0).term());
@@ -118,7 +119,7 @@ class BriefingBuilderTest {
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                articles, "gpt-4o", "v1", null);
+                articles, "gpt-4o", "v1", null, null);
 
         assertEquals(1, briefing.metadata().collectedArticleCount());
         assertEquals(1, briefing.metadata().selectedNewsCount());
@@ -140,7 +141,7 @@ class BriefingBuilderTest {
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                createArticles(), "gpt-4o", "v1", null);
+                createArticles(), "gpt-4o", "v1", null, null);
 
         assertEquals(NewsCategory.OTHER, briefing.news().get(0).category());
     }
