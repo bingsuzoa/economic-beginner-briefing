@@ -1,5 +1,5 @@
 briefing:
-  dry-run: false
+  dry-run: ${DRY_RUN:false}
   scheduler:
     enabled: true
 
