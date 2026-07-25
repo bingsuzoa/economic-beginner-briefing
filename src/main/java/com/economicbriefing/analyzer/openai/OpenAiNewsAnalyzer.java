@@ -72,7 +72,7 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                 request.targetDate(),
                 request.articles(),
                 openAiProperties.model(),
-                "v1",
+                "v2",
                 request.briefingTitle(),
                 request.targetHour()
         );
@@ -118,7 +118,13 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
             if (news.id() == null || news.id().isBlank()) {
                 throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR);
             }
-            if (news.representativeTitle() == null || news.representativeTitle().isBlank()) {
+            if (news.easyTitle() == null || news.easyTitle().isBlank()) {
+                throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR);
+            }
+            if (news.threeLineSummary() == null || news.threeLineSummary().isEmpty()) {
+                throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR);
+            }
+            if (news.whatHappened() == null || news.whatHappened().isBlank()) {
                 throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR);
             }
             if (news.sources() == null || news.sources().isEmpty()) {

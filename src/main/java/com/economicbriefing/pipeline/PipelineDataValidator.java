@@ -67,13 +67,13 @@ public class PipelineDataValidator {
         for (AnalyzedNews news : result.briefing().news()) {
             if (news.sources() == null || news.sources().isEmpty()) {
                 warnings.add(new ValidationWarning("analyze",
-                        "News \"" + news.representativeTitle() + "\" has no source references, excluded"));
+                        "News \"" + news.easyTitle() + "\" has no source references, excluded"));
                 continue;
             }
             boolean hasUrl = news.sources().stream().anyMatch(s -> s.url() != null && !s.url().isBlank());
             if (!hasUrl) {
                 warnings.add(new ValidationWarning("analyze",
-                        "News \"" + news.representativeTitle() + "\" has no source URLs, excluded"));
+                        "News \"" + news.easyTitle() + "\" has no source URLs, excluded"));
                 continue;
             }
             validNews.add(news);

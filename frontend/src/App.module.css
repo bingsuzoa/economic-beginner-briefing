@@ -1,0 +1,24 @@
+.layout {
+  display: flex;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  gap: 32px;
+}
+.main {
+  flex: 1;
+  min-width: 0;
+}
+.status {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--color-text-secondary);
+  font-size: 1.1rem;
+  line-height: 1.8;
+}
+.chick {
+  display: inline-block;
+  font-size: 2rem;
+  animation: wiggle 1s ease-in-out infinite;
+  margin-bottom: 8px;
+}

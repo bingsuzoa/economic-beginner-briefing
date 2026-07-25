@@ -27,7 +27,7 @@ class BriefingBuilderTest {
                 LocalDate.of(2025, 1, 15),
                 articles,
                 "gpt-4o",
-                "v1",
+                "v2",
                 null,
                 null
         );
@@ -39,19 +39,23 @@ class BriefingBuilderTest {
     }
 
     @Test
-    void shouldMapNewsWithSourceArticleMetadata() {
+    void shouldMapNewsWithNewFields() {
         AiResponse aiResponse = createAiResponse();
         List<Article> articles = createArticles();
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                articles, "gpt-4o", "v1", null, null);
+                articles, "gpt-4o", "v2", null, null);
 
         assertEquals(1, briefing.news().size());
         var news = briefing.news().get(0);
         assertEquals("news-1", news.id());
+        assertEquals("기준금리가 내려갔어요", news.easyTitle());
         assertEquals(NewsCategory.INTEREST_RATE, news.category());
         assertEquals(5, news.importance());
+        assertEquals(3, news.threeLineSummary().size());
+        assertNotNull(news.whatHappened());
+        assertNotNull(news.whyItHappened());
         assertEquals(NewsEvidenceStatus.CONFIRMED, news.evidenceStatus());
 
         assertEquals(1, news.sources().size());
@@ -65,16 +69,17 @@ class BriefingBuilderTest {
                 List.of("요약"),
                 List.of(new AiResponse.AiAnalyzedNews(
                         "news-1", "제목", "interest_rate", 5,
-                        "왜 중요한가", "한 줄 결론", "해설",
-                        "confirmed", null,
-                        List.of(), List.of(new AiResponse.AiSourceReference("non-existent-id", true))
+                        List.of("핵심"), "사건", "원인", "경제영향", "생활영향",
+                        List.of(), "긍정", "부정", List.of(),
+                        List.of(), "confirmed", List.of(),
+                        List.of(new AiResponse.AiSourceReference("non-existent-id", true))
                 )),
                 List.of()
         );
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                List.of(), "gpt-4o", "v1", null, null);
+                List.of(), "gpt-4o", "v2", null, null);
 
         assertEquals("Unknown", briefing.news().get(0).sources().get(0).sourceName());
     }
@@ -86,7 +91,7 @@ class BriefingBuilderTest {
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                articles, "gpt-4o", "v1", "커스텀 제목", null);
+                articles, "gpt-4o", "v2", "커스텀 제목", null);
 
         assertEquals("커스텀 제목", briefing.title());
     }
@@ -97,15 +102,17 @@ class BriefingBuilderTest {
                 List.of("요약"),
                 List.of(new AiResponse.AiAnalyzedNews(
                         "news-1", "제목", "interest_rate", 5,
-                        "왜", "결론", "해설", "confirmed", null,
-                        List.of(), List.of(new AiResponse.AiSourceReference("article-1", true))
+                        List.of("핵심"), "사건", "원인", "경제영향", "생활영향",
+                        List.of(), "긍정", "부정", List.of(),
+                        List.of(), "confirmed", List.of(),
+                        List.of(new AiResponse.AiSourceReference("article-1", true))
                 )),
                 List.of(new AiResponse.AiEconomicTerm("기준금리", "설명", "예시"))
         );
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                createArticles(), "gpt-4o", "v1", null, null);
+                createArticles(), "gpt-4o", "v2", null, null);
 
         assertEquals(1, briefing.glossary().size());
         assertEquals("기준금리", briefing.glossary().get(0).term());
@@ -119,12 +126,12 @@ class BriefingBuilderTest {
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                articles, "gpt-4o", "v1", null, null);
+                articles, "gpt-4o", "v2", null, null);
 
         assertEquals(1, briefing.metadata().collectedArticleCount());
         assertEquals(1, briefing.metadata().selectedNewsCount());
         assertEquals("gpt-4o", briefing.metadata().modelName());
-        assertEquals("v1", briefing.metadata().promptVersion());
+        assertEquals("v2", briefing.metadata().promptVersion());
     }
 
     @Test
@@ -133,15 +140,17 @@ class BriefingBuilderTest {
                 List.of("요약"),
                 List.of(new AiResponse.AiAnalyzedNews(
                         "news-1", "제목", "unknown_category", 3,
-                        "왜", "결론", "해설", "confirmed", null,
-                        List.of(), List.of(new AiResponse.AiSourceReference("article-1", true))
+                        List.of("핵심"), "사건", "원인", "경제영향", "생활영향",
+                        List.of(), "긍정", "부정", List.of(),
+                        List.of(), "confirmed", List.of(),
+                        List.of(new AiResponse.AiSourceReference("article-1", true))
                 )),
                 List.of()
         );
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                createArticles(), "gpt-4o", "v1", null, null);
+                createArticles(), "gpt-4o", "v2", null, null);
 
         assertEquals(NewsCategory.OTHER, briefing.news().get(0).category());
     }
@@ -151,15 +160,21 @@ class BriefingBuilderTest {
                 List.of("전체 요약 문장"),
                 List.of(new AiResponse.AiAnalyzedNews(
                         "news-1",
-                        "기준금리 인하 결정",
+                        "기준금리가 내려갔어요",
                         "interest_rate",
                         5,
-                        "변동금리 대출자에게 직접적 영향",
+                        List.of("핵심 1", "핵심 2", "핵심 3"),
                         "기준금리가 인하되었습니다.",
-                        "[무슨 일이 있었나]\n내용\n[왜 이런 일이 발생했나]\n배경\n[우리에게 어떤 의미가 있나]\n의미",
-                        "confirmed",
-                        null,
+                        "경기 둔화 우려",
+                        "시중금리 하락",
+                        "대출 이자 감소",
+                        List.of("변동금리 대출자"),
+                        "대출 이자 부담 감소",
+                        "예금 이자 수입 감소",
+                        List.of(),
                         List.of(new AiResponse.AiEconomicTerm("기준금리", "설명", null)),
+                        "confirmed",
+                        List.of(),
                         List.of(new AiResponse.AiSourceReference("article-1", true))
                 )),
                 List.of()

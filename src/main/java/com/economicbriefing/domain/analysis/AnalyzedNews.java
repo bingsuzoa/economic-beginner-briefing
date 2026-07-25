@@ -6,16 +6,20 @@ import com.economicbriefing.domain.article.NewsCategory;
 
 public record AnalyzedNews(
     String id,
-    String representativeTitle,
+    String easyTitle,
     NewsCategory category,
     int importance,
-    String whyImportant,
-    TargetAudience targetAudience,
-    List<ImpactAssessment> impactAssessment,
-    String oneLineSummary,
-    String explanation,
+    List<String> threeLineSummary,
+    String whatHappened,
+    String whyItHappened,
+    String economicImpact,
+    String householdImpact,
+    List<String> affectedPeople,
+    String positiveImpact,
+    String negativeImpact,
+    List<String> actionItems,
+    List<EconomicTerm> terms,
     NewsEvidenceStatus evidenceStatus,
-    String uncertaintyNote,
-    List<EconomicTerm> economicTerms,
+    List<String> uncertainties,
     List<SourceReference> sources
 ) {}

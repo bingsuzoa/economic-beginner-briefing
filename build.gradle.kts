@@ -33,7 +33,7 @@ dependencies {
 
     // Database
     runtimeOnly("org.postgresql:postgresql")
-    runtimeOnly("com.h2database:h2")
+    implementation("com.pgvector:pgvector:0.1.6")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
 

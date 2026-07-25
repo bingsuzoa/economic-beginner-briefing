@@ -46,17 +46,15 @@ class NotionPageBuilderTest {
     }
 
     @Test
-    void shouldBuildExplanationSections() {
-        Briefing briefing = createBriefingWithExplanation(
-                "[무슨 일이 있었나]\n\n사건 내용\n\n[왜 이런 일이 발생했나]\n\n배경 설명\n\n[우리에게 어떤 의미가 있나]\n\n의미 설명");
+    void shouldBuild12SectionBlocks() {
+        Briefing briefing = createBriefing();
         List<NotionBlock> blocks = NotionPageBuilder.buildBriefingBlocks(briefing);
 
-        // Should convert [sections] to heading3
-        long heading3Count = blocks.stream()
-                .filter(b -> "heading_3".equals(b.type()))
-                .count();
-        // At least 3 section headings + news title heading + 뉴스 안의 경제용어 + 출처
-        assertTrue(heading3Count >= 6);
+        // Should have section headings for the 12-section structure
+        assertTrue(blocks.stream().anyMatch(b -> "heading_3".equals(b.type()) && containsText(b, "무슨 일이 있었나요?")));
+        assertTrue(blocks.stream().anyMatch(b -> "heading_3".equals(b.type()) && containsText(b, "왜 이런 일이 생겼나요?")));
+        assertTrue(blocks.stream().anyMatch(b -> "heading_3".equals(b.type()) && containsText(b, "경제에는 어떤 영향을 주나요?")));
+        assertTrue(blocks.stream().anyMatch(b -> "heading_3".equals(b.type()) && containsText(b, "우리 생활에는 어떤 영향이 있나요?")));
     }
 
     @Test
@@ -111,7 +109,6 @@ class NotionPageBuilderTest {
         List<NotionBlock> blocks = NotionPageBuilder.buildBriefingBlocks(briefing);
 
         assertFalse(blocks.isEmpty());
-        // At least: summary heading + bullets + news heading + divider + news blocks + glossary + metadata
         assertTrue(blocks.size() >= 10);
     }
 
@@ -155,11 +152,25 @@ class NotionPageBuilderTest {
         return false;
     }
 
-    private Briefing createBriefing() {
-        return createBriefingWithExplanation("[무슨 일이 있었나]\n\n내용\n\n[왜 이런 일이 발생했나]\n\n배경\n\n[우리에게 어떤 의미가 있나]\n\n의미");
+    private AnalyzedNews createAnalyzedNews() {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.ofHours(9));
+        return new AnalyzedNews(
+                "news-1", "기준금리가 내려갔어요", NewsCategory.INTEREST_RATE, 5,
+                List.of("핵심 1", "핵심 2", "핵심 3"),
+                "기준금리가 인하되었습니다.", "경기 둔화 우려",
+                "시중금리 하락", "대출 이자 감소",
+                List.of("변동금리 대출자"),
+                "대출 이자 부담 감소", "예금 이자 수입 감소",
+                List.of(),
+                List.of(new EconomicTerm("기준금리", "한국은행이 정하는 금리", null)),
+                NewsEvidenceStatus.CONFIRMED,
+                List.of(),
+                List.of(new SourceReference("article-1", "한국은행", "기준금리 인하 결정",
+                        "https://example.com/1", now, true))
+        );
     }
 
-    private Briefing createBriefingWithExplanation(String explanation) {
+    private Briefing createBriefing() {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.ofHours(9));
         return new Briefing(
                 "briefing-2025-01-15",
@@ -167,17 +178,9 @@ class NotionPageBuilderTest {
                 now,
                 "2025-01-15 경제 브리핑",
                 List.of("요약 1", "요약 2"),
-                List.of(new AnalyzedNews(
-                        "news-1", "기준금리 인하", NewsCategory.INTEREST_RATE, 5,
-                        "변동금리 대출자에게 영향", null, null,
-                        "기준금리가 인하되었습니다.", explanation,
-                        NewsEvidenceStatus.CONFIRMED, null,
-                        List.of(new EconomicTerm("기준금리", "한국은행이 정하는 금리", null)),
-                        List.of(new SourceReference("article-1", "한국은행", "기준금리 인하 결정",
-                                "https://example.com/1", now, true))
-                )),
+                List.of(createAnalyzedNews()),
                 List.of(new EconomicTerm("기준금리", "한국은행이 정하는 금리", null)),
-                new BriefingMetadata(10, 10, 1, "gpt-4o", "v1")
+                new BriefingMetadata(10, 10, 1, "gpt-4o", "v2")
         );
     }
 
@@ -191,15 +194,17 @@ class NotionPageBuilderTest {
                 List.of("요약"),
                 List.of(new AnalyzedNews(
                         "news-1", "제목", NewsCategory.OTHER, 3,
-                        "이유", null, null,
-                        "결론", "해설",
-                        NewsEvidenceStatus.CONFIRMED, null,
+                        List.of("핵심"),
+                        "사건", "원인", "경제영향", "생활영향",
+                        List.of(), "긍정", "부정", List.of(),
+                        List.of(),
+                        NewsEvidenceStatus.CONFIRMED,
                         List.of(),
                         List.of(new SourceReference("article-1", "출처", "제목",
                                 "https://example.com", now, true))
                 )),
                 glossary,
-                new BriefingMetadata(5, 5, 1, "gpt-4o", "v1")
+                new BriefingMetadata(5, 5, 1, "gpt-4o", "v2")
         );
     }
 }

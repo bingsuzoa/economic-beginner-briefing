@@ -12,7 +12,9 @@ public record AppProperties(
     RetryProperties retry,
     DiversityProperties diversity,
     AudienceProperties audience,
-    SchedulerProperties scheduler
+    SchedulerProperties scheduler,
+    TeacherProperties teacher,
+    EmbeddingProperties embedding
 ) {
     public record TimeoutProperties(
         Duration rssHttp,
@@ -43,5 +45,16 @@ public record AppProperties(
     public record SchedulerProperties(
         boolean enabled,
         String cron
+    ) {}
+
+    public record TeacherProperties(
+        boolean enabled,
+        String promptVersion
+    ) {}
+
+    public record EmbeddingProperties(
+        boolean enabled,
+        String model,
+        int dimensions
     ) {}
 }

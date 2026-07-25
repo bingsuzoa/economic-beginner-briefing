@@ -49,28 +49,73 @@ public final class NotionPageBuilder {
         List<NotionBlock> blocks = new ArrayList<>();
 
         blocks.add(NotionBlock.divider());
-        blocks.add(NotionBlock.heading3(news.representativeTitle() + " (중요도 " + news.importance() + "/5)"));
-        blocks.add(NotionBlock.paragraph("한 줄 결론: " + news.oneLineSummary()));
-        blocks.add(NotionBlock.paragraph("왜 중요한가: " + news.whyImportant()));
+        blocks.add(NotionBlock.heading3(news.easyTitle() + " (중요도 " + news.importance() + "/5)"));
 
-        // Explanation paragraphs
-        String[] explanationParagraphs = news.explanation().split("\n\n");
-        for (String para : explanationParagraphs) {
-            String trimmed = para.trim();
-            if (trimmed.isEmpty()) {
-                continue;
-            }
-            if (trimmed.matches("^\\[.+]$")) {
-                String sectionTitle = trimmed.substring(1, trimmed.length() - 1);
-                blocks.add(NotionBlock.heading3(sectionTitle));
-            } else {
-                blocks.add(NotionBlock.paragraph(trimmed));
-            }
+        // 세 줄 핵심 정리
+        if (news.threeLineSummary() != null && !news.threeLineSummary().isEmpty()) {
+            blocks.add(NotionBlock.heading3("세 줄 핵심 정리"));
+            blocks.addAll(toBulletList(news.threeLineSummary()));
         }
 
-        // Economic terms
-        blocks.add(NotionBlock.heading3("뉴스 안의 경제용어"));
-        blocks.addAll(buildGlossaryBlocks(news.economicTerms()));
+        // 무슨 일이 있었나요?
+        if (news.whatHappened() != null && !news.whatHappened().isBlank()) {
+            blocks.add(NotionBlock.heading3("무슨 일이 있었나요?"));
+            blocks.add(NotionBlock.paragraph(news.whatHappened()));
+        }
+
+        // 왜 이런 일이 생겼나요?
+        if (news.whyItHappened() != null && !news.whyItHappened().isBlank()) {
+            blocks.add(NotionBlock.heading3("왜 이런 일이 생겼나요?"));
+            blocks.add(NotionBlock.paragraph(news.whyItHappened()));
+        }
+
+        // 경제 영향
+        if (news.economicImpact() != null && !news.economicImpact().isBlank()) {
+            blocks.add(NotionBlock.heading3("경제에는 어떤 영향을 주나요?"));
+            blocks.add(NotionBlock.paragraph(news.economicImpact()));
+        }
+
+        // 생활 영향
+        if (news.householdImpact() != null && !news.householdImpact().isBlank()) {
+            blocks.add(NotionBlock.heading3("우리 생활에는 어떤 영향이 있나요?"));
+            blocks.add(NotionBlock.paragraph(news.householdImpact()));
+        }
+
+        // 영향 대상
+        if (news.affectedPeople() != null && !news.affectedPeople().isEmpty()) {
+            blocks.add(NotionBlock.heading3("누가 영향을 받나요?"));
+            blocks.addAll(toBulletList(news.affectedPeople()));
+        }
+
+        // 긍정적 영향
+        if (news.positiveImpact() != null && !news.positiveImpact().isBlank()) {
+            blocks.add(NotionBlock.heading3("긍정적인 영향"));
+            blocks.add(NotionBlock.paragraph(news.positiveImpact()));
+        }
+
+        // 부정적 영향
+        if (news.negativeImpact() != null && !news.negativeImpact().isBlank()) {
+            blocks.add(NotionBlock.heading3("부정적인 영향"));
+            blocks.add(NotionBlock.paragraph(news.negativeImpact()));
+        }
+
+        // 확인할 것
+        if (news.actionItems() != null && !news.actionItems().isEmpty()) {
+            blocks.add(NotionBlock.heading3("지금 무엇을 확인하면 좋을까요?"));
+            blocks.addAll(toBulletList(news.actionItems()));
+        }
+
+        // 용어 설명
+        if (news.terms() != null && !news.terms().isEmpty()) {
+            blocks.add(NotionBlock.heading3("어려운 용어 설명"));
+            blocks.addAll(buildGlossaryBlocks(news.terms()));
+        }
+
+        // 불확실성
+        if (news.uncertainties() != null && !news.uncertainties().isEmpty()) {
+            blocks.add(NotionBlock.heading3("불확실성 구분"));
+            blocks.addAll(toBulletList(news.uncertainties()));
+        }
 
         // Sources
         blocks.add(NotionBlock.heading3("출처"));

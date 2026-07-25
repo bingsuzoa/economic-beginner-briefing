@@ -93,8 +93,8 @@ public final class BriefingBuilder {
                 })
                 .toList();
 
-        List<EconomicTerm> economicTerms = aiNews.economicTerms() != null
-                ? aiNews.economicTerms().stream()
+        List<EconomicTerm> terms = aiNews.terms() != null
+                ? aiNews.terms().stream()
                         .map(BriefingBuilder::mapToEconomicTerm)
                         .toList()
                 : Collections.emptyList();
@@ -115,17 +115,21 @@ public final class BriefingBuilder {
 
         return new AnalyzedNews(
                 aiNews.id(),
-                aiNews.representativeTitle(),
+                aiNews.easyTitle(),
                 category,
                 aiNews.importance(),
-                aiNews.whyImportant(),
-                null,
-                null,
-                aiNews.oneLineSummary(),
-                aiNews.explanation(),
+                aiNews.threeLineSummary() != null ? aiNews.threeLineSummary() : Collections.emptyList(),
+                aiNews.whatHappened(),
+                aiNews.whyItHappened(),
+                aiNews.economicImpact(),
+                aiNews.householdImpact(),
+                aiNews.affectedPeople() != null ? aiNews.affectedPeople() : Collections.emptyList(),
+                aiNews.positiveImpact(),
+                aiNews.negativeImpact(),
+                aiNews.actionItems() != null ? aiNews.actionItems() : Collections.emptyList(),
+                terms,
                 evidenceStatus,
-                aiNews.uncertaintyNote(),
-                economicTerms,
+                aiNews.uncertainties() != null ? aiNews.uncertainties() : Collections.emptyList(),
                 sources
         );
     }

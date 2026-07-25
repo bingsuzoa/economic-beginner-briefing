@@ -90,16 +90,17 @@ class MockBriefingPublisherTest {
                 "2025-01-15 경제 브리핑",
                 List.of("전체 요약 1", "전체 요약 2"),
                 List.of(new AnalyzedNews(
-                        "news-1", "기준금리 인하", NewsCategory.INTEREST_RATE, 5,
-                        "왜 중요한가", null, null,
-                        "한 줄 결론", "해설",
-                        NewsEvidenceStatus.CONFIRMED, null,
+                        "news-1", "기준금리가 내려갔어요", NewsCategory.INTEREST_RATE, 5,
+                        List.of("핵심 1", "핵심 2", "핵심 3"),
+                        "사건", "원인", "경제영향", "생활영향",
+                        List.of(), "긍정", "부정", List.of(),
                         List.of(new EconomicTerm("기준금리", "설명", null)),
+                        NewsEvidenceStatus.CONFIRMED, List.of(),
                         List.of(new SourceReference("article-1", "한국은행", "제목",
                                 "https://example.com", now, true))
                 )),
                 List.of(new EconomicTerm("기준금리", "설명", null)),
-                new BriefingMetadata(10, 10, 1, "gpt-4o", "v1")
+                new BriefingMetadata(10, 10, 1, "gpt-4o", "v2")
         );
     }
 }

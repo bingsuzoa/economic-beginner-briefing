@@ -1,0 +1,25 @@
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 48px 0;
+  gap: 32px;
+}
+.text h1 {
+  font-size: 2rem;
+  margin-bottom: 12px;
+  color: var(--color-text);
+}
+.text p {
+  font-size: 1.1rem;
+  color: var(--color-text-secondary);
+  max-width: 480px;
+}
+.chickBig {
+  font-size: 5rem;
+  animation: wiggle 2s ease-in-out infinite;
+}
+
+@media (max-width: 700px) {
+  .hero { flex-direction: column; text-align: center; padding: 32px 0; }
+}
