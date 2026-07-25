@@ -21,3 +21,6 @@ build/
 # Frontend
 node_modules/
 frontend/dist/
+
+# Server logs (scripts/run-server.ps1)
+logs/
