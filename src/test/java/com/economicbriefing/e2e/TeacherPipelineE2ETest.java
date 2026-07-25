@@ -15,9 +15,7 @@ import com.economicbriefing.classifier.repository.TeacherLabelRepository;
 import com.economicbriefing.domain.execution.ExecutionLog;
 import com.economicbriefing.domain.execution.ExecutionStatus;
 import com.economicbriefing.pipeline.BriefingPipeline;
-import com.economicbriefing.pipeline.MockExecutionTracker;
 import com.economicbriefing.pipeline.PipelineOptions;
-import com.economicbriefing.publisher.mock.MockBriefingPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -42,15 +40,18 @@ class TeacherPipelineE2ETest {
     private static final Logger log = LoggerFactory.getLogger(TeacherPipelineE2ETest.class);
 
     @Autowired private BriefingPipeline pipeline;
-    @Autowired private MockExecutionTracker executionTracker;
-    @Autowired private MockBriefingPublisher mockPublisher;
     @Autowired private ArticleRepository articleRepository;
     @Autowired private TeacherLabelRepository teacherLabelRepository;
     @Autowired private ArticleEmbeddingRepository embeddingRepository;
+    @Autowired private com.economicbriefing.admin.repository.PipelineRunRepository runRepository;
+    @Autowired private com.economicbriefing.admin.repository.PipelineLogRepository logRepository;
+    @Autowired private com.economicbriefing.admin.repository.PipelineItemRepository itemRepository;
 
     @BeforeEach
     void setUp() {
-        executionTracker.clear();
+        logRepository.deleteAll();
+        itemRepository.deleteAll();
+        runRepository.deleteAll();
         articleRepository.deleteAll();
         teacherLabelRepository.deleteAll();
         embeddingRepository.deleteAll();
@@ -188,7 +189,9 @@ class TeacherPipelineE2ETest {
     @Test
     void shouldGenerateReportForAllTestItems() {
         LocalDate targetDate = LocalDate.of(2026, 7, 23);
-        executionTracker.clear();
+        logRepository.deleteAll();
+        itemRepository.deleteAll();
+        runRepository.deleteAll();
         articleRepository.deleteAll();
         teacherLabelRepository.deleteAll();
 

@@ -24,12 +24,12 @@ class DiversitySelectorTest {
         AppProperties.DiversityProperties diversity = new AppProperties.DiversityProperties(3, 3, 3, 5);
         AppProperties props = new AppProperties(
                 true,
-                new AppProperties.TimeoutProperties(null, null, null, null),
+                new AppProperties.TimeoutProperties(null, null),
                 new AppProperties.RetryProperties(2, null, null),
                 diversity,
                 new AppProperties.AudienceProperties("beginner", List.of(), List.of()),
                 new AppProperties.SchedulerProperties(false, "0 0 * * * *"),
-                new AppProperties.TeacherProperties(true, "teacher-v1"),
+                new AppProperties.TeacherProperties(true, "teacher-v1", "gpt-4o-mini", 6),
                 new AppProperties.EmbeddingProperties(false, "text-embedding-3-small", 1536)
         );
         selector = new DiversitySelector(props);

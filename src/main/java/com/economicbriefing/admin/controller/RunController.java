@@ -12,8 +12,7 @@ import com.economicbriefing.admin.repository.PipelineItemRepository;
 import com.economicbriefing.admin.repository.PipelineLogRepository;
 import com.economicbriefing.admin.repository.PipelineRunRepository;
 import com.economicbriefing.config.AdminProperties;
-import com.economicbriefing.pipeline.BriefingPipeline;
-import com.economicbriefing.pipeline.PipelineLock;
+import com.economicbriefing.pipeline.PipelineExecutionService;
 import com.economicbriefing.pipeline.PipelineOptions;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -34,22 +33,19 @@ public class RunController {
     private final PipelineRunRepository runRepo;
     private final PipelineLogRepository logRepo;
     private final PipelineItemRepository itemRepo;
-    private final PipelineLock pipelineLock;
-    private final BriefingPipeline pipeline;
+    private final PipelineExecutionService executionService;
     private final AdminProperties adminProperties;
 
     public RunController(
             PipelineRunRepository runRepo,
             PipelineLogRepository logRepo,
             PipelineItemRepository itemRepo,
-            PipelineLock pipelineLock,
-            BriefingPipeline pipeline,
+            PipelineExecutionService executionService,
             AdminProperties adminProperties) {
         this.runRepo = runRepo;
         this.logRepo = logRepo;
         this.itemRepo = itemRepo;
-        this.pipelineLock = pipelineLock;
-        this.pipeline = pipeline;
+        this.executionService = executionService;
         this.adminProperties = adminProperties;
     }
 
@@ -116,8 +112,7 @@ public class RunController {
     @GetMapping("/runs/{runId}/items")
     public ResponseEntity<ApiResponse<?>> getRunItems(
             @PathVariable String runId,
-            @RequestParam(required = false) String analysisStatus,
-            @RequestParam(required = false) String publishStatus) {
+            @RequestParam(required = false) String analysisStatus) {
 
         if (runRepo.findById(runId).isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -126,8 +121,6 @@ public class RunController {
 
         var items = analysisStatus != null
                 ? itemRepo.findByRunIdAndAnalysisStatusOrderByIdAsc(runId, analysisStatus)
-                : publishStatus != null
-                ? itemRepo.findByRunIdAndPublishStatusOrderByIdAsc(runId, publishStatus)
                 : itemRepo.findByRunIdOrderByIdAsc(runId);
 
         return ResponseEntity.ok(ApiResponse.ok(items));
@@ -147,17 +140,16 @@ public class RunController {
             }
         }
 
-        if (pipelineLock.isLocked()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(ApiResponse.error("PIPELINE_ALREADY_RUNNING", "파이프라인이 이미 실행 중입니다."));
-        }
-
         PipelineOptions options = targetDateStr != null
                 ? PipelineOptions.manual(LocalDate.parse(targetDateStr))
                 : PipelineOptions.hourly();
 
-        // Run async
-        Thread.startVirtualThread(() -> pipeline.run(options));
+        // Same service the scheduler uses; it takes the lock before dispatching, so a
+        // concurrent run is rejected atomically rather than by a check-then-act race.
+        if (!executionService.tryRunAsync(options)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiResponse.error("PIPELINE_ALREADY_RUNNING", "파이프라인이 이미 실행 중입니다."));
+        }
 
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(ApiResponse.ok(Map.of("message", "파이프라인 실행이 시작되었습니다.")));

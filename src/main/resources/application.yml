@@ -1,17 +1,18 @@
 spring:
   application:
     name: economic-briefing
+
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/economic_briefing?stringtype=unspecified}
-    username: ${SPRING_DATASOURCE_USERNAME:${user.name}}
-    password: ${SPRING_DATASOURCE_PASSWORD:}
-    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.postgresql.Driver}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: ${SPRING_JPA_DDL_AUTO:none}
-    database-platform: ${SPRING_JPA_DIALECT:}
+      ddl-auto: none
+
   flyway:
-    enabled: ${SPRING_FLYWAY_ENABLED:true}
+    enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
     baseline-version: 1
@@ -20,21 +21,25 @@ server:
   port: ${ADMIN_PORT:3000}
 
 briefing:
-  dry-run: ${DRY_RUN:true}
+  # false = real RSS + real OpenAI. When true, every external call is mocked.
+  dry-run: ${DRY_RUN:false}
+
   timeouts:
     rss-http: 10s
     ai-api: 60s
-    notion-api: 15s
-    email-api: 15s
+
   retry:
-    max-attempts: 2
+    # 3 attempts: a TPM-limit 429 needs the rate window to roll over, one retry is not enough
+    max-attempts: 3
     initial-delay: 1s
     next-delay: 2s
+
   diversity:
     max-articles-per-source: 3
     max-articles-per-category: 3
     min-personal-finance-relevance: 3
     soft-max-override-score: 5
+
   audience:
     economic-knowledge-level: beginner
     interests:
@@ -48,32 +53,44 @@ briefing:
       - "\uC2E0\uD63C\uBD80\uBD80"
       - "\uC8FC\uD0DD \uAD6C\uC785\uACFC \uCD9C\uC0B0 \uC900\uBE44"
       - "\uACBD\uC81C\uC6A9\uC5B4 \uC124\uBA85 \uD544\uC694"
+
   cli:
     enabled: ${BRIEFING_CLI_ENABLED:false}
+
   scheduler:
-    enabled: ${SCHEDULER_ENABLED:false}
-    cron: "0 0 * * * *"
+    # On by default: this file is the operating configuration, no profile required.
+    # Set SCHEDULER_ENABLED=false to run without the hourly trigger (tests, one-shot CLI).
+    enabled: ${SCHEDULER_ENABLED:true}
+    # 6 fields (sec min hour day month weekday). Evaluated in Asia/Seoul.
+    cron: ${SCHEDULER_CRON:0 0 * * * *}
+
+  health:
+    # GET /api/health/briefing reports DOWN past this age. Hourly cron, so this tolerates
+    # two missed ticks before paging. Only enforced while the scheduler is enabled.
+    max-success-age: ${HEALTH_MAX_SUCCESS_AGE:3h}
+
   teacher:
     enabled: ${TEACHER_ENABLED:true}
     prompt-version: "teacher-v1"
+    # Cheap model on purpose: one call per article, so this stage would otherwise drain
+    # the main model's tokens-per-minute budget before the analysis call runs.
+    model: ${TEACHER_MODEL:gpt-4o-mini}
+    concurrency: ${TEACHER_CONCURRENCY:6}
+
   embedding:
-    enabled: ${EMBEDDING_ENABLED:false}
-    model: "text-embedding-3-small"
+    enabled: ${EMBEDDING_ENABLED:true}
+    model: text-embedding-3-small
     dimensions: 1536
 
 openai:
-  api-key: ${OPENAI_API_KEY:}
-  model: gpt-4o
+  api-key: ${OPENAI_API_KEY}
+  model: ${OPENAI_MODEL:gpt-4o}
   temperature: 0.3
   timeout: 60s
   max-selected-news: 10
 
-notion:
-  api-key: ${NOTION_API_KEY:}
-  database-id: ${NOTION_DATABASE_ID:}
-  timeout: 15s
-
 admin:
+  # No default: a blank token is rejected at startup and by the admin filter.
   token: ${ADMIN_TOKEN:}
   default-page-size: 20
 

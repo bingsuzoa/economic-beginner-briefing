@@ -43,7 +43,8 @@ public class OpenAiTeacherClassifier implements TeacherClassifier {
 
     private TeacherLabelResponse callAndParse(Article article) {
         String userPrompt = TeacherPromptBuilder.buildUserPrompt(article);
-        String content = aiClient.complete(TeacherPromptBuilder.SYSTEM_PROMPT, userPrompt);
+        String content = aiClient.complete(TeacherPromptBuilder.SYSTEM_PROMPT, userPrompt,
+                appProperties.teacher().model());
 
         try {
             return objectMapper.readValue(content, TeacherLabelResponse.class);

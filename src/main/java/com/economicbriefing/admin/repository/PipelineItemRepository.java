@@ -10,6 +10,4 @@ public interface PipelineItemRepository extends JpaRepository<PipelineItemEntity
     List<PipelineItemEntity> findByRunIdOrderByIdAsc(String runId);
 
     List<PipelineItemEntity> findByRunIdAndAnalysisStatusOrderByIdAsc(String runId, String analysisStatus);
-
-    List<PipelineItemEntity> findByRunIdAndPublishStatusOrderByIdAsc(String runId, String publishStatus);
 }

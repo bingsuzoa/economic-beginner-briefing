@@ -65,6 +65,24 @@ class RetryExecutorTest {
     }
 
     @Test
+    void shouldWaitTheServerSuppliedRetryAfterInsteadOfTheFixedDelay() {
+        AtomicInteger attempts = new AtomicInteger(0);
+        long start = System.nanoTime();
+
+        String result = RetryExecutor.execute(() -> {
+            if (attempts.incrementAndGet() < 2) {
+                // fixed delay is 10ms; the server asks for 300ms and must win
+                throw new AnalyzeException(ErrorCode.ANALYZE_API_ERROR, Duration.ofMillis(300));
+            }
+            return "ok";
+        }, retryConfig);
+
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+        assertEquals("ok", result);
+        assertTrue(elapsedMs >= 300, "should honour retry-after, waited only " + elapsedMs + "ms");
+    }
+
+    @Test
     void shouldNotRetryNonBriefingExceptions() {
         AtomicInteger attempts = new AtomicInteger(0);
 

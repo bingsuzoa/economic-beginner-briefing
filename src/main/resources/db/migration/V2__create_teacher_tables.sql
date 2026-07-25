@@ -48,14 +48,13 @@ CREATE INDEX idx_teacher_labels_article_id ON teacher_labels (article_id);
 CREATE INDEX idx_teacher_labels_label ON teacher_labels (label);
 CREATE INDEX idx_teacher_labels_prompt_version ON teacher_labels (teacher_prompt_version);
 
--- pgvector extension
-CREATE EXTENSION IF NOT EXISTS vector;
-
--- Embedding (pgvector native vector type)
+-- Embedding
+-- ponytail: pgvector text format "[0.1,...]" in TEXT. Windows PG17 has no pgvector and
+-- nothing queries by similarity yet. Switch to vector(1536) when ANN search is needed.
 CREATE TABLE IF NOT EXISTS article_embeddings (
   id SERIAL PRIMARY KEY,
   article_id VARCHAR(64) NOT NULL REFERENCES articles(id),
-  embedding_vector vector(1536) NOT NULL,
+  embedding_vector TEXT NOT NULL,
   embedding_model VARCHAR(128) NOT NULL,
   embedding_model_version VARCHAR(64),
   dimensions INTEGER NOT NULL,

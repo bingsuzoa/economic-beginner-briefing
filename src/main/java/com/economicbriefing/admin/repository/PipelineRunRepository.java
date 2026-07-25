@@ -13,6 +13,10 @@ public interface PipelineRunRepository extends JpaRepository<PipelineRunEntity, 
     @Query("SELECT r FROM PipelineRunEntity r WHERE r.status = 'RUNNING' ORDER BY r.startedAt DESC")
     Optional<PipelineRunEntity> findRunning();
 
+    Optional<PipelineRunEntity> findFirstByDedupeKeyOrderByStartedAtDesc(String dedupeKey);
+
+    Optional<PipelineRunEntity> findFirstByStatusOrderByStartedAtDesc(String status);
+
     Page<PipelineRunEntity> findAllByOrderByStartedAtDesc(Pageable pageable);
 
     Page<PipelineRunEntity> findByStatusOrderByStartedAtDesc(String status, Pageable pageable);

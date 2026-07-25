@@ -27,15 +27,13 @@ class AppPropertiesTest {
         assertNotNull(timeouts);
         assertEquals(Duration.ofSeconds(10), timeouts.rssHttp());
         assertEquals(Duration.ofSeconds(60), timeouts.aiApi());
-        assertEquals(Duration.ofSeconds(15), timeouts.notionApi());
-        assertEquals(Duration.ofSeconds(15), timeouts.emailApi());
     }
 
     @Test
     void shouldBindRetry() {
         AppProperties.RetryProperties retry = appProperties.retry();
         assertNotNull(retry);
-        assertEquals(2, retry.maxAttempts());
+        assertEquals(3, retry.maxAttempts());
         assertEquals(Duration.ofSeconds(1), retry.initialDelay());
         assertEquals(Duration.ofSeconds(2), retry.nextDelay());
     }

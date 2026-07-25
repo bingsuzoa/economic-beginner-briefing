@@ -22,6 +22,10 @@ public class PipelineRunEntity {
     @Column(name = "trigger_type", nullable = false, length = 20)
     private String triggerType;
 
+    /** date (manual) or date+hour (scheduled) — what duplicate detection keys on. */
+    @Column(name = "dedupe_key", length = 64)
+    private String dedupeKey;
+
     @Column(name = "started_at", nullable = false)
     private OffsetDateTime startedAt;
 
@@ -45,12 +49,6 @@ public class PipelineRunEntity {
 
     @Column(name = "analysis_failure_count", nullable = false)
     private int analysisFailureCount;
-
-    @Column(name = "publish_success_count", nullable = false)
-    private int publishSuccessCount;
-
-    @Column(name = "publish_failure_count", nullable = false)
-    private int publishFailureCount;
 
     @Column(name = "total_failure_count", nullable = false)
     private int totalFailureCount;
@@ -89,6 +87,9 @@ public class PipelineRunEntity {
     public String getTriggerType() { return triggerType; }
     public void setTriggerType(String triggerType) { this.triggerType = triggerType; }
 
+    public String getDedupeKey() { return dedupeKey; }
+    public void setDedupeKey(String dedupeKey) { this.dedupeKey = dedupeKey; }
+
     public OffsetDateTime getStartedAt() { return startedAt; }
     public void setStartedAt(OffsetDateTime startedAt) { this.startedAt = startedAt; }
 
@@ -112,12 +113,6 @@ public class PipelineRunEntity {
 
     public int getAnalysisFailureCount() { return analysisFailureCount; }
     public void setAnalysisFailureCount(int analysisFailureCount) { this.analysisFailureCount = analysisFailureCount; }
-
-    public int getPublishSuccessCount() { return publishSuccessCount; }
-    public void setPublishSuccessCount(int publishSuccessCount) { this.publishSuccessCount = publishSuccessCount; }
-
-    public int getPublishFailureCount() { return publishFailureCount; }
-    public void setPublishFailureCount(int publishFailureCount) { this.publishFailureCount = publishFailureCount; }
 
     public int getTotalFailureCount() { return totalFailureCount; }
     public void setTotalFailureCount(int totalFailureCount) { this.totalFailureCount = totalFailureCount; }

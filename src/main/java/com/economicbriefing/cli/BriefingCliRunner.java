@@ -45,9 +45,10 @@ public class BriefingCliRunner implements CommandLineRunner {
             targetDateStr = System.getenv("TARGET_DATE");
         }
 
-        // Determine mode from GitHub Actions event
-        String githubEvent = System.getenv("GITHUB_EVENT_NAME");
-        if ("workflow_dispatch".equals(githubEvent)) {
+        // An explicit target date means a specific window was requested; otherwise this is
+        // the automatic previous-hour run. (Previously read from GITHUB_EVENT_NAME, which no
+        // longer exists now that the CI workflows are gone.)
+        if (targetDateStr != null && !targetDateStr.isBlank()) {
             mode = "manual";
         }
 

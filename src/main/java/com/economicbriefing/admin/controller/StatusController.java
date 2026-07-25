@@ -3,6 +3,7 @@ package com.economicbriefing.admin.controller;
 import com.economicbriefing.admin.dto.ApiResponse;
 import com.economicbriefing.admin.dto.StatusResponse;
 import com.economicbriefing.admin.repository.PipelineRunRepository;
+import com.economicbriefing.config.AppProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
@@ -17,9 +18,11 @@ public class StatusController {
     private static final Logger log = LoggerFactory.getLogger(StatusController.class);
 
     private final PipelineRunRepository runRepo;
+    private final AppProperties appProperties;
 
-    public StatusController(PipelineRunRepository runRepo) {
+    public StatusController(PipelineRunRepository runRepo, AppProperties appProperties) {
         this.runRepo = runRepo;
+        this.appProperties = appProperties;
     }
 
     @GetMapping("/status")
@@ -51,13 +54,15 @@ public class StatusController {
             );
         }
 
+        var scheduler = appProperties.scheduler();
         StatusResponse status = new StatusResponse(
                 "running",
                 running != null,
                 running != null ? running.getId() : null,
                 running != null ? running.getCurrentStep() : null,
                 lastRunInfo,
-                dbConnected
+                dbConnected,
+                new StatusResponse.SchedulerInfo(scheduler.state(), scheduler.cron())
         );
 
         return ApiResponse.ok(status);

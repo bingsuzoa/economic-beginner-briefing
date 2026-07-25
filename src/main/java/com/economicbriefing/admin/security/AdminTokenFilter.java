@@ -24,8 +24,10 @@ public class AdminTokenFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                      FilterChain filterChain) throws ServletException, IOException {
+        // Fail closed. A blank token previously let every admin request through, which
+        // silently exposed run-triggering and history to anyone who could reach the port.
         if (adminToken == null || adminToken.isBlank()) {
-            filterChain.doFilter(request, response);
+            sendUnauthorized(response, "관리자 토큰이 설정되지 않았습니다.");
             return;
         }
 

@@ -47,8 +47,7 @@ import static org.junit.jupiter.api.Assertions.*;
     "briefing.embedding.enabled=true",
     "briefing.teacher.enabled=true",
     "briefing.teacher.prompt-version=teacher-v1",
-    "notion.api-key=dummy-for-test",
-    "notion.database-id=dummy-for-test"
+    "admin.token=test-admin-token",
 })
 @EnabledIfEnvironmentVariable(named = "OPENAI_API_KEY", matches = "sk-.+", disabledReason = "OPENAI_API_KEY not set")
 class PgVectorE2ETest {

@@ -11,8 +11,7 @@ import com.economicbriefing.admin.repository.PipelineItemRepository;
 import com.economicbriefing.admin.repository.PipelineLogRepository;
 import com.economicbriefing.admin.repository.PipelineRunRepository;
 import com.economicbriefing.admin.security.SecurityConfig;
-import com.economicbriefing.pipeline.BriefingPipeline;
-import com.economicbriefing.pipeline.PipelineLock;
+import com.economicbriefing.pipeline.PipelineExecutionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -48,10 +47,7 @@ class RunControllerTest {
     private PipelineItemRepository itemRepo;
 
     @MockitoBean
-    private PipelineLock pipelineLock;
-
-    @MockitoBean
-    private BriefingPipeline pipeline;
+    private PipelineExecutionService executionService;
 
     private static final String AUTH = "Bearer test-admin-token";
 
@@ -145,7 +141,7 @@ class RunControllerTest {
 
     @Test
     void shouldTriggerPipelineRun() throws Exception {
-        when(pipelineLock.isLocked()).thenReturn(false);
+        when(executionService.tryRunAsync(any())).thenReturn(true);
 
         mockMvc.perform(post("/api/admin/runs")
                         .header("Authorization", AUTH)
@@ -157,7 +153,7 @@ class RunControllerTest {
 
     @Test
     void shouldRejectWhenPipelineAlreadyRunning() throws Exception {
-        when(pipelineLock.isLocked()).thenReturn(true);
+        when(executionService.tryRunAsync(any())).thenReturn(false);
 
         mockMvc.perform(post("/api/admin/runs")
                         .header("Authorization", AUTH)
@@ -179,7 +175,7 @@ class RunControllerTest {
 
     @Test
     void shouldTriggerWithTargetDate() throws Exception {
-        when(pipelineLock.isLocked()).thenReturn(false);
+        when(executionService.tryRunAsync(any())).thenReturn(true);
 
         mockMvc.perform(post("/api/admin/runs")
                         .header("Authorization", AUTH)

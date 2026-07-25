@@ -1,10 +1,7 @@
 package com.economicbriefing.scheduler;
 
-import com.economicbriefing.domain.execution.ExecutionLog;
-import com.economicbriefing.domain.execution.ExecutionStatus;
-import com.economicbriefing.pipeline.BriefingPipeline;
+import com.economicbriefing.pipeline.PipelineExecutionService;
 import com.economicbriefing.pipeline.PipelineOptions;
-import com.economicbriefing.util.KstDateTimeUtil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -13,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -22,43 +20,58 @@ import static org.mockito.Mockito.*;
 class BriefingSchedulerTest {
 
     @Mock
-    private BriefingPipeline pipeline;
+    private PipelineExecutionService executionService;
 
     @InjectMocks
     private BriefingScheduler scheduler;
 
     @Test
     void shouldRunHourlyBriefing() {
-        ExecutionLog log = new ExecutionLog("test-id", LocalDate.now(), KstDateTimeUtil.now());
-        log.markSuccess(KstDateTimeUtil.now());
-
-        when(pipeline.run(any(PipelineOptions.class))).thenReturn(log);
+        when(executionService.tryRun(any(PipelineOptions.class))).thenReturn(Optional.empty());
 
         scheduler.runHourlyBriefing();
 
         ArgumentCaptor<PipelineOptions> captor = ArgumentCaptor.forClass(PipelineOptions.class);
-        verify(pipeline).run(captor.capture());
+        verify(executionService).tryRun(captor.capture());
 
         PipelineOptions options = captor.getValue();
         assertEquals("SCHEDULER", options.triggerType());
         assertNotNull(options.timeRange());
     }
 
+    /** Requirement 7: a failing tick must not propagate, or the trigger stops firing. */
     @Test
     void shouldHandleExceptionGracefully() {
-        when(pipeline.run(any())).thenThrow(new RuntimeException("Unexpected error"));
+        when(executionService.tryRun(any())).thenThrow(new RuntimeException("Unexpected error"));
 
         assertDoesNotThrow(() -> scheduler.runHourlyBriefing());
+        assertDoesNotThrow(() -> scheduler.runHourlyBriefing());
+        verify(executionService, times(2)).tryRun(any());
     }
 
     @Test
-    void shouldCallPipelineExactlyOnce() {
-        ExecutionLog log = new ExecutionLog("test-id", LocalDate.now(), KstDateTimeUtil.now());
-        log.markSuccess(KstDateTimeUtil.now());
-        when(pipeline.run(any())).thenReturn(log);
+    void shouldCallExecutionServiceExactlyOnce() {
+        when(executionService.tryRun(any())).thenReturn(Optional.empty());
 
         scheduler.runHourlyBriefing();
 
-        verify(pipeline, times(1)).run(any());
+        verify(executionService, times(1)).tryRun(any());
+    }
+
+    /** The scheduler decides when; it must not re-implement how a run happens. */
+    @Test
+    void shouldDelegateEverythingToTheSharedService() {
+        when(executionService.tryRun(any())).thenReturn(Optional.empty());
+
+        scheduler.runHourlyBriefing();
+
+        verify(executionService).tryRun(any());
+        verifyNoMoreInteractions(executionService);
+    }
+
+    @Test
+    void shouldSeparateScheduledAndManualTriggerTypes() {
+        assertEquals("MANUAL", PipelineOptions.manual(LocalDate.of(2026, 7, 25)).triggerType());
+        assertEquals("SCHEDULER", PipelineOptions.hourly().triggerType());
     }
 }

@@ -28,8 +28,8 @@ src/
 │  ├─ config/             # Spring 설정
 │  └─ common/             # 공통 유틸
 ├─ main/resources/
-│  ├─ application.yml
-│  ├─ application-prod.yml
+│  ├─ application.yml     # 운영 설정 (프로파일 없이 이 파일로 실행)
+│  ├─ application-test.yml
 │  └─ db/migration/       # Flyway SQL
 └─ test/java/com/economicbriefing/
 
