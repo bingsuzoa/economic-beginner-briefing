@@ -1,0 +1,107 @@
+.card {
+  background: var(--color-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 32px;
+  margin-bottom: 28px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  animation: fadeInUp 0.5s ease both;
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.category {
+  display: inline-block;
+  background: var(--color-primary);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+.evidence {
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+.confirmed {
+  background: #e6fcf0;
+  color: var(--color-positive);
+}
+.proposed {
+  background: #fff3e0;
+  color: #e8890c;
+}
+.expected {
+  background: #eee;
+  color: #888;
+}
+.title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  line-height: 1.4;
+}
+.affected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+.tag {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+.uncertainties {
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.uncertainties strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.actions {
+  margin-bottom: 20px;
+}
+.actions h4 {
+  font-size: 0.95rem;
+  margin-bottom: 8px;
+}
+.actions ul {
+  list-style: disc inside;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+.teacherBadge {
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: #e8f4fd;
+  color: #1976d2;
+  font-weight: 600;
+}
+.projected {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.uncertain {
+  background: #fff3e0;
+  color: #e65100;
+}

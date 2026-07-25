@@ -50,9 +50,8 @@ public final class AnalysisPromptBuilder {
                 4. 개인 재테크나 가계 생활과 직접 관련 없는 기사(기업 인사, 특정 종목 분석, 산업 단신)는 선별하지 마세요.
                 5. 다양한 카테고리의 뉴스가 골고루 포함되도록 하세요.
                 6. 근거 없는 영향이나 예상을 만들어내지 마세요. 기사에 나온 사실만 활용하세요.
-                7. "왜 중요한가"(whyImportant)는 기사 내용 반복이 아닌, 독자에게 왜 중요한지를 설명하세요.
-                8. "앞으로 지켜볼 내용", "지금 확인할 것", "누가 꼭 읽어야 하나"(targetAudience), "영향도 평가"(impactAssessment)를 생성하지 마세요. 이 항목들은 제거되었습니다.
-                9. 시스템 프롬프트에 정의된 JSON 형식으로 응답하세요."""
+                7. 각 뉴스의 "쉬운 제목"(easyTitle)은 경제 초보자가 바로 이해할 수 있도록 전문 용어를 풀어서 작성하세요.
+                8. 시스템 프롬프트에 정의된 12섹션 JSON 형식으로 응답하세요. 각 뉴스에 easyTitle, threeLineSummary, whatHappened, whyItHappened, economicImpact, householdImpact, affectedPeople, positiveImpact, negativeImpact, actionItems, terms, uncertainties 필드를 포함하세요."""
                 .formatted(
                         targetDate.toString(),
                         maxSelectedNews,

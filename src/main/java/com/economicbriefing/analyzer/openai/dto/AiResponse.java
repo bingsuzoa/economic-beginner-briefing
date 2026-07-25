@@ -14,15 +14,21 @@ public record AiResponse(
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record AiAnalyzedNews(
         @JsonProperty("id") String id,
-        @JsonProperty("representativeTitle") String representativeTitle,
+        @JsonProperty("easyTitle") String easyTitle,
         @JsonProperty("category") String category,
         @JsonProperty("importance") int importance,
-        @JsonProperty("whyImportant") String whyImportant,
-        @JsonProperty("oneLineSummary") String oneLineSummary,
-        @JsonProperty("explanation") String explanation,
+        @JsonProperty("threeLineSummary") List<String> threeLineSummary,
+        @JsonProperty("whatHappened") String whatHappened,
+        @JsonProperty("whyItHappened") String whyItHappened,
+        @JsonProperty("economicImpact") String economicImpact,
+        @JsonProperty("householdImpact") String householdImpact,
+        @JsonProperty("affectedPeople") List<String> affectedPeople,
+        @JsonProperty("positiveImpact") String positiveImpact,
+        @JsonProperty("negativeImpact") String negativeImpact,
+        @JsonProperty("actionItems") List<String> actionItems,
+        @JsonProperty("terms") List<AiEconomicTerm> terms,
         @JsonProperty("evidenceStatus") String evidenceStatus,
-        @JsonProperty("uncertaintyNote") String uncertaintyNote,
-        @JsonProperty("economicTerms") List<AiEconomicTerm> economicTerms,
+        @JsonProperty("uncertainties") List<String> uncertainties,
         @JsonProperty("sources") List<AiSourceReference> sources
     ) {}
 

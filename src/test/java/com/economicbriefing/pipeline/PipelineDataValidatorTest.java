@@ -132,8 +132,13 @@ class PipelineDataValidatorTest {
 
     private AnalyzedNews createAnalyzedNews(String id, List<SourceReference> sources) {
         return new AnalyzedNews(id, "제목", NewsCategory.OTHER, 3,
-                "이유", null, null, "결론", "해설",
-                NewsEvidenceStatus.CONFIRMED, null, List.of(), sources);
+                List.of("핵심"),
+                "사건", "원인", "경제영향", "생활영향",
+                List.of(), "긍정", "부정", List.of(),
+                List.of(),
+                NewsEvidenceStatus.CONFIRMED,
+                List.of(),
+                sources);
     }
 
     private AnalyzeNewsResult createAnalyzeResult(List<AnalyzedNews> news) {
@@ -142,7 +147,7 @@ class PipelineDataValidatorTest {
                 OffsetDateTime.now(ZoneOffset.ofHours(9)),
                 targetDate + " 경제 브리핑",
                 List.of("요약"), news, List.of(),
-                new BriefingMetadata(5, 5, news.size(), "mock", "v1")
+                new BriefingMetadata(5, 5, news.size(), "mock", "v2")
         );
         return new AnalyzeNewsResult(briefing, List.of(), List.of());
     }

@@ -30,13 +30,21 @@ class BriefingTest {
         );
 
         AnalyzedNews news = new AnalyzedNews(
-            "news-1", "금리 인하 소식",
-            NewsCategory.INTEREST_RATE, 5, "가계 대출 이자에 직접 영향",
-            null, null,
+            "news-1", "금리가 내려갔어요",
+            NewsCategory.INTEREST_RATE, 5,
+            List.of("핵심 1", "핵심 2", "핵심 3"),
             "한국은행이 기준금리를 인하했습니다",
-            "한국은행이 기준금리를 0.25%p 인하하여 3.25%로 결정했습니다.",
-            NewsEvidenceStatus.CONFIRMED, null,
-            List.of(term), List.of(source)
+            "경기 둔화 우려",
+            "시중금리 하락",
+            "대출 이자 감소",
+            List.of("변동금리 대출자"),
+            "대출 이자 부담 감소",
+            "예금 이자 수입 감소",
+            List.of(),
+            List.of(term),
+            NewsEvidenceStatus.CONFIRMED,
+            List.of(),
+            List.of(source)
         );
 
         BriefingMetadata metadata = new BriefingMetadata(50, 30, 5, "gpt-4o", "v1");

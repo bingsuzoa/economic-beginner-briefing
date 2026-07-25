@@ -1,11 +1,21 @@
 package com.economicbriefing.pipeline;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import com.economicbriefing.analyzer.NewsAnalyzer;
 import com.economicbriefing.analyzer.dto.AnalyzeNewsRequest;
 import com.economicbriefing.analyzer.dto.AnalyzeNewsResult;
+import com.economicbriefing.classifier.ArticlePersistenceService;
+import com.economicbriefing.classifier.EmbeddingService;
+import com.economicbriefing.classifier.TeacherClassifier;
+import com.economicbriefing.classifier.TeacherLabelResponse;
+import com.economicbriefing.classifier.entity.ArticleAnalysisEntity;
+import com.economicbriefing.classifier.entity.TeacherLabelEntity;
+import com.economicbriefing.classifier.repository.ArticleAnalysisRepository;
+import com.economicbriefing.classifier.repository.TeacherLabelRepository;
 import com.economicbriefing.collector.NewsCollector;
 import com.economicbriefing.collector.dto.CollectNewsRequest;
 import com.economicbriefing.collector.dto.CollectNewsResult;
@@ -13,12 +23,14 @@ import com.economicbriefing.collector.filter.DiversitySelector;
 import com.economicbriefing.collector.filter.RelevanceScorer;
 import com.economicbriefing.config.AppProperties;
 import com.economicbriefing.config.OpenAiProperties;
+import com.economicbriefing.domain.analysis.AnalyzedNews;
 import com.economicbriefing.domain.analysis.AudienceProfile;
 import com.economicbriefing.domain.article.Article;
 import com.economicbriefing.domain.article.NewsCategory;
 import com.economicbriefing.domain.execution.ExecutionError;
 import com.economicbriefing.domain.execution.ExecutionLog;
 import com.economicbriefing.domain.execution.PublicationDecision;
+import com.economicbriefing.domain.briefing.Briefing;
 import com.economicbriefing.exception.BriefingException;
 import com.economicbriefing.exception.ErrorCode;
 import com.economicbriefing.publisher.BriefingPublisher;
@@ -45,6 +57,12 @@ public class BriefingPipeline {
     private final DiversitySelector diversitySelector;
     private final AppProperties appProperties;
     private final OpenAiProperties openAiProperties;
+    private final TeacherClassifier teacherClassifier;
+    private final ArticlePersistenceService articlePersistenceService;
+    private final TeacherLabelRepository teacherLabelRepository;
+    private final ArticleAnalysisRepository articleAnalysisRepository;
+    private final EmbeddingService embeddingService; // null when embedding disabled
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     public BriefingPipeline(
             NewsCollector collector,
@@ -55,7 +73,13 @@ public class BriefingPipeline {
             RelevanceScorer relevanceScorer,
             DiversitySelector diversitySelector,
             AppProperties appProperties,
-            OpenAiProperties openAiProperties) {
+            OpenAiProperties openAiProperties,
+            TeacherClassifier teacherClassifier,
+            ArticlePersistenceService articlePersistenceService,
+            TeacherLabelRepository teacherLabelRepository,
+            ArticleAnalysisRepository articleAnalysisRepository,
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper,
+            @org.springframework.lang.Nullable EmbeddingService embeddingService) {
         this.collector = collector;
         this.analyzer = analyzer;
         this.publisher = publisher;
@@ -65,6 +89,12 @@ public class BriefingPipeline {
         this.diversitySelector = diversitySelector;
         this.appProperties = appProperties;
         this.openAiProperties = openAiProperties;
+        this.teacherClassifier = teacherClassifier;
+        this.articlePersistenceService = articlePersistenceService;
+        this.teacherLabelRepository = teacherLabelRepository;
+        this.articleAnalysisRepository = articleAnalysisRepository;
+        this.objectMapper = objectMapper;
+        this.embeddingService = embeddingService;
     }
 
     public ExecutionLog run(PipelineOptions options) {
@@ -131,23 +161,42 @@ public class BriefingPipeline {
 
         executionLog.setCollectedArticleCount(validArticles.size());
 
+        // 1.6 Persist articles + Teacher classification
+        articlePersistenceService.saveAll(validArticles);
+
+        List<Article> teacherFiltered = validArticles;
+        if (appProperties.teacher() != null && appProperties.teacher().enabled()) {
+            teacherFiltered = applyTeacherClassification(validArticles);
+            log.info("Teacher classification: before={}, after={}", validArticles.size(), teacherFiltered.size());
+
+            if (teacherFiltered.isEmpty()) {
+                teacherFiltered = validArticles; // fallback: use all if teacher filters everything
+                log.warn("Teacher filtered all articles, falling back to all valid articles");
+            }
+        }
+
+        // 1.65 Embedding (non-blocking, failures don't stop pipeline)
+        if (embeddingService != null && appProperties.embedding() != null && appProperties.embedding().enabled()) {
+            embeddingService.embedAll(teacherFiltered);
+        }
+
         // 1.7 Apply relevance scoring and diversity selection
         int minRelevance = appProperties.diversity().minPersonalFinanceRelevance();
         RelevanceScorer.RelevanceScoringResult relevanceResult =
-                relevanceScorer.score(validArticles, minRelevance);
+                relevanceScorer.score(teacherFiltered, minRelevance);
         DiversitySelector.DiversitySelectionResult diversityResult =
                 diversitySelector.select(relevanceResult.filtered(), relevanceResult.scores(),
                         DiversitySelector.DiversityOptions.defaults());
 
         List<Article> articlesForAnalysis = diversityResult.selected();
 
-        log.info("Filtering stats: validated={}, relevance_passed={}, diversity_selected={}",
-                validArticles.size(), relevanceResult.filtered().size(), articlesForAnalysis.size());
+        log.info("Filtering stats: teacherFiltered={}, relevance_passed={}, diversity_selected={}",
+                teacherFiltered.size(), relevanceResult.filtered().size(), articlesForAnalysis.size());
 
-        // Fallback: if all filtered out, use top valid articles
-        if (articlesForAnalysis.isEmpty() && !validArticles.isEmpty()) {
-            articlesForAnalysis = validArticles.subList(0,
-                    Math.min(validArticles.size(), openAiProperties.maxSelectedNews()));
+        // Fallback: if all filtered out, use top teacher-filtered articles
+        if (articlesForAnalysis.isEmpty() && !teacherFiltered.isEmpty()) {
+            articlesForAnalysis = teacherFiltered.subList(0,
+                    Math.min(teacherFiltered.size(), openAiProperties.maxSelectedNews()));
         }
 
         if (articlesForAnalysis.isEmpty()) {
@@ -193,6 +242,9 @@ public class BriefingPipeline {
         }
 
         executionLog.setSelectedNewsCount(analyzeResult.briefing().news().size());
+
+        // 2.7 Save article analyses to DB (fail-safe)
+        saveArticleAnalyses(analyzeResult.briefing());
 
         // 3. Publish
         PublishBriefingResult publishResult;
@@ -245,12 +297,87 @@ public class BriefingPipeline {
         return executionLog;
     }
 
+    private void saveArticleAnalyses(Briefing briefing) {
+        for (AnalyzedNews news : briefing.news()) {
+            try {
+                String primaryArticleId = news.sources().stream()
+                        .filter(s -> s.isPrimary())
+                        .map(s -> s.articleId())
+                        .findFirst()
+                        .orElse(news.sources().isEmpty() ? null : news.sources().get(0).articleId());
+
+                if (primaryArticleId == null) continue;
+
+                ArticleAnalysisEntity entity = new ArticleAnalysisEntity();
+                entity.setArticleId(primaryArticleId);
+                entity.setBriefingId(briefing.id());
+                entity.setAnalysisJson(objectMapper.writeValueAsString(news));
+                entity.setModelName(briefing.metadata().modelName());
+                entity.setPromptVersion(briefing.metadata().promptVersion());
+                articleAnalysisRepository.save(entity);
+            } catch (Exception e) {
+                log.warn("Failed to save article analysis for news {}: {}", news.id(), e.getMessage());
+            }
+        }
+    }
+
+    private List<Article> applyTeacherClassification(List<Article> articles) {
+        String promptVersion = appProperties.teacher().promptVersion();
+        List<Article> relevant = new ArrayList<>();
+
+        for (Article article : articles) {
+            try {
+                TeacherLabelResponse response = teacherClassifier.classify(article);
+                saveTeacherLabel(article.id(), response, promptVersion);
+
+                if ("RELEVANT".equals(response.label()) || "UNCERTAIN".equals(response.label())) {
+                    relevant.add(article);
+                }
+            } catch (Exception e) {
+                log.warn("Teacher classification failed for article {}, including as RELEVANT: {}",
+                        article.id(), e.getMessage());
+                relevant.add(article); // fail-open: 분류 실패 시 포함
+            }
+        }
+        return relevant;
+    }
+
+    private void saveTeacherLabel(String articleId, TeacherLabelResponse response, String promptVersion) {
+        try {
+            TeacherLabelEntity entity = new TeacherLabelEntity();
+            entity.setArticleId(articleId);
+            entity.setLabel(response.label());
+            entity.setConfidence(response.confidence());
+            entity.setReason(response.reason());
+            entity.setAffectedAreas(response.affectedAreas() != null
+                    ? toJsonArray(response.affectedAreas()) : null);
+            entity.setSeverity(response.severity());
+            entity.setNeedsFollowUp(response.needsFollowUp());
+            entity.setUsableForTraining(response.usableForTraining());
+            entity.setTeacherModelProvider("openai");
+            entity.setTeacherModelName(openAiProperties.model());
+            entity.setTeacherPromptVersion(promptVersion);
+            entity.setTeacherTemperature(openAiProperties.temperature());
+            entity.setLabeledAt(OffsetDateTime.now());
+            teacherLabelRepository.save(entity);
+        } catch (Exception e) {
+            log.warn("Failed to save teacher label for article {}: {}", articleId, e.getMessage());
+        }
+    }
+
     private AudienceProfile buildAudienceProfile() {
         AppProperties.AudienceProperties aud = appProperties.audience();
         List<NewsCategory> interests = aud.interests().stream()
                 .map(NewsCategory::fromValue)
                 .toList();
         return new AudienceProfile(aud.economicKnowledgeLevel(), interests, aud.contextNotes());
+    }
+
+    private static String toJsonArray(List<String> items) {
+        if (items == null || items.isEmpty()) return "[]";
+        return "[" + items.stream()
+                .map(s -> "\"" + s.replace("\"", "\\\"") + "\"")
+                .collect(java.util.stream.Collectors.joining(",")) + "]";
     }
 
     private ExecutionError toExecutionError(String stage, Exception e) {

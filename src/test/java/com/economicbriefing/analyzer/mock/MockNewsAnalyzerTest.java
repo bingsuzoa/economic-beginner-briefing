@@ -67,11 +67,13 @@ class MockNewsAnalyzerTest {
 
         var firstNews = result.briefing().news().get(0);
         assertEquals("analyzed-mock-article-001", firstNews.id());
-        assertTrue(firstNews.explanation().contains("[무슨 일이 있었나]"));
-        assertTrue(firstNews.explanation().contains("[왜 이런 일이 발생했나]"));
-        assertTrue(firstNews.explanation().contains("[우리에게 어떤 의미가 있나]"));
-        assertFalse(firstNews.economicTerms().isEmpty());
-        assertEquals("기준금리", firstNews.economicTerms().get(0).term());
+        assertNotNull(firstNews.whatHappened());
+        assertTrue(firstNews.whatHappened().contains("기준금리"));
+        assertNotNull(firstNews.whyItHappened());
+        assertNotNull(firstNews.householdImpact());
+        assertEquals(3, firstNews.threeLineSummary().size());
+        assertFalse(firstNews.terms().isEmpty());
+        assertEquals("기준금리", firstNews.terms().get(0).term());
     }
 
     @Test
@@ -142,8 +144,7 @@ class MockNewsAnalyzerTest {
         AnalyzeNewsResult result = analyzer.analyze(request);
 
         assertEquals(1, result.briefing().news().size());
-        assertEquals("일반 가계에 직접적인 영향이 있는 경제 뉴스입니다.",
-                result.briefing().news().get(0).whyImportant());
+        assertEquals("테스트 기사", result.briefing().news().get(0).easyTitle());
     }
 
     private List<Article> createMockArticles() {

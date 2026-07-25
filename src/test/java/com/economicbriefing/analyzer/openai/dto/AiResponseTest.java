@@ -19,16 +19,23 @@ class AiResponseTest {
                   "news": [
                     {
                       "id": "news-1",
-                      "representativeTitle": "기준금리 인하",
+                      "easyTitle": "기준금리가 내려갔어요",
                       "category": "interest_rate",
                       "importance": 5,
-                      "whyImportant": "대출 이자 변화",
-                      "oneLineSummary": "기준금리가 인하되었습니다",
-                      "explanation": "해설 내용",
-                      "evidenceStatus": "confirmed",
-                      "economicTerms": [
+                      "threeLineSummary": ["핵심 1", "핵심 2", "핵심 3"],
+                      "whatHappened": "기준금리가 인하되었습니다",
+                      "whyItHappened": "경기 둔화 우려",
+                      "economicImpact": "시중금리 하락",
+                      "householdImpact": "대출 이자 감소",
+                      "affectedPeople": ["변동금리 대출자"],
+                      "positiveImpact": "대출 이자 부담 감소",
+                      "negativeImpact": "예금 이자 수입 감소",
+                      "actionItems": ["변동금리 대출 이자 확인"],
+                      "terms": [
                         {"term": "기준금리", "explanation": "설명"}
                       ],
+                      "evidenceStatus": "confirmed",
+                      "uncertainties": [],
                       "sources": [
                         {"articleId": "article-1", "isPrimary": true}
                       ]
@@ -45,9 +52,11 @@ class AiResponseTest {
         assertEquals(2, response.overallSummary().size());
         assertEquals(1, response.news().size());
         assertEquals("news-1", response.news().get(0).id());
+        assertEquals("기준금리가 내려갔어요", response.news().get(0).easyTitle());
         assertEquals("interest_rate", response.news().get(0).category());
         assertEquals(5, response.news().get(0).importance());
-        assertEquals(1, response.news().get(0).economicTerms().size());
+        assertEquals(3, response.news().get(0).threeLineSummary().size());
+        assertEquals(1, response.news().get(0).terms().size());
         assertEquals(1, response.glossary().size());
         assertEquals("DSR", response.glossary().get(0).term());
         assertEquals("예시", response.glossary().get(0).example());
@@ -61,17 +70,22 @@ class AiResponseTest {
                   "news": [
                     {
                       "id": "news-1",
-                      "representativeTitle": "제목",
+                      "easyTitle": "제목",
                       "category": "other",
                       "importance": 3,
-                      "whyImportant": "이유",
-                      "oneLineSummary": "결론",
-                      "explanation": "해설",
+                      "threeLineSummary": ["핵심"],
+                      "whatHappened": "사건",
+                      "whyItHappened": "원인",
+                      "economicImpact": "영향",
+                      "householdImpact": "생활영향",
+                      "affectedPeople": [],
+                      "positiveImpact": "긍정",
+                      "negativeImpact": "부정",
+                      "actionItems": [],
+                      "terms": [],
                       "evidenceStatus": "expected",
-                      "economicTerms": [],
+                      "uncertainties": [],
                       "sources": [{"articleId": "a-1", "isPrimary": true}],
-                      "targetAudience": {"mustRead": ["전세 세입자"], "notRelevant": []},
-                      "impactAssessment": [{"target": "일반 가계", "score": 3, "reason": "이유"}],
                       "unknownField": "value"
                     }
                   ],
@@ -94,12 +108,11 @@ class AiResponseTest {
                   "news": [
                     {
                       "id": "news-1",
-                      "representativeTitle": "제목",
+                      "easyTitle": "제목",
                       "category": "housing",
                       "importance": 4,
-                      "whyImportant": "이유",
-                      "oneLineSummary": "결론",
-                      "explanation": "해설",
+                      "threeLineSummary": ["핵심"],
+                      "whatHappened": "사건",
                       "evidenceStatus": "proposed",
                       "sources": [{"articleId": "a-1", "isPrimary": true}]
                     }
@@ -109,8 +122,8 @@ class AiResponseTest {
 
         AiResponse response = objectMapper.readValue(json, AiResponse.class);
 
-        assertNull(response.news().get(0).uncertaintyNote());
-        assertNull(response.news().get(0).economicTerms());
+        assertNull(response.news().get(0).uncertainties());
+        assertNull(response.news().get(0).terms());
         assertNull(response.glossary());
     }
 }

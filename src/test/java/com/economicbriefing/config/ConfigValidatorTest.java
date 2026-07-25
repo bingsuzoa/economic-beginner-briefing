@@ -21,7 +21,9 @@ class ConfigValidatorTest {
                 new AppProperties.RetryProperties(2, Duration.ofSeconds(1), Duration.ofSeconds(2)),
                 new AppProperties.DiversityProperties(3, 3, 3, 5),
                 new AppProperties.AudienceProperties("beginner", List.of("interest_rate"), List.of("신혼부부")),
-                new AppProperties.SchedulerProperties(false, "0 0 * * * *")
+                new AppProperties.SchedulerProperties(false, "0 0 * * * *"),
+                new AppProperties.TeacherProperties(true, "teacher-v1"),
+                new AppProperties.EmbeddingProperties(false, "text-embedding-3-small", 1536)
         );
     }
 

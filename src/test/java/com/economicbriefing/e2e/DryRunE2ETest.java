@@ -127,7 +127,7 @@ class DryRunE2ETest {
 
         var firstNews = briefing.news().get(0);
         assertNotNull(firstNews.id());
-        assertNotNull(firstNews.representativeTitle());
+        assertNotNull(firstNews.easyTitle());
         assertFalse(firstNews.sources().isEmpty());
 
         // Check metadata
