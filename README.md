@@ -133,11 +133,46 @@ CI를 다시 도입한다면 파이프라인 실행이 아니라 **빌드·테�
 
 ## 프론트엔드
 
+**운영**: 빌드하면 백엔드가 `:3000`에서 함께 서빙합니다. 별도 프로세스가 필요 없습니다.
+
 ```bash
 cd frontend
 npm install
+npm run build   # frontend/dist 생성 → http://localhost:3000 에서 바로 보임
+```
+
+`frontend/dist`는 git에 포함되지 않으므로 **새로 clone하면 반드시 한 번 빌드**해야 합니다.
+프론트를 수정한 뒤에도 `npm run build`만 하면 됩니다 (백엔드 재시작 불필요).
+
+**개발**: 핫 리로드가 필요할 때만 개발 서버를 씁니다.
+
+```bash
 npm run dev     # http://localhost:5173 (/api 는 :3000 으로 프록시)
 ```
+
+## 상시 구동 (Windows)
+
+작업 스케줄러에 `EconomicBriefingServer` 작업이 등록되어 있습니다. **로그온 시 자동 시작**하고,
+실패하면 1분 간격으로 3회까지 재시도합니다.
+
+```powershell
+Get-ScheduledTask  -TaskName EconomicBriefingServer   # 상태 확인
+Start-ScheduledTask -TaskName EconomicBriefingServer   # 수동 시작
+Stop-ScheduledTask  -TaskName EconomicBriefingServer   # 중지
+```
+
+실행 스크립트는 `scripts/run-server.ps1`이며 `.env`를 읽어 JDK 21로 JAR을 띄웁니다.
+로그는 `logs/server-YYYY-MM-DD.log`에 하루 단위로 쌓이고 30일이 지나면 자동 삭제됩니다.
+
+> **부팅 시 자동 시작이 필요하면** 관리자 권한으로 트리거를 바꿔야 합니다.
+> 현재는 로그온 트리거라 재부팅 후 로그인하지 않으면 서버가 뜨지 않습니다.
+>
+> ```powershell
+> # 관리자 PowerShell에서 실행
+> $t = Get-ScheduledTask -TaskName EconomicBriefingServer
+> $t.Triggers = (New-ScheduledTaskTrigger -AtStartup)
+> $t | Set-ScheduledTask -User "SYSTEM" -RunLevel Highest
+> ```
 
 ## 관리자 API
 

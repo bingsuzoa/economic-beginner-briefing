@@ -17,6 +17,13 @@ spring:
     baseline-on-migrate: true
     baseline-version: 1
 
+  # 빌드된 프론트엔드를 같은 프로세스에서 서빙합니다. 별도 정적 서버가 필요 없어
+  # 상시 구동해야 할 프로세스가 하나로 줄어듭니다.
+  # 프론트를 수정했다면: cd frontend && npm run build
+  web:
+    resources:
+      static-locations: "classpath:/static/,file:${FRONTEND_DIST:C:/economic-beginner-briefing/frontend/dist}/"
+
 server:
   port: ${ADMIN_PORT:3000}
 
