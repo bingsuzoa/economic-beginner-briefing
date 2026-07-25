@@ -55,18 +55,6 @@ public class PipelineItemEntity {
     @Column(name = "analysis_error_message", columnDefinition = "TEXT")
     private String analysisErrorMessage;
 
-    @Column(name = "publish_status", nullable = false, length = 20)
-    private String publishStatus = "PENDING";
-
-    @Column(name = "notion_page_id", length = 128)
-    private String notionPageId;
-
-    @Column(name = "notion_page_url", columnDefinition = "TEXT")
-    private String notionPageUrl;
-
-    @Column(name = "publish_error_message", columnDefinition = "TEXT")
-    private String publishErrorMessage;
-
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
@@ -111,14 +99,6 @@ public class PipelineItemEntity {
     public void setAnalysisResultJson(String analysisResultJson) { this.analysisResultJson = analysisResultJson; }
     public String getAnalysisErrorMessage() { return analysisErrorMessage; }
     public void setAnalysisErrorMessage(String analysisErrorMessage) { this.analysisErrorMessage = analysisErrorMessage; }
-    public String getPublishStatus() { return publishStatus; }
-    public void setPublishStatus(String publishStatus) { this.publishStatus = publishStatus; }
-    public String getNotionPageId() { return notionPageId; }
-    public void setNotionPageId(String notionPageId) { this.notionPageId = notionPageId; }
-    public String getNotionPageUrl() { return notionPageUrl; }
-    public void setNotionPageUrl(String notionPageUrl) { this.notionPageUrl = notionPageUrl; }
-    public String getPublishErrorMessage() { return publishErrorMessage; }
-    public void setPublishErrorMessage(String publishErrorMessage) { this.publishErrorMessage = publishErrorMessage; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
 }

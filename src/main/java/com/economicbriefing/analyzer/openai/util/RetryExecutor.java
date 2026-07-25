@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.function.Supplier;
 
 import com.economicbriefing.config.AppProperties;
+import com.economicbriefing.exception.AnalyzeException;
 import com.economicbriefing.exception.BriefingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +38,12 @@ public final class RetryExecutor {
                     break;
                 }
 
+                // A 429 tells us exactly how long to wait; a fixed delay just burns the attempt.
                 Duration delay = attempt == 1 ? initialDelay : nextDelay;
+                if (e instanceof AnalyzeException ae && ae.getRetryAfter() != null) {
+                    delay = ae.getRetryAfter();
+                }
+
                 log.warn("Attempt {}/{} failed, retrying after {}ms: {}",
                         attempt, maxAttempts, delay.toMillis(), e.getMessage());
                 sleep(delay);

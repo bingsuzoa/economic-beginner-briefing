@@ -2,12 +2,14 @@ package com.economicbriefing.e2e;
 
 import java.time.LocalDate;
 
+import com.economicbriefing.admin.repository.PipelineItemRepository;
+import com.economicbriefing.admin.repository.PipelineLogRepository;
+import com.economicbriefing.admin.repository.PipelineRunRepository;
+import com.economicbriefing.classifier.repository.ArticleAnalysisRepository;
 import com.economicbriefing.domain.execution.ExecutionLog;
 import com.economicbriefing.domain.execution.ExecutionStatus;
 import com.economicbriefing.pipeline.BriefingPipeline;
-import com.economicbriefing.pipeline.MockExecutionTracker;
 import com.economicbriefing.pipeline.PipelineOptions;
-import com.economicbriefing.publisher.mock.MockBriefingPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,24 +20,24 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * End-to-end test with DRY_RUN=true.
- * Runs the full pipeline: MockCollector → filters → MockAnalyzer → MockPublisher.
+ * Runs the full pipeline: MockCollector → filters → MockAnalyzer → article_analyses.
  */
 @SpringBootTest
 @ActiveProfiles("test")
 class DryRunE2ETest {
 
-    @Autowired
-    private BriefingPipeline pipeline;
-
-    @Autowired
-    private MockExecutionTracker executionTracker;
-
-    @Autowired
-    private MockBriefingPublisher mockPublisher;
+    @Autowired private BriefingPipeline pipeline;
+    @Autowired private PipelineRunRepository runRepository;
+    @Autowired private PipelineLogRepository logRepository;
+    @Autowired private PipelineItemRepository itemRepository;
+    @Autowired private ArticleAnalysisRepository analysisRepository;
 
     @BeforeEach
     void setUp() {
-        executionTracker.clear();
+        logRepository.deleteAll();
+        itemRepository.deleteAll();
+        runRepository.deleteAll();
+        analysisRepository.deleteAll();
     }
 
     @Test
@@ -53,44 +55,38 @@ class DryRunE2ETest {
         assertTrue(log.getSelectedNewsCount() > 0, "Should have selected news");
     }
 
+    /** article_analyses is what the public API serves, so it is the real output of a run. */
     @Test
-    void shouldPublishBriefingViaMockPublisher() {
-        PipelineOptions options = PipelineOptions.manual(LocalDate.of(2025, 3, 16));
+    void shouldStoreAnalysesForTheApiToServe() {
+        pipeline.run(PipelineOptions.manual(LocalDate.of(2025, 3, 16)));
 
-        pipeline.run(options);
+        var analyses = analysisRepository.findAll();
+        assertFalse(analyses.isEmpty(), "pipeline should persist analyses");
 
-        assertFalse(mockPublisher.getPublishedBriefings().isEmpty(),
-                "Mock publisher should have received at least one briefing");
-
-        var briefing = mockPublisher.getPublishedBriefings().get(
-                mockPublisher.getPublishedBriefings().size() - 1);
-        assertNotNull(briefing.id(), "Briefing should have an ID");
-        assertFalse(briefing.news().isEmpty(), "Briefing should have news items");
-        assertNotNull(briefing.overallSummary(), "Briefing should have a summary");
+        var first = analyses.get(0);
+        assertNotNull(first.getArticleId());
+        assertNotNull(first.getBriefingId());
+        assertNotNull(first.getAnalysisJson());
+        assertTrue(first.getAnalysisJson().contains("easyTitle"));
     }
 
     @Test
     void shouldRecordExecutionAfterRun() {
-        LocalDate date = LocalDate.of(2025, 3, 17);
-        PipelineOptions options = PipelineOptions.manual(date);
+        pipeline.run(PipelineOptions.manual(LocalDate.of(2025, 3, 17)));
 
-        pipeline.run(options);
-
-        ExecutionLog recorded = executionTracker.getLastExecution("2025-03-17");
-        assertNotNull(recorded, "Execution should be recorded in tracker");
-        assertEquals(ExecutionStatus.SUCCESS, recorded.getStatus());
+        var recorded = runRepository.findFirstByDedupeKeyOrderByStartedAtDesc("2025-03-17");
+        assertTrue(recorded.isPresent(), "Execution should be recorded in tracker");
+        assertEquals("SUCCESS", recorded.get().getStatus());
     }
 
     @Test
     void shouldSkipDuplicateExecution() {
         LocalDate date = LocalDate.of(2025, 3, 18);
 
-        // First run
         ExecutionLog first = pipeline.run(PipelineOptions.manual(date));
         assertEquals(ExecutionStatus.SUCCESS, first.getStatus());
         assertTrue(first.getCollectedArticleCount() > 0);
 
-        // Second run - should be skipped (dedup)
         ExecutionLog second = pipeline.run(PipelineOptions.manual(date));
         assertEquals(ExecutionStatus.SUCCESS, second.getStatus());
         assertEquals(0, second.getCollectedArticleCount(),
@@ -99,9 +95,7 @@ class DryRunE2ETest {
 
     @Test
     void shouldHandleHourlyMode() {
-        PipelineOptions options = PipelineOptions.hourly();
-
-        ExecutionLog log = pipeline.run(options);
+        ExecutionLog log = pipeline.run(PipelineOptions.hourly());
 
         assertNotNull(log);
         // Hourly mode may collect 0 articles if mock doesn't match the time range,
@@ -111,35 +105,8 @@ class DryRunE2ETest {
     }
 
     @Test
-    void shouldProduceBriefingWithCorrectStructure() {
-        PipelineOptions options = PipelineOptions.manual(LocalDate.of(2025, 3, 19));
-
-        pipeline.run(options);
-
-        var briefing = mockPublisher.getPublishedBriefings().get(
-                mockPublisher.getPublishedBriefings().size() - 1);
-
-        // Validate briefing structure matches Node.js output format
-        assertNotNull(briefing.id());
-        assertNotNull(briefing.overallSummary());
-        assertFalse(briefing.overallSummary().isEmpty());
-        assertFalse(briefing.news().isEmpty());
-
-        var firstNews = briefing.news().get(0);
-        assertNotNull(firstNews.id());
-        assertNotNull(firstNews.easyTitle());
-        assertFalse(firstNews.sources().isEmpty());
-
-        // Check metadata
-        assertNotNull(briefing.metadata());
-        assertTrue(briefing.metadata().selectedNewsCount() > 0);
-    }
-
-    @Test
     void shouldHaveNoErrorsOnCleanRun() {
-        PipelineOptions options = PipelineOptions.manual(LocalDate.of(2025, 3, 20));
-
-        ExecutionLog log = pipeline.run(options);
+        ExecutionLog log = pipeline.run(PipelineOptions.manual(LocalDate.of(2025, 3, 20)));
 
         assertTrue(log.getErrors().isEmpty(),
                 "Clean E2E run should have no errors, but had: " + log.getErrors());

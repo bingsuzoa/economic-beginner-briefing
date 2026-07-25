@@ -25,6 +25,8 @@ public class OpenAiClient {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAiClient.class);
     private static final String API_URL = "https://api.openai.com/v1/chat/completions";
+    private static final java.util.regex.Pattern RETRY_HINT =
+            java.util.regex.Pattern.compile("try again in ([0-9.]+)(ms|s)");
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -39,8 +41,16 @@ public class OpenAiClient {
     }
 
     public String complete(String systemPrompt, String userPrompt) {
+        return complete(systemPrompt, userPrompt, properties.model());
+    }
+
+    /**
+     * Model override: the teacher stage runs on a cheaper model so it does not eat the
+     * main model's token-per-minute budget before the analysis call needs it.
+     */
+    public String complete(String systemPrompt, String userPrompt, String model) {
         try {
-            String requestBody = buildRequestBody(systemPrompt, userPrompt);
+            String requestBody = buildRequestBody(systemPrompt, userPrompt, model);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(API_URL))
@@ -50,17 +60,15 @@ public class OpenAiClient {
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .build();
 
-            log.info("Calling OpenAI API with model={}", properties.model());
+            log.info("Calling OpenAI API with model={}", model);
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
-                boolean retryable = response.statusCode() == 429
-                        || response.statusCode() == 500
-                        || response.statusCode() == 503;
-                ErrorCode errorCode = retryable ? ErrorCode.ANALYZE_API_ERROR : ErrorCode.ANALYZE_API_ERROR;
-                AnalyzeException ex = new AnalyzeException(errorCode);
                 log.error("OpenAI API error: status={} body={}", response.statusCode(), response.body());
-                throw ex;
+                Duration retryAfter = response.statusCode() == 429
+                        ? parseRetryAfter(response)
+                        : null;
+                throw new AnalyzeException(ErrorCode.ANALYZE_API_ERROR, retryAfter);
             }
 
             JsonNode root = objectMapper.readTree(response.body());
@@ -87,10 +95,49 @@ public class OpenAiClient {
         }
     }
 
-    private String buildRequestBody(String systemPrompt, String userPrompt) {
+    /**
+     * How long to wait after a 429. Prefers the Retry-After headers; falls back to the
+     * "Please try again in 7.894s" hint OpenAI puts in the error message.
+     * A fixed retry delay is useless against a TPM limit, so this must be honoured.
+     */
+    static Duration parseRetryAfter(HttpResponse<String> response) {
+        Duration fromHeader = response.headers().firstValue("retry-after-ms")
+                .map(v -> parseLongOrNull(v))
+                .filter(ms -> ms != null)
+                .map(Duration::ofMillis)
+                .orElseGet(() -> response.headers().firstValue("retry-after")
+                        .map(OpenAiClient::parseLongOrNull)
+                        .filter(s -> s != null)
+                        .map(Duration::ofSeconds)
+                        .orElse(null));
+        if (fromHeader != null) {
+            return fromHeader.plusMillis(500);
+        }
+
+        var matcher = RETRY_HINT.matcher(response.body() != null ? response.body() : "");
+        if (matcher.find()) {
+            double seconds = Double.parseDouble(matcher.group(1));
+            if (matcher.group(2).equals("ms")) {
+                seconds /= 1000d;
+            }
+            // margin: the TPM window must actually roll over before we retry
+            return Duration.ofMillis((long) (seconds * 1000) + 500);
+        }
+        return null;
+    }
+
+    private static Long parseLongOrNull(String value) {
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private String buildRequestBody(String systemPrompt, String userPrompt, String model) {
         try {
             ObjectNode root = objectMapper.createObjectNode();
-            root.put("model", properties.model());
+            root.put("model", model);
             root.put("temperature", properties.temperature());
 
             ObjectNode responseFormat = objectMapper.createObjectNode();

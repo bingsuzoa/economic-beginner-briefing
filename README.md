@@ -1,6 +1,6 @@
 # Economic Beginner Briefing
 
-경제를 전혀 모르는 사용자를 위해, 전날의 경제·재테크·부동산 뉴스를 수집하고 중요한 뉴스를 선별한 뒤 쉬운 말로 설명하여 Notion에 저장하는 자동화 프로젝트입니다.
+경제를 전혀 모르는 사용자를 위해, 전날의 경제·재테크·부동산 뉴스를 수집하고 중요한 뉴스를 선별한 뒤 쉬운 말로 설명하여 웹으로 제공하는 자동화 프로젝트입니다.
 
 ## 프로젝트 목표
 
@@ -21,10 +21,10 @@
 - Framework: Spring Boot 3.4
 - Build: Gradle (Kotlin DSL)
 - Database: PostgreSQL + Flyway migration
-- AI: OpenAI API (gpt-4o)
-- Storage: Notion API
+- AI: OpenAI API (분석 gpt-4o / 기사 분류 gpt-4o-mini)
+- Frontend: React 18 + Vite 6
 - RSS: Rome 2.1
-- Scheduler: GitHub Actions
+- Scheduler: Spring `@Scheduled` (애플리케이션 내장, 매시 정각)
 - Test: JUnit 5 + Spring Boot Test + H2
 
 ## 전체 구조
@@ -35,14 +35,15 @@ src/
 │  ├─ EconomicBriefingApplication.java   # Spring Boot 진입점
 │  ├─ collector/                          # 뉴스 수집 (RSS)
 │  ├─ analyzer/                           # AI 분석 (OpenAI)
-│  ├─ publisher/                          # 결과 발행 (Notion)
+│  ├─ classifier/                         # Teacher 분류 + 임베딩 + 영속화
+│  ├─ api/                                # 공개 브리핑 API
 │  ├─ pipeline/                           # 파이프라인 오케스트레이션
 │  ├─ domain/                             # 도메인 모델
 │  ├─ config/                             # Spring 설정
 │  └─ common/                             # 공통 유틸
 ├─ main/resources/
 │  ├─ application.yml                     # 기본 설정
-│  ├─ application-prod.yml                # 운영 설정
+│  ├─ application-test.yml                # 테스트(H2) 설정
 │  └─ db/migration/                       # Flyway SQL
 └─ test/java/com/economicbriefing/        # 테스트
 ```
@@ -50,13 +51,14 @@ src/
 ## 실행 흐름
 
 ```text
-CLI / GitHub Actions
+내장 스케줄러(매시 정각) / 관리자 API / CLI
   → Spring Boot 시작
   → BriefingPipeline 실행:
       1. 뉴스 수집 (NewsCollector → RSS → 필터링)
-      2. AI 분석 (NewsAnalyzer → OpenAI → Briefing 생성)
-      3. Notion 저장 (BriefingPublisher)
-      4. 실행 결과 반환
+      2. Teacher 분류 + 임베딩 (classifier)
+      3. AI 분석 (NewsAnalyzer → OpenAI → Briefing 생성)
+      4. article_analyses 저장 → 프론트엔드가 공개 API로 조회
+      5. 실행 이력 기록 (pipeline_runs / logs / items)
   → 종료
 ```
 
@@ -73,13 +75,20 @@ CLI / GitHub Actions
 
 | 변수 | 필수 | 설명 |
 |------|------|------|
-| `SPRING_PROFILES_ACTIVE` | 기본값: default | Spring 프로파일 (prod 등) |
+| `SCHEDULER_ENABLED` | 기본값: true | 매시 정각 자동 실행. 끄려면 `false` |
+| `SCHEDULER_CRON` | 기본값: `0 0 * * * *` | 6필드 cron, Asia/Seoul 기준 |
+| `HEALTH_MAX_SUCCESS_AGE` | 기본값: 3h | 이 시간을 넘기면 `/api/health/briefing`이 DOWN |
 | `TZ` | 기본값: Asia/Seoul | 타임존 |
-| `DRY_RUN` | 기본값: true | true면 외부 API 호출 없이 Mock 실행 |
+| `DRY_RUN` | 기본값: false | true면 외부 API 호출 없이 Mock 실행 |
 | `LOG_LEVEL` | 기본값: info | 로그 레벨 |
-| `OPENAI_API_KEY` | 실제 분석 시 필수 | OpenAI API 키 |
-| `NOTION_API_KEY` | Notion 저장 시 필수 | Notion Integration 토큰 |
-| `NOTION_DATABASE_ID` | Notion 저장 시 필수 | Notion 데이터베이스 ID |
+| `OPENAI_API_KEY` | 필수 | OpenAI API 키 |
+| `ADMIN_TOKEN` | 필수 (DRY_RUN=false) | 관리자 API 인증 토큰. 비어 있으면 기동 실패 |
+| `SPRING_DATASOURCE_USERNAME` / `_PASSWORD` | 필수 | PostgreSQL 접속 정보 |
+| `TEACHER_MODEL` | 기본값: gpt-4o-mini | 기사 분류 모델 |
+| `TEACHER_CONCURRENCY` | 기본값: 6 | 분류 동시 실행 수 |
+| `EMBEDDING_ENABLED` | 기본값: true | 임베딩 생성 여부 |
+
+`.env.example`을 `.env`로 복사해 사용합니다.
 
 ## 수동 실행
 
@@ -92,24 +101,52 @@ java -jar build/libs/economic-briefing-0.1.0.jar
 java -jar build/libs/economic-briefing-0.1.0.jar --target-date=2026-07-16
 ```
 
-## GitHub Actions
+## 자동 실행 (스케줄러)
 
-`.github/workflows/weekly-briefing.yml`로 매시 정각 자동 실행됩니다.
+매시 정각 실행은 **애플리케이션 내부 스케줄러**가 담당합니다. 별도 프로파일 없이 `application.yml`만으로 동작합니다.
 
-- **주기**: 매시 정각 (UTC) → KST 기준 해당 시간대 뉴스 수집
-- **수동 실행**: Actions 탭에서 workflow_dispatch로 실행 가능
-- **필요 Secrets**: `OPENAI_API_KEY`, `NOTION_API_KEY`, `NOTION_DATABASE_ID`
-- **중복 실행 방지**: concurrency group 설정
-- **Watchdog**: `briefing-watchdog.yml`이 스케줄 누락 시 자동 재실행
+- **주기**: `briefing.scheduler.cron` (기본 `0 0 * * * *`, Asia/Seoul) → 직전 1시간 뉴스 수집
+- **끄기**: `SCHEDULER_ENABLED=false`
+- **중복 실행 방지**: 실행 중이면 skip(`PipelineLock`) + 이미 발행된 시간대면 skip(`pipeline_runs.dedupe_key`)
+- **감시**: `GET /api/health/briefing` — 200 UP / 503 DOWN
 
-## Notion 연동
+```
+[Scheduler] Pipeline started
+[Scheduler] RSS collected : 2
+[Scheduler] Teacher completed
+[Scheduler] Embedding completed
+[Scheduler] Analyze completed
+[Scheduler] Pipeline finished (10s) status=SUCCESS
+```
 
-1. [Notion Integrations](https://www.notion.so/my-integrations)에서 Integration을 생성합니다.
-2. 브리핑을 저장할 데이터베이스를 만들고, 다음 속성을 추가합니다:
-   - `Name` (title)
-   - `Briefing ID` (rich_text)
-   - `Target Date` (date)
-   - `Generated At` (date)
-   - `News Count` (number)
-3. 데이터베이스에 Integration을 연결합니다.
-4. `NOTION_API_KEY`와 `NOTION_DATABASE_ID`를 환경변수에 설정합니다.
+## CI
+
+GitHub Actions 워크플로는 없습니다. 자동 실행은 애플리케이션 내장 스케줄러가 담당하고, DB는 운영 서버 로컬에 있어 GitHub 러너에서 접근할 수 없습니다.
+
+빌드·테스트는 로컬에서 실행합니다.
+
+```bash
+./gradlew clean build
+```
+
+CI를 다시 도입한다면 파이프라인 실행이 아니라 **빌드·테스트 검증용**으로 두는 것이 맞습니다. 러너에서 파이프라인을 돌리려면 `services: postgres`와 외부 접근 가능한 DB가 필요하고, 스케줄 트리거를 걸면 내장 스케줄러와 이중 실행이 됩니다.
+
+## 프론트엔드
+
+```bash
+cd frontend
+npm install
+npm run dev     # http://localhost:5173 (/api 는 :3000 으로 프록시)
+```
+
+## 관리자 API
+
+`/api/admin/**`는 `ADMIN_TOKEN`이 필요합니다.
+
+```bash
+curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:3000/api/admin/runs
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+     -d '{"targetDate":"2026-07-25"}' http://localhost:3000/api/admin/runs
+```
+
+공개 브리핑 API(`/api/briefing/**`)는 인증이 없습니다.

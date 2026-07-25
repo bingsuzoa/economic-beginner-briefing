@@ -14,8 +14,9 @@ class AdminTokenFilterTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // Fail closed: an unconfigured token must not turn the admin API into an open endpoint.
     @Test
-    void shouldPassThroughWhenTokenIsBlank() throws Exception {
+    void shouldRejectWhenTokenIsBlank() throws Exception {
         AdminTokenFilter filter = new AdminTokenFilter("", objectMapper);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/admin/status");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -23,12 +24,12 @@ class AdminTokenFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        verify(chain).doFilter(request, response);
-        assertEquals(HttpServletResponse.SC_OK, response.getStatus());
+        verify(chain, never()).doFilter(request, response);
+        assertEquals(HttpServletResponse.SC_UNAUTHORIZED, response.getStatus());
     }
 
     @Test
-    void shouldPassThroughWhenTokenIsNull() throws Exception {
+    void shouldRejectWhenTokenIsNull() throws Exception {
         AdminTokenFilter filter = new AdminTokenFilter(null, objectMapper);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/admin/status");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -36,7 +37,8 @@ class AdminTokenFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        verify(chain).doFilter(request, response);
+        verify(chain, never()).doFilter(request, response);
+        assertEquals(HttpServletResponse.SC_UNAUTHORIZED, response.getStatus());
     }
 
     @Test

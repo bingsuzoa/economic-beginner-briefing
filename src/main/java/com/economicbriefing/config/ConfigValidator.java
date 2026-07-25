@@ -15,18 +15,20 @@ public class ConfigValidator {
 
     private final AppProperties appProperties;
     private final OpenAiProperties openAiProperties;
-    private final NotionProperties notionProperties;
+    private final AdminProperties adminProperties;
 
     public ConfigValidator(AppProperties appProperties,
                            OpenAiProperties openAiProperties,
-                           NotionProperties notionProperties) {
+                           AdminProperties adminProperties) {
         this.appProperties = appProperties;
         this.openAiProperties = openAiProperties;
-        this.notionProperties = notionProperties;
+        this.adminProperties = adminProperties;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void validate() {
+        logSchedulerState();
+
         if (appProperties.dryRun()) {
             log.info("Dry-run mode: skipping external API config validation");
             return;
@@ -37,17 +39,28 @@ public class ConfigValidator {
                     "OPENAI_API_KEY is required when dry-run is disabled");
         }
 
-        if (isBlank(notionProperties.apiKey())) {
+        // The admin API can trigger pipeline runs and expose run history. Starting without
+        // a token would leave it open, so refuse to start rather than silently allow all.
+        if (isBlank(adminProperties.token())) {
             throw new BriefingException(ErrorCode.SYSTEM_CONFIG_ERROR, "system",
-                    "NOTION_API_KEY is required when dry-run is disabled");
+                    "ADMIN_TOKEN is required when dry-run is disabled");
         }
 
-        if (isBlank(notionProperties.databaseId())) {
-            throw new BriefingException(ErrorCode.SYSTEM_CONFIG_ERROR, "system",
-                    "NOTION_DATABASE_ID is required when dry-run is disabled");
-        }
+        log.info("Configuration validated: OpenAI API key and admin token present");
+    }
 
-        log.info("Configuration validated: all required API keys present");
+    /** Stated on every boot: whether an unattended hourly run is armed is not something an
+     *  operator should have to infer from the absence of a log line. */
+    private void logSchedulerState() {
+        AppProperties.SchedulerProperties scheduler = appProperties.scheduler();
+        if (scheduler == null || !scheduler.enabled()) {
+            log.info("[Scheduler] DISABLED (briefing.scheduler.enabled=false)");
+        } else if (scheduler.cronValid()) {
+            log.info("[Scheduler] ENABLED cron='{}' zone=Asia/Seoul", scheduler.cron());
+        } else {
+            log.error("[Scheduler] MISCONFIGURED cron='{}' - hourly briefings will NOT run",
+                    scheduler.cron());
+        }
     }
 
     private boolean isBlank(String value) {

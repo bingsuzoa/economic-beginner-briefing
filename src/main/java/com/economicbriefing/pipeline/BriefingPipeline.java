@@ -3,7 +3,15 @@ package com.economicbriefing.pipeline;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 
 import com.economicbriefing.analyzer.NewsAnalyzer;
 import com.economicbriefing.analyzer.dto.AnalyzeNewsRequest;
@@ -32,11 +40,6 @@ import com.economicbriefing.domain.execution.ExecutionLog;
 import com.economicbriefing.domain.execution.PublicationDecision;
 import com.economicbriefing.domain.briefing.Briefing;
 import com.economicbriefing.exception.BriefingException;
-import com.economicbriefing.exception.ErrorCode;
-import com.economicbriefing.publisher.BriefingPublisher;
-import com.economicbriefing.publisher.dto.PublishBriefingRequest;
-import com.economicbriefing.publisher.dto.PublishBriefingResult;
-import com.economicbriefing.publisher.dto.PublishChannelResult;
 import com.economicbriefing.util.IdGenerator;
 import com.economicbriefing.util.KstDateTimeUtil;
 import org.slf4j.Logger;
@@ -50,7 +53,6 @@ public class BriefingPipeline {
 
     private final NewsCollector collector;
     private final NewsAnalyzer analyzer;
-    private final BriefingPublisher publisher;
     private final ExecutionTracker executionTracker;
     private final PipelineDataValidator validator;
     private final RelevanceScorer relevanceScorer;
@@ -67,7 +69,6 @@ public class BriefingPipeline {
     public BriefingPipeline(
             NewsCollector collector,
             NewsAnalyzer analyzer,
-            BriefingPublisher publisher,
             ExecutionTracker executionTracker,
             PipelineDataValidator validator,
             RelevanceScorer relevanceScorer,
@@ -82,7 +83,6 @@ public class BriefingPipeline {
             @org.springframework.lang.Nullable EmbeddingService embeddingService) {
         this.collector = collector;
         this.analyzer = analyzer;
-        this.publisher = publisher;
         this.executionTracker = executionTracker;
         this.validator = validator;
         this.relevanceScorer = relevanceScorer;
@@ -121,9 +121,29 @@ public class BriefingPipeline {
             return executionLog;
         }
 
+        executionTracker.startRun(executionId, dedupeKey, options.triggerType(), executionLog.getStartedAt());
+
+        // Every exit path below must land in finishRun, or the run row stays RUNNING forever.
+        try {
+            return execute(executionId, dedupeKey, targetDate, timeRange, executionLog);
+        } catch (RuntimeException e) {
+            log.error("Pipeline aborted unexpectedly", e);
+            executionLog.addError(toExecutionError("system", e));
+            executionLog.markFailed(KstDateTimeUtil.now());
+            return executionLog;
+        } finally {
+            executionTracker.finishRun(executionId, dedupeKey, executionLog);
+            log.info("Pipeline completed: executionId={}, status={}", executionId, executionLog.getStatus());
+        }
+    }
+
+    private ExecutionLog execute(String runId, String dedupeKey, LocalDate targetDate,
+                                 KstDateTimeUtil.TimeRange timeRange, ExecutionLog executionLog) {
+
         // 1. Collect
         CollectNewsResult collectResult;
         try {
+            executionTracker.log(runId, "INFO", "COLLECT", "COLLECT_START", "뉴스 수집을 시작합니다.");
             CollectNewsRequest request = timeRange != null
                     ? CollectNewsRequest.of(targetDate, timeRange.start(), timeRange.end())
                     : CollectNewsRequest.of(targetDate);
@@ -132,12 +152,13 @@ public class BriefingPipeline {
             log.error("Collection failed", e);
             executionLog.addError(toExecutionError("collect", e));
             executionLog.markFailed(KstDateTimeUtil.now());
-            executionTracker.recordExecution(executionLog);
+            executionTracker.log(runId, "ERROR", "COLLECT", "COLLECT_FAILED", String.valueOf(e.getMessage()));
             return executionLog;
         }
 
         if (collectResult.articles().isEmpty()) {
             log.info("No articles collected, finishing successfully");
+            executionTracker.log(runId, "INFO", "COLLECT", "COLLECT_EMPTY", "수집된 기사가 없습니다.");
             executionLog.markSuccess(KstDateTimeUtil.now());
             return executionLog;
         }
@@ -155,11 +176,15 @@ public class BriefingPipeline {
             executionLog.addError(new ExecutionError("collect", "COLLECT_NO_ARTICLES",
                     "No valid articles after validation", false, null));
             executionLog.markFailed(KstDateTimeUtil.now());
-            executionTracker.recordExecution(executionLog);
+            executionTracker.log(runId, "ERROR", "COLLECT", "COLLECT_NO_ARTICLES",
+                    "검증을 통과한 기사가 없습니다.");
             return executionLog;
         }
 
         executionLog.setCollectedArticleCount(validArticles.size());
+        executionTracker.recordItems(runId, validArticles);
+        executionTracker.log(runId, "INFO", "COLLECT", "COLLECT_DONE",
+                validArticles.size() + "건의 기사를 수집했습니다.");
 
         // 1.6 Persist articles + Teacher classification
         articlePersistenceService.saveAll(validArticles);
@@ -168,6 +193,8 @@ public class BriefingPipeline {
         if (appProperties.teacher() != null && appProperties.teacher().enabled()) {
             teacherFiltered = applyTeacherClassification(validArticles);
             log.info("Teacher classification: before={}, after={}", validArticles.size(), teacherFiltered.size());
+            executionTracker.log(runId, "INFO", "CLASSIFY", "TEACHER_DONE",
+                    validArticles.size() + "건 중 " + teacherFiltered.size() + "건이 관련 기사로 분류되었습니다.");
 
             if (teacherFiltered.isEmpty()) {
                 teacherFiltered = validArticles; // fallback: use all if teacher filters everything
@@ -178,6 +205,10 @@ public class BriefingPipeline {
         // 1.65 Embedding (non-blocking, failures don't stop pipeline)
         if (embeddingService != null && appProperties.embedding() != null && appProperties.embedding().enabled()) {
             embeddingService.embedAll(teacherFiltered);
+            executionTracker.log(runId, "INFO", "EMBED", "EMBED_DONE",
+                    teacherFiltered.size() + "건의 임베딩을 처리했습니다.");
+        } else {
+            executionTracker.log(runId, "INFO", "EMBED", "EMBED_SKIPPED", "임베딩이 비활성화되어 건너뜁니다.");
         }
 
         // 1.7 Apply relevance scoring and diversity selection
@@ -200,6 +231,8 @@ public class BriefingPipeline {
         }
 
         if (articlesForAnalysis.isEmpty()) {
+            executionTracker.log(runId, "WARN", "ANALYZE", "ANALYZE_NO_CANDIDATES",
+                    "분석할 후보 기사가 없습니다.");
             executionLog.markSuccess(KstDateTimeUtil.now());
             return executionLog;
         }
@@ -214,6 +247,8 @@ public class BriefingPipeline {
 
         AnalyzeNewsResult analyzeResult;
         try {
+            executionTracker.log(runId, "INFO", "ANALYZE", "ANALYZE_START",
+                    articlesForAnalysis.size() + "건을 AI 분석합니다.");
             analyzeResult = analyzer.analyze(new AnalyzeNewsRequest(
                     articlesForAnalysis, targetDate,
                     openAiProperties.maxSelectedNews(), audience, briefingTitle, targetHour));
@@ -221,7 +256,7 @@ public class BriefingPipeline {
             log.error("Analysis failed", e);
             executionLog.addError(toExecutionError("analyze", e));
             executionLog.markFailed(KstDateTimeUtil.now());
-            executionTracker.recordExecution(executionLog);
+            executionTracker.log(runId, "ERROR", "ANALYZE", "ANALYZE_FAILED", String.valueOf(e.getMessage()));
             return executionLog;
         }
 
@@ -237,64 +272,29 @@ public class BriefingPipeline {
             executionLog.addError(new ExecutionError("analyze", "ANALYZE_EMPTY_INPUT",
                     "No valid news in briefing after validation", false, null));
             executionLog.markFailed(KstDateTimeUtil.now());
-            executionTracker.recordExecution(executionLog);
+            executionTracker.log(runId, "ERROR", "ANALYZE", "ANALYZE_EMPTY_INPUT",
+                    "검증을 통과한 분석 결과가 없습니다.");
             return executionLog;
         }
 
         executionLog.setSelectedNewsCount(analyzeResult.briefing().news().size());
 
-        // 2.7 Save article analyses to DB (fail-safe)
+        // 2.7 Save article analyses to DB — this is what the public API serves
         saveArticleAnalyses(analyzeResult.briefing());
+        executionTracker.markAnalyzed(runId, analyzedUrls(analyzeResult.briefing()));
+        executionTracker.log(runId, "INFO", "ANALYZE", "ANALYZE_DONE",
+                analyzeResult.briefing().news().size() + "건의 분석 결과를 저장했습니다.");
 
-        // 3. Publish
-        PublishBriefingResult publishResult;
-        try {
-            publishResult = publisher.publish(new PublishBriefingRequest(
-                    analyzeResult.briefing(), appProperties.dryRun()));
-        } catch (Exception e) {
-            log.error("Publishing failed", e);
-            executionLog.addError(toExecutionError("publish", e));
-            executionLog.markFailed(KstDateTimeUtil.now());
-            executionTracker.recordExecution(executionLog);
-            return executionLog;
-        }
-
-        // Record publish channel results
-        for (PublishChannelResult r : publishResult.results()) {
-            if (r.status() == PublishChannelResult.Status.FAILED) {
-                executionLog.addError(new ExecutionError("publish",
-                        r.errorCode() != null ? r.errorCode() : "PUBLISH_CHANNEL_ERROR",
-                        r.errorMessage() != null ? r.errorMessage() : r.channel() + " publish failed",
-                        false, null));
-            } else if (r.status() == PublishChannelResult.Status.SKIPPED && r.errorCode() != null) {
-                executionLog.addError(new ExecutionError("publish",
-                        r.errorCode(),
-                        r.errorMessage() != null ? r.errorMessage() : r.channel() + " publish skipped",
-                        false, null));
-            }
-        }
-
-        // Determine final status
-        boolean allSucceeded = publishResult.results().stream()
-                .allMatch(r -> r.status() == PublishChannelResult.Status.SUCCESS
-                        || r.status() == PublishChannelResult.Status.SKIPPED);
-        boolean allFailed = publishResult.results().stream()
-                .allMatch(r -> r.status() == PublishChannelResult.Status.FAILED);
-
-        if (allFailed) {
-            executionLog.addError(new ExecutionError("publish",
-                    ErrorCode.PUBLISH_ALL_CHANNELS_FAILED.name(),
-                    "모든 발행 채널이 실패했습니다.", false, null));
-            executionLog.markFailed(KstDateTimeUtil.now());
-        } else if (allSucceeded) {
-            executionLog.markSuccess(KstDateTimeUtil.now());
-        } else {
-            executionLog.markPartialSuccess(KstDateTimeUtil.now());
-        }
-
-        executionTracker.recordExecution(executionLog);
-        log.info("Pipeline completed: executionId={}, status={}", executionId, executionLog.getStatus());
+        executionLog.markSuccess(KstDateTimeUtil.now());
         return executionLog;
+    }
+
+    private Set<String> analyzedUrls(Briefing briefing) {
+        Set<String> urls = new HashSet<>();
+        for (AnalyzedNews news : briefing.news()) {
+            news.sources().forEach(source -> urls.add(source.url()));
+        }
+        return urls;
     }
 
     private void saveArticleAnalyses(Briefing briefing) {
@@ -321,25 +321,76 @@ public class BriefingPipeline {
         }
     }
 
+    /**
+     * Classifies articles with bounded concurrency. One article per API call, so running
+     * these serially cost ~2 minutes for 80 articles; the bound keeps us under the rate limit.
+     * Order of the returned list follows the input.
+     */
     private List<Article> applyTeacherClassification(List<Article> articles) {
         String promptVersion = appProperties.teacher().promptVersion();
-        List<Article> relevant = new ArrayList<>();
+        int concurrency = Math.max(1, appProperties.teacher().concurrency());
+        Semaphore permits = new Semaphore(concurrency);
 
-        for (Article article : articles) {
-            try {
-                TeacherLabelResponse response = teacherClassifier.classify(article);
-                saveTeacherLabel(article.id(), response, promptVersion);
+        List<Article> relevant = Collections.synchronizedList(new ArrayList<>());
+        Set<String> relevantIds = ConcurrentHashMap.newKeySet();
 
-                if ("RELEVANT".equals(response.label()) || "UNCERTAIN".equals(response.label())) {
-                    relevant.add(article);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            List<Future<?>> futures = new ArrayList<>();
+            for (Article article : articles) {
+                futures.add(executor.submit(() -> {
+                    permits.acquireUninterruptibly();
+                    try {
+                        if (classifyOne(article, promptVersion)) {
+                            relevantIds.add(article.id());
+                        }
+                    } finally {
+                        permits.release();
+                    }
+                }));
+            }
+            for (Future<?> future : futures) {
+                try {
+                    future.get();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (ExecutionException e) {
+                    log.warn("Teacher classification task failed: {}", e.getCause().getMessage());
                 }
-            } catch (Exception e) {
-                log.warn("Teacher classification failed for article {}, including as RELEVANT: {}",
-                        article.id(), e.getMessage());
-                relevant.add(article); // fail-open: 분류 실패 시 포함
+            }
+        }
+
+        // rebuild in input order
+        for (Article article : articles) {
+            if (relevantIds.contains(article.id())) {
+                relevant.add(article);
             }
         }
         return relevant;
+    }
+
+    /** Returns true when the article should go on to analysis. */
+    private boolean classifyOne(Article article, String promptVersion) {
+        try {
+            // Reuse an existing label for this prompt version: re-runs must not
+            // duplicate rows or re-spend the OpenAI token budget.
+            String label = teacherLabelRepository
+                    .findByArticleIdAndTeacherPromptVersion(article.id(), promptVersion)
+                    .map(TeacherLabelEntity::getLabel)
+                    .orElse(null);
+
+            if (label == null) {
+                TeacherLabelResponse response = teacherClassifier.classify(article);
+                saveTeacherLabel(article.id(), response, promptVersion);
+                label = response.label();
+            }
+
+            return "RELEVANT".equals(label) || "UNCERTAIN".equals(label);
+        } catch (Exception e) {
+            log.warn("Teacher classification failed for article {}, including as RELEVANT: {}",
+                    article.id(), e.getMessage());
+            return true; // fail-open: 분류 실패 시 포함
+        }
     }
 
     private void saveTeacherLabel(String articleId, TeacherLabelResponse response, String promptVersion) {
@@ -355,7 +406,7 @@ public class BriefingPipeline {
             entity.setNeedsFollowUp(response.needsFollowUp());
             entity.setUsableForTraining(response.usableForTraining());
             entity.setTeacherModelProvider("openai");
-            entity.setTeacherModelName(openAiProperties.model());
+            entity.setTeacherModelName(appProperties.teacher().model());
             entity.setTeacherPromptVersion(promptVersion);
             entity.setTeacherTemperature(openAiProperties.temperature());
             entity.setLabeledAt(OffsetDateTime.now());
