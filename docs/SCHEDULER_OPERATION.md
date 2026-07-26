@@ -75,6 +75,10 @@ Read from the environment (see `.env.example`); never printed in logs:
 - `ADMIN_TOKEN` — required; a blank value stops startup and the admin API rejects every request
 - `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD`
 
+In production these are read from `.env` by `scripts/install-service.ps1` and written into the
+`EconomicBriefing` service's environment at install time. Editing `.env` therefore has no effect
+until the service is re-registered — run `scripts/deploy.ps1` (or `install-service.ps1`) again.
+
 ## Monitoring
 
 `GET /api/health/briefing` — unauthenticated, `200 UP` / `503 DOWN`.

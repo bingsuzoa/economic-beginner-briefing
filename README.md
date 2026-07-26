@@ -150,29 +150,58 @@ npm run build   # frontend/dist 생성 → http://localhost:3000 에서 바로 �
 npm run dev     # http://localhost:5173 (/api 는 :3000 으로 프록시)
 ```
 
-## 상시 구동 (Windows)
+## 상시 구동 (Windows 서비스)
 
-작업 스케줄러에 `EconomicBriefingServer` 작업이 등록되어 있습니다. **로그온 시 자동 시작**하고,
-실패하면 1분 간격으로 3회까지 재시도합니다.
+운영은 **NSSM으로 감싼 Windows 서비스 `EconomicBriefing`** 입니다. `java -jar`로 bootJar
+산출물을 직접 띄우며, `gradlew bootRun`은 운영에 쓰지 않습니다(호출하면 실패하도록 막아둠).
+
+| 항목 | 설정 |
+|---|---|
+| 시작 유형 | 자동(지연 시작) — 로그인 여부와 무관 |
+| 실행 계정 | `LocalSystem` |
+| 의존 서비스 | `postgresql-x64-17` |
+| 프로세스 종료 시 | NSSM이 5초 후 재시작 (+ SCM 복구 동작 3단계) |
+| 중복 실행 | SCM이 단일 인스턴스 보장, 설치 시 3000 포트 점유 프로세스 정리 |
+| 로그 | `logs/service-stdout.log`, `logs/service-stderr.log` (일 단위 / 10MB 로테이션) |
 
 ```powershell
-Get-ScheduledTask  -TaskName EconomicBriefingServer   # 상태 확인
-Start-ScheduledTask -TaskName EconomicBriefingServer   # 수동 시작
-Stop-ScheduledTask  -TaskName EconomicBriefingServer   # 중지
+Get-Service EconomicBriefing        # 상태 확인
+Restart-Service EconomicBriefing    # 재시작 (관리자)
+Stop-Service EconomicBriefing       # 중지 (관리자)
 ```
 
-실행 스크립트는 `scripts/run-server.ps1`이며 `.env`를 읽어 JDK 21로 JAR을 띄웁니다.
-로그는 `logs/server-YYYY-MM-DD.log`에 하루 단위로 쌓이고 30일이 지나면 자동 삭제됩니다.
+### 배포 (코드 수정 후)
 
-> **부팅 시 자동 시작이 필요하면** 관리자 권한으로 트리거를 바꿔야 합니다.
-> 현재는 로그온 트리거라 재부팅 후 로그인하지 않으면 서버가 뜨지 않습니다.
->
-> ```powershell
-> # 관리자 PowerShell에서 실행
-> $t = Get-ScheduledTask -TaskName EconomicBriefingServer
-> $t.Triggers = (New-ScheduledTaskTrigger -AtStartup)
-> $t | Set-ScheduledTask -User "SYSTEM" -RunLevel Highest
-> ```
+**관리자 PowerShell에서** 아래 한 줄만 실행합니다.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\deploy.ps1
+```
+
+서비스 중지 → `gradlew clean bootJar` → 서비스 재등록·시작을 순서대로 수행합니다.
+서비스가 떠 있는 동안에는 JVM이 JAR 파일을 잠그기 때문에 `gradlew clean`이 실패합니다.
+**`gradlew`를 직접 호출하지 말고 이 스크립트를 쓰세요.**
+
+`.env`를 수정한 경우에도 이 스크립트(또는 `scripts\install-service.ps1`)를 다시 실행해야 합니다.
+환경변수는 서비스 등록 시점에 주입되므로 재시작만으로는 반영되지 않습니다.
+
+### 모니터링
+
+`GET /api/health/briefing`은 인증 없이 `200 UP` / `503 DOWN`을 반환합니다.
+개인 PC 구성이라 감시는 외부에 두어야 합니다 — UptimeRobot 설정은 `docs/MONITORING.md` 참고.
+
+### 최초 설치
+
+`tools/nssm.exe`가 없으면 먼저 받습니다(git에 포함되지 않음).
+
+```powershell
+Invoke-WebRequest https://nssm.cc/release/nssm-2.24.zip -OutFile $env:TEMP\nssm.zip
+Expand-Archive $env:TEMP\nssm.zip $env:TEMP -Force
+New-Item -ItemType Directory tools -Force | Out-Null
+Copy-Item $env:TEMP\nssm-2.24\win64\nssm.exe tools\nssm.exe
+```
+
+그 다음 관리자 PowerShell에서 `scripts\install-service.ps1`을 실행합니다.
 
 ## 관리자 API
 

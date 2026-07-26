@@ -22,5 +22,8 @@ build/
 node_modules/
 frontend/dist/
 
-# Server logs (scripts/run-server.ps1)
+# Server logs (NSSM AppStdout/AppStderr)
 logs/
+
+# Vendored NSSM binary (fetched by docs/OPERATIONS setup step)
+tools/
