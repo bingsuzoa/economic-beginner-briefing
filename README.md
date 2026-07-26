@@ -412,23 +412,37 @@ npm run dev     # http://localhost:5173 (/api 는 :3000 으로 프록시)
 | `/images/**` | `max-age=86400, public` | `public/`에서 이름 그대로 복사되어 내용이 바뀌어도 URL이 같음 |
 | `index.html`, `/api/**` | `no-store` (유지) | index.html은 해시 번들을 가리키므로 캐시되면 배포 후 빈 화면이 됨 |
 
-이미지를 교체했는데 즉시 반영해야 한다면 **URL을 바꿔야 합니다.** 파일 이름을 바꾸거나 쿼리
-문자열을 붙이는 방법뿐입니다. 내용만 바꾸고 URL이 그대로면 최대 하루 동안 예전 이미지가 나갑니다.
-Cloudflare가 엣지에도 캐시하므로 브라우저 강제 새로고침으로도 넘을 수 없습니다.
+`public/`의 이미지는 이름이 그대로라 **내용만 바꾸면 최대 하루 동안 예전 이미지가 나갑니다.**
+Cloudflare가 엣지에도 캐시하므로 브라우저 강제 새로고침으로도 넘을 수 없습니다. 즉시 반영이
+필요하면 파일 이름을 바꾸거나 쿼리 문자열을 붙여 URL을 바꿔야 합니다.
 
-**파비콘을 교체할 때**는 `frontend/public/images/favicon.png`를 덮어쓴 뒤 `index.html`의
-쿼리 값을 새 파일 해시로 바꿉니다.
+`main-logo.png`가 이 경우에 해당합니다(Navbar·Footer의 `<img src>`). JSX의 절대 경로는
+Vite가 건드리지 않으므로 교체 시 URL을 직접 바꿔야 합니다.
 
-```powershell
-(Get-FileHash frontend\public\images\favicon.png -Algorithm SHA256).Hash.Substring(0,8).ToLower()
+### 파비콘 교체
+
+**파일만 덮어쓰면 됩니다.** 버전 문자열도, 이름 변경도 필요 없습니다.
+
+```bash
+# frontend/src/assets/favicon.png 를 새 이미지로 덮어쓰고
+cd frontend && npm run build
 ```
+
+`public/`이 아니라 `src/assets/`에 두는 이유입니다. `index.html`이 상대 경로로 참조하므로
+Vite가 빌드 때 `/assets/favicon-<해시>.png`로 바꿔 내보냅니다. 내용이 바뀌면 해시가 바뀌고,
+해시가 바뀌면 URL이 바뀌므로 무효화할 캐시가 애초에 없습니다. `/assets/**`는 1년 `immutable`인데
+그래도 안전한 이유가 같습니다.
 
 ```html
-<link rel="icon" type="image/png" href="/images/favicon.png?v=여기에붙여넣기" />
+<!-- 소스 (개발 서버가 이 경로를 그대로 서빙) -->
+<link rel="icon" type="image/png" href="./src/assets/favicon.png" />
+
+<!-- 빌드 결과 -->
+<link rel="icon" type="image/png" href="/assets/favicon-BOqpS_8-.png" />
 ```
 
-이 한 줄을 잊으면 파일은 바뀌었는데 화면은 그대로입니다. Navbar·Footer가 쓰는
-`main-logo.png`도 같은 규칙이 적용되지만, 그쪽은 `<img src>`라 컴포넌트에서 바꿉니다.
+절대 경로(`/images/...`)로 쓰면 Vite가 `public/` 파일로 보고 손대지 않으므로 해시가 붙지
+않습니다. **경로 앞의 `./`를 지우지 마세요.**
 
 ## 상시 구동 (Windows 서비스)
 

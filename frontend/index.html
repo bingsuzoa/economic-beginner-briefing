@@ -3,16 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Lives in frontend/public/, so the path is identical in both environments: the dev server
-         serves public/ at the root, and `vite build` copies it verbatim into dist/, which Spring
-         serves from disk (application.yml -> spring.web.resources.static-locations).
-
-         ?v= is the cache buster, and it is not optional. Files under /images/ are served with
-         max-age=86400 and Cloudflare caches them at the edge, so replacing favicon.png without
-         changing the URL keeps the old icon live for up to a day - a browser hard-refresh does
-         not help, because it still hits the edge. Bump this to the first 8 hex of the new file's
-         SHA-256 whenever the image is replaced. -->
-    <link rel="icon" type="image/png" href="/images/favicon.png?v=e0bdaaca" />
+    <!-- Relative path on purpose. Vite rewrites relative asset URLs in this file, so the build
+         emits /assets/favicon-<contenthash>.png and points this href at it; an absolute /images/...
+         path would be treated as a public/ file and passed through untouched. The hash is what
+         makes replacing the icon safe: /assets/** is served immutable for a year and Cloudflare
+         caches it at the edge, but new bytes produce a new filename, so there is nothing stale to
+         invalidate. Drop a new frontend/src/assets/favicon.png and rebuild - no version to bump.
+         The dev server serves this same path straight from disk. -->
+    <link rel="icon" type="image/png" href="./src/assets/favicon.png" />
     <title>병아리 경제 뉴스</title>
   </head>
   <body>
