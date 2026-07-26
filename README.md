@@ -185,6 +185,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\deploy.ps1
 `.env`를 수정한 경우에도 이 스크립트(또는 `scripts\install-service.ps1`)를 다시 실행해야 합니다.
 환경변수는 서비스 등록 시점에 주입되므로 재시작만으로는 반영되지 않습니다.
 
+재부팅 후 자동 시작이 정상인지 확인하려면 `docs/REBOOT_TEST.md`의 절차를 실행합니다.
+
 ### 모니터링
 
 `GET /api/health/briefing`은 인증 없이 `200 UP` / `503 DOWN`을 반환합니다.
