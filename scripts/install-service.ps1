@@ -14,11 +14,18 @@
 # turns a native command's redirected stderr into a terminating NativeCommandError while
 # $ErrorActionPreference is 'Stop' - which aborts this script halfway through the install.
 # Letting stderr go straight to the console is both safer and more visible.
+#
+# -ProjectRoot exists for the CI deploy: the workflow checks out into the runner's workspace,
+# so the script that runs is NOT the copy inside the production directory. Without it the
+# service would be registered against the workspace, which the runner is free to wipe.
+
+param([string]$ProjectRoot)
 
 $ErrorActionPreference = 'Stop'
 
 $ServiceName = 'EconomicBriefing'
-$ProjectRoot = Split-Path -Parent $PSScriptRoot
+if (-not $ProjectRoot) { $ProjectRoot = Split-Path -Parent $PSScriptRoot }
+$ProjectRoot = (Resolve-Path $ProjectRoot).Path
 $Nssm        = Join-Path $ProjectRoot 'tools\nssm.exe'
 $EnvFile     = Join-Path $ProjectRoot '.env'
 $LogDir      = Join-Path $ProjectRoot 'logs'

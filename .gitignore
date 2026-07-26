@@ -27,3 +27,6 @@ logs/
 
 # Vendored NSSM binary (fetched by docs/OPERATIONS setup step)
 tools/
+
+# Previous releases kept by scripts/deploy.ps1 for rollback
+backup/
