@@ -1,23 +1,51 @@
+import { useState } from 'react'
 import s from './Sidebar.module.css'
 
-export default function Sidebar({ news }) {
-  const scrollTo = (id) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+const menus = [
+  {
+    id: 'news',
+    icon: '/images/news-icon.png',
+    title: '오늘의 병아리 뉴스',
+    path: '/',
+    isImage: true
+  },
+  {
+    id: 'loan',
+    icon: '/images/loan-icon.png',
+    title: '대출계산기',
+    path: '/loan',
+    isImage: true
+  }
+]
+
+export default function Sidebar({ onMenuChange }) {
+  const [activeMenu, setActiveMenu] = useState('news')
+
+  const handleMenuClick = (menu) => {
+    setActiveMenu(menu.id)
+    if (onMenuChange) {
+      onMenuChange(menu.id)
+    }
   }
 
   return (
     <aside className={s.sidebar}>
-      <div className={s.title}>오늘의 뉴스</div>
-      <ul className={s.list}>
-        {news.map((n, i) => (
-          <li key={n.articleId || n.id || i}>
-            <button className={s.item} onClick={() => scrollTo(n.articleId || n.id)}>
-              <span className={s.importance}>{'★'.repeat(n.importance || 3)}</span>
-              {n.easyTitle || n.originalTitle || '제목 없음'}
-            </button>
-          </li>
+      <nav className={s.menu}>
+        {menus.map((menu) => (
+          <button
+            key={menu.id}
+            className={`${s.item} ${activeMenu === menu.id ? s.active : ''}`}
+            onClick={() => handleMenuClick(menu)}
+          >
+            {menu.isImage ? (
+              <img src={menu.icon} alt="" className={s.icon} />
+            ) : (
+              <span className={s.icon}>{menu.icon}</span>
+            )}
+            <span className={s.title}>{menu.title}</span>
+          </button>
         ))}
-      </ul>
+      </nav>
     </aside>
   )
 }

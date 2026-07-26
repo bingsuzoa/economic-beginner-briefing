@@ -314,8 +314,10 @@ npm run dev     # http://localhost:5173 (/api 는 :3000 으로 프록시)
 
 ## 상시 구동 (Windows 서비스)
 
-운영은 **NSSM으로 감싼 Windows 서비스 `EconomicBriefing`** 입니다. `java -jar`로 bootJar
-산출물을 직접 띄우며, `gradlew bootRun`은 운영에 쓰지 않습니다(호출하면 실패하도록 막아둠).
+| 환경 | 실행 방법 |
+|---|---|
+| **개발 (Mac/Linux)** | `./gradlew bootRun` |
+| **운영 (Windows)** | `gradlew clean bootJar` + Windows Service (NSSM) — bootRun은 Windows에서 호출하면 실패합니다 |
 
 | 항목 | 설정 |
 |---|---|

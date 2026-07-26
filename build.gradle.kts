@@ -64,11 +64,21 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-// 운영은 NSSM 서비스(scripts/install-service.ps1)가 bootJar 산출물을 java -jar로 띄웁니다.
-// bootRun은 사용하지 않으므로 비활성화합니다. 환경변수는 서비스 등록 시 .env에서 주입됩니다.
-// enabled=false로 두면 조용히 SKIPPED 되어 "성공했는데 서버가 없다"로 오해합니다. 명시적으로 실패시킵니다.
+// 운영(Windows)은 NSSM 서비스가 bootJar 산출물을 java -jar로 띄웁니다.
+// 개발(Mac/Linux)에서는 bootRun을 허용하며, .env 파일에서 환경변수를 로드합니다.
 tasks.bootRun {
     doFirst {
-        throw GradleException("bootRun은 사용하지 않습니다. .\\gradlew.bat clean bootJar 후 scripts\\install-service.ps1 로 서비스를 운영하세요.")
+        if (System.getProperty("os.name").lowercase().contains("windows")) {
+            throw GradleException("운영 환경에서는 bootRun을 사용하지 않습니다. .\\gradlew.bat clean bootJar 후 scripts\\install-service.ps1 로 서비스를 운영하세요.")
+        }
+    }
+    val envFile = rootProject.file(".env")
+    if (envFile.exists()) {
+        envFile.readLines()
+            .filter { it.isNotBlank() && !it.startsWith("#") && '=' in it }
+            .forEach { line ->
+                val (key, value) = line.split("=", limit = 2)
+                environment(key.trim(), value.trim())
+            }
     }
 }
