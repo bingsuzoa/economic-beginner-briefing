@@ -23,6 +23,10 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   line-height: 1.6;
+  /* 한글은 기본값(word-break: normal)에서 글자 단위로 끊긴다. 어절 단위 줄바꿈을 전역으로 걸고,
+     끊을 수 없는 긴 문자열(URL 등)만 break-word로 흘려보낸다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 a {

@@ -27,3 +27,8 @@
   border-radius: 50%;
   background: var(--color-primary-dark);
 }
+
+@media (max-width: 700px) {
+  .box { padding: 14px 16px; margin-bottom: 16px; }
+  .box li { font-size: 0.92rem; line-height: 1.6; }
+}

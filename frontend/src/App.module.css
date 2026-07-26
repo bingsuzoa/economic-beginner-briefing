@@ -40,3 +40,12 @@
   color: var(--color-text);
   font-weight: 600;
 }
+
+@media (max-width: 700px) {
+  /* 사이드바가 숨는 구간. 좌우 12px만 남겨 콘텐츠가 화면 폭의 92~96%를 쓰게 한다. */
+  .main { padding: 16px 12px; }
+  .status { padding: 32px 8px; font-size: 1rem; }
+  .loanHero { padding: 48px 0; }
+  .loanImage { width: 150px; height: 150px; }
+  .loanMessage { font-size: 1.15rem; }
+}

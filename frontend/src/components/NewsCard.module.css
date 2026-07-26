@@ -13,8 +13,9 @@
 }
 .header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 10px;
   margin-bottom: 16px;
 }
 .category {
@@ -23,14 +24,19 @@
   color: var(--color-text);
   font-size: 0.75rem;
   font-weight: 600;
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: 20px;
 }
 .evidence {
   font-size: 0.75rem;
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: 20px;
   font-weight: 600;
+}
+/* 짧은 배지는 flex item으로 줄어들면서 '세'/'금'처럼 세로로 쪼개진다. 줄이지 말고 다음 줄로 넘긴다. */
+.category, .evidence {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .confirmed {
   background: #e6fcf0;
@@ -91,11 +97,13 @@
 }
 .teacherBadge {
   font-size: 0.7rem;
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 20px;
   background: #e8f4fd;
   color: #1976d2;
   font-weight: 600;
+  /* 라벨 길이가 가변이라 nowrap을 걸면 넘칠 수 있다. 좁으면 다음 줄로 내려가 그 안에서 접히게 둔다. */
+  max-width: 100%;
 }
 .projected {
   background: #e3f2fd;
@@ -104,4 +112,12 @@
 .uncertain {
   background: #fff3e0;
   color: #e65100;
+}
+
+@media (max-width: 700px) {
+  .card { padding: 18px 16px; margin-bottom: 16px; }
+  .title { font-size: 1.15rem; line-height: 1.5; margin-bottom: 16px; }
+  .uncertainties { padding: 12px 14px; margin-bottom: 16px; }
+  .actions { margin-bottom: 16px; }
+  .affected { margin-bottom: 16px; }
 }
