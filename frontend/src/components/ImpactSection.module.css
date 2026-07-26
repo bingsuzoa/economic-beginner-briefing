@@ -24,6 +24,7 @@
   font-size: 0.9rem;
 }
 
-@media (max-width: 600px) {
-  .grid { grid-template-columns: 1fr; }
+@media (max-width: 700px) {
+  .grid { grid-template-columns: 1fr; gap: 10px; margin-bottom: 16px; }
+  .card { padding: 12px 14px; }
 }

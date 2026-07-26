@@ -55,3 +55,11 @@
   font-style: italic;
   color: var(--color-primary-dark);
 }
+
+@media (max-width: 700px) {
+  .section { margin-bottom: 16px; }
+  .toggle { padding: 12px 14px; font-size: 0.9rem; }
+  .inner { padding: 0 14px 12px; }
+  /* 폭이 좁아지면 같은 설명이 두 배로 길어져 200px에서 잘린다. */
+  .contentOpen { max-height: 480px; }
+}
