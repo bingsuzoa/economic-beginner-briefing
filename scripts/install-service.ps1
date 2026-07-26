@@ -40,6 +40,31 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 if (-not (Test-Path $Nssm))    { Fail "nssm.exe not found: $Nssm" }
 if (-not (Test-Path $EnvFile)) { Fail ".env not found: $EnvFile" }
 
+# --- Secrets from .env, parsed and checked BEFORE anything is touched ---------------------
+# Same parsing rule the project has always used: only lines starting with '#' are comments,
+# so a '#' inside a value (API keys, passwords) survives.
+#
+# This runs up here, not next to the nssm call that consumes it, because this script removes
+# the existing service before installing the new one. Validating afterwards means a bad .env
+# takes production down and only then reports why. A .env that parses but is missing a
+# required key is worse than one that fails to parse: the service installs, starts, fails
+# ConfigValidator, and NSSM restarts it forever - a crash loop instead of an error message.
+# That is not hypothetical. A stray newline inside ADMIN_TOKEN once split it into 'A' and
+# 'DMIN_TOKEN', which parses cleanly as a key nobody reads.
+$pairs = Get-Content $EnvFile |
+    Where-Object { -not $_.TrimStart().StartsWith('#') } |
+    ForEach-Object { if ($_ -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$') { "$($Matches[1])=$($Matches[2].Trim())" } }
+if (-not $pairs) { Fail "No KEY=VALUE lines parsed from $EnvFile" }
+
+$names    = $pairs | ForEach-Object { ($_ -split '=', 2)[0] }
+$dryRun   = $pairs | Where-Object { $_ -match '^DRY_RUN\s*=\s*true$' }
+$required = @('OPENAI_API_KEY') + $(if (-not $dryRun) { 'ADMIN_TOKEN' })
+$missing  = $required | Where-Object { $names -notcontains $_ }
+if ($missing) {
+    Fail ("$EnvFile is missing required key(s): $($missing -join ', '). Parsed only: $($names -join ', '). " +
+          "A key split across lines shows up as a truncated name - check for stray newlines.")
+}
+
 # --- Resolve the fat JAR (exclude the -plain.jar that bootJar also leaves behind) ---
 $Jar = Get-ChildItem (Join-Path $ProjectRoot 'build\libs') -Filter '*.jar' -ErrorAction SilentlyContinue |
        Where-Object { $_.Name -notlike '*-plain.jar' } |
@@ -141,13 +166,8 @@ if ($LASTEXITCODE -ne 0) { Fail "nssm install failed (exit $LASTEXITCODE)" }
 & $Nssm set $ServiceName AppRotateSeconds 86400                              | Out-Null
 & $Nssm set $ServiceName AppRotateBytes   10485760                           | Out-Null
 
-# --- Secrets from .env -> service environment (NSSM wants a NUL-free multiline blob) ---
-# Same parsing rule the project has always used: only lines starting with '#' are comments,
-# so a '#' inside a value (API keys, passwords) survives.
-$pairs = Get-Content $EnvFile |
-    Where-Object { -not $_.TrimStart().StartsWith('#') } |
-    ForEach-Object { if ($_ -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$') { "$($Matches[1])=$($Matches[2].Trim())" } }
-if (-not $pairs) { Fail "No KEY=VALUE lines parsed from $EnvFile" }
+# --- .env -> service environment (NSSM wants a NUL-free multiline blob) ---
+# $pairs was parsed and validated at the top, before the old service was removed.
 & $Nssm set $ServiceName AppEnvironmentExtra ($pairs -join "`r`n") | Out-Null
 
 # Windows' own recovery, as a backstop for the case NSSM itself dies.
