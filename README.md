@@ -119,16 +119,101 @@ java -jar build/libs/economic-briefing-0.1.0.jar --target-date=2026-07-16
 [Scheduler] Pipeline finished (10s) status=SUCCESS
 ```
 
+## 개발 프로세스
+
+```text
+feature 브랜치 작업
+       ↓
+   PR 생성
+       ↓
+   CI 검증          (.github/workflows/ci.yml — GitHub 클라우드, ubuntu-latest)
+   - mock 검사
+   - frontend build
+   - backend test
+       ↓
+    Merge           ← CI가 실패하면 Merge 버튼이 잠깁니다
+       ↓
+   자동 배포        (.github/workflows/deploy.yml — 이 PC, self-hosted runner)
+```
+
+워크플로가 두 개인 이유는 역할이 다르기 때문입니다.
+
+| | `ci.yml` | `deploy.yml` |
+|---|---|---|
+| 트리거 | `pull_request` (main 대상) | `push` (main) |
+| 실행 위치 | GitHub 클라우드 `ubuntu-latest` | 이 PC, self-hosted runner |
+| 하는 일 | mock 검사 · 프론트 빌드 · 백엔드 테스트 | 테스트 · 빌드 · **배포** |
+| 배포 | **안 함** | 함 |
+| 목적 | 머지 전에 막기 | 머지된 것을 운영에 반영 |
+
+`ci.yml`은 **절대 self-hosted runner를 쓰지 않습니다.** 이 저장소는 public이고 runner는 SYSTEM
+권한으로 도는 서비스라, `pull_request`를 self-hosted에 걸면 임의의 fork PR이 이 PC에서 코드를
+실행하게 됩니다. `ubuntu-latest`는 GitHub가 매번 새로 만들고 버리는 일회용 VM이라 안전합니다.
+
+### Branch Protection 설정
+
+CI 실패 시 Merge 버튼을 잠그려면 GitHub에서 한 번 설정해야 합니다(코드로는 불가능).
+
+**Settings → Branches → Add branch protection rule**
+
+| 항목 | 값 |
+|---|---|
+| Branch name pattern | `main` |
+| Require a pull request before merging | 체크 |
+| Require status checks to pass before merging | 체크 |
+| ↳ 검색해서 선택할 체크 이름 | **`verify`** |
+| Require branches to be up to date before merging | 권장 |
+
+선택할 status check 이름은 `ci.yml`의 **job 이름인 `verify`** 입니다(워크플로 이름 `CI`가 아닙니다).
+목록에 안 보이면 PR을 한 번 만들어 CI를 1회 실행시킨 뒤 다시 검색하면 나옵니다.
+
+> `ci.yml`에서 job 이름을 바꾸면 이 규칙이 조용히 풀립니다. 규칙은 존재하지만 매칭되는 체크가
+> 없어져 Merge 버튼이 다시 초록색이 됩니다. 이름을 바꾸면 Branch Protection도 같이 고쳐야 합니다.
+
+### mock 데이터 검사
+
+```bash
+node scripts/check-mock-data.mjs
+```
+
+`frontend/src` 아래 `.js/.jsx/.ts/.tsx`에서 mock 참조를 찾습니다. 의존성이 없어 로컬(Windows)과
+CI(Linux) 모두에서 같은 명령으로 돌아갑니다. PR을 올리기 전에 직접 실행해 볼 수 있습니다.
+
+| 종료 코드 | 의미 |
+|---|---|
+| `0` | 깨끗함 |
+| `1` | mock 참조 발견 — 파일·줄·내용을 전부 출력 |
+| `2` | 검사 자체가 불가 (대상 디렉터리 없음). **조용히 통과하지 않습니다** |
+
+검사 패턴은 스크립트 상단 `PATTERNS` 배열에 있습니다. 추가하려면 거기에 한 줄 넣으면 됩니다.
+
+```js
+const PATTERNS = [
+  { label: 'mockData', regex: /mockData/i },
+  { label: 'mockNews', regex: /mockNews/i },
+  { label: 'import ... mock', regex: /import\s.*mock/i },
+  { label: 'from ... mock',   regex: /from\s.*mock/i },
+]
+```
+
+우회 수단(주석으로 무시 등)은 일부러 두지 않았습니다. 오탐이 나면 `PATTERNS`를 고치는 것이
+유일한 방법이고, 그래야 검사가 의미를 유지합니다.
+
+이 검사가 존재하는 이유는 실제 사고 때문입니다. UI 작업 커밋에서 `App.jsx`의 실제 `fetch`가
+주석 블록으로 들어가고 `mockData.js`가 그 자리를 대신한 채 머지·배포되어, API는 실제 분석을
+내려주는데 공개 사이트는 지어낸 브리핑을 보여줬습니다. 배포 파이프라인은 시킨 대로 동작했으므로,
+검사는 배포 전이 아니라 **머지 전**에 있어야 합니다.
+
 ## CI/CD 운영 방법
 
 `main`에 push되면 GitHub Actions가 **집 데스크탑에 설치된 self-hosted runner**에서 테스트·빌드·배포를
-수행합니다. 워크플로는 `.github/workflows/deploy.yml`(이름: `Deploy Economic Briefing`) 하나입니다.
+수행합니다.
 
 ```text
 main push
   → GitHub Actions (Deploy Economic Briefing)
   → self-hosted runner (이 PC, LocalSystem 서비스)
-  → checkout → JDK 21 → gradlew.bat test
+  → checkout → mock 가드 → JDK 21 → gradlew.bat test
   → scripts\deploy.ps1  (백업 → bootJar + 프론트 빌드 → 서비스 중지 → 산출물 복사 → 재등록·시작)
   → scripts\health-check.ps1
   → 실패하면 이전 JAR로 자동 롤백
@@ -311,6 +396,24 @@ npm run build   # frontend/dist 생성 → http://localhost:3000 에서 바로 �
 ```bash
 npm run dev     # http://localhost:5173 (/api 는 :3000 으로 프록시)
 ```
+
+### 정적 파일과 파비콘
+
+`frontend/public/` 아래 파일은 Vite가 빌드 시 `dist/`로 **그대로 복사**하고, 백엔드가 그 디렉터리를
+루트로 서빙합니다. 그래서 `/images/main-logo.png` 같은 경로가 개발 서버와 운영에서 동일하게 동작합니다.
+파비콘도 이 방식으로 `index.html`에서 참조합니다.
+
+캐시 정책은 `StaticResourceCacheConfig`에 있습니다. Spring Security가 기본으로 모든 응답에
+`no-store`를 붙이는데, API와 `index.html`에는 맞지만 이미지·번들에는 맞지 않아 두 경로만 열어둡니다.
+
+| 경로 | Cache-Control | 이유 |
+|---|---|---|
+| `/assets/**` | `max-age=31536000, public, immutable` | Vite가 파일명에 콘텐츠 해시를 넣으므로 내용이 바뀌면 URL이 바뀜 |
+| `/images/**` | `max-age=86400, public` | `public/`에서 이름 그대로 복사되어 내용이 바뀌어도 URL이 같음 |
+| `index.html`, `/api/**` | `no-store` (유지) | index.html은 해시 번들을 가리키므로 캐시되면 배포 후 빈 화면이 됨 |
+
+이미지를 교체했는데 즉시 반영해야 한다면 **파일 이름을 바꾸세요.** 이 파일들에는 그것 말고
+캐시를 무효화할 수단이 없습니다(최대 하루).
 
 ## 상시 구동 (Windows 서비스)
 

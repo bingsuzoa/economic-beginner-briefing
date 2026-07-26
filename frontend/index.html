@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Lives in frontend/public/, so the path is identical in both environments: the dev server
+         serves public/ at the root, and `vite build` copies it verbatim into dist/, which Spring
+         serves from disk (application.yml -> spring.web.resources.static-locations). -->
+    <link rel="icon" type="image/png" href="/images/main-logo.png" />
     <title>병아리 경제 뉴스</title>
   </head>
   <body>
