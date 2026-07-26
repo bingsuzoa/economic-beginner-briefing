@@ -5,7 +5,6 @@ import Sidebar from './components/Sidebar'
 import HeroSection from './components/HeroSection'
 import NewsCard from './components/NewsCard'
 import Footer from './components/Footer'
-import { mockNews } from './mockData'
 
 const API_BASE = '/api/briefing'
 
@@ -16,13 +15,6 @@ export default function App() {
   const [activeMenu, setActiveMenu] = useState('news')
 
   useEffect(() => {
-    // Mock 데이터 사용 (실제 API 연결 시 아래 주석 해제)
-    setTimeout(() => {
-      setNews(mockNews)
-      setLoading(false)
-    }, 500)
-
-    /* 실제 API 사용 시:
     fetch(`${API_BASE}/articles`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -36,7 +28,6 @@ export default function App() {
         setError(err.message)
         setLoading(false)
       })
-    */
   }, [])
 
   return (

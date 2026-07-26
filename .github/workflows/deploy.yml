@@ -35,6 +35,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # A UI-only commit once swapped the live fetch for a bundled mockData.js and left the real
+      # call commented out. The pipeline deployed it exactly as told, and the public site served
+      # fabricated briefings while the API was returning real ones. Cheap check, runs before the
+      # build so it fails in seconds.
+      - name: Guard against mock data in the frontend
+        run: |
+          $hits = Get-ChildItem frontend\src -Recurse -File -Include *.js,*.jsx |
+                  Select-String -Pattern 'mockData|mockNews'
+          if ($hits) {
+            $hits | ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber): $($_.Line.Trim())" }
+            throw 'Mock data is referenced in frontend/src. Restore the real API call before deploying.'
+          }
+          Write-Host 'No mock data references in frontend/src.'
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
