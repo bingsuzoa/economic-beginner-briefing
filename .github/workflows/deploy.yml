@@ -21,7 +21,15 @@ jobs:
     timeout-minutes: 30
     defaults:
       run:
-        shell: powershell
+        # Not the built-in `shell: powershell`. That one runs `powershell -command ". '<step>.ps1'"`
+        # with no -ExecutionPolicy flag, and this runner is a service running as SYSTEM: SYSTEM has
+        # no CurrentUser policy and LocalMachine is Undefined, so its effective policy is Restricted
+        # and every step dies in under a second with "running scripts is disabled on this system".
+        # Setting the machine-wide policy would fix it too; keeping it here keeps the workaround in
+        # the repository instead of in undocumented machine state.
+        # A custom shell string skips the built-in template, so the two things that template adds -
+        # stop-on-error and exit-code propagation - have to be spelled out.
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; . '{0}'; exit $LASTEXITCODE"
 
     steps:
       - name: Checkout

@@ -280,6 +280,7 @@ literal 200을 요구하려면 `-Strict`를 붙입니다.
 | `Deploy` 스텝 exit 2 | 롤백까지 실패 | 서비스가 내려가 있을 수 있음. 위 "수동 롤백" 절차 실행 |
 | 배포는 성공인데 도메인 502 | Cloudflare Tunnel | `Restart-Service cloudflared` (관리자) |
 | `Access is denied` / nssm 실패 | runner가 관리자 권한이 아님 | runner 서비스 계정이 `LocalSystem`인지 확인, 아니면 `install-runner.ps1` 재실행 |
+| 모든 스텝이 1초 안에 exit 1 | `running scripts is disabled on this system` — SYSTEM의 실효 실행 정책이 Restricted | 워크플로의 `defaults.run.shell`이 `-ExecutionPolicy Bypass`를 포함하는지 확인. 지우면 재발합니다 |
 | DB 연결 실패 | postgres 중지 | `Get-Service postgresql-x64-17` → `Start-Service` |
 | 배포가 서로 겹침 | — | `concurrency`가 직렬화하므로 발생하지 않음. 겹쳤다면 워크플로에서 `concurrency` 확인 |
 
