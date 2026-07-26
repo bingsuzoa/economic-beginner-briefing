@@ -3,12 +3,13 @@
 > 이 문서는 **재부팅 후 자동 시작 검증**을 위한 자기완결 런북입니다.
 > 맥락을 모르는 새 세션이 이 파일만 읽고도 합격/불합격을 판정할 수 있게 작성되었습니다.
 > 작성 시각: 2026-07-26 15:40 KST / 커밋 `4fb2af1`
+> **검증 완료: 2026-07-26 15:46 KST — 합격 (10/10)**. 결과는 §7 참고. 이후 재검증에도 그대로 사용합니다.
 
 ## 1. 무엇을 검증하는가
 
 2026-07-26에 이 프로젝트를 개발 실행(`gradlew bootRun`)에서 **Windows 서비스 운영**으로 전환했습니다.
-전환 후 ①~⑩ 항목은 모두 검증 완료했고, **⑪ 재부팅 후 자동 실행만 미검증** 상태입니다.
-(재부팅은 작업 세션을 종료시키므로 사용자가 직접 수행하기로 결정)
+전환 후 ①~⑩ 항목에 이어 **⑪ 재부팅 후 자동 실행도 2026-07-26 15:46 검증 완료**입니다(§7).
+아래 절차는 서비스 구성이나 JDK/DB를 손댄 뒤 재검증할 때 다시 씁니다.
 
 검증해야 할 것은 세 가지입니다.
 
@@ -36,7 +37,9 @@
 
 ## 3. 검증 절차
 
-재부팅 후 **1~3분 기다린 뒤** 실행합니다. 지연 시작이라 즉시 뜨지 않는 것이 정상입니다.
+재부팅 후 **3분 이상 기다린 뒤** 실행합니다. 지연 시작이라 즉시 뜨지 않는 것이 정상입니다.
+이 PC의 실측 기동 시점은 **부팅 후 약 130초**이며, 그 전에는 서비스가 `Stopped`이고
+`Service Control Manager` 이벤트조차 없습니다. **1~2분 시점의 `Stopped`는 실패가 아닙니다.**
 관리자 권한은 필요 없습니다.
 
 ```powershell
@@ -107,7 +110,7 @@ Get-Content logs\service-stdout.log -Tail 200 |
 
 | 증상 | 원인 후보 | 조치 |
 |---|---|---|
-| 서비스 `Stopped` | 시작 실패 | `logs\service-stderr.log`, `Get-EventLog System -Source 'Service Control Manager' -Newest 30` |
+| 서비스 `Stopped` | **부팅 3분 이내면 지연 시작 대기 중(정상)**. 그 이후면 시작 실패 | `logs\service-stderr.log`, `Get-EventLog System -Source 'Service Control Manager' -Newest 30` |
 | 서비스 없음 | 등록이 풀림 | 관리자 PS에서 `scripts\install-service.ps1` |
 | `Running`인데 포트 없음 | JVM 크래시 후 재시작 루프 | `logs\service-stdout.log` 마지막 예외 확인 |
 | DB 연결 실패 | postgres보다 먼저 뜸 | 의존성 확인: `sc qc EconomicBriefing`에 `postgresql-x64-17` |
@@ -141,7 +144,29 @@ docs/REBOOT_TEST.md 읽고 재부팅 테스트 검증해줘
 docs/REBOOT_TEST.md 읽고 검증한 다음, 다음 정각 파이프라인 실행까지 지켜봐줘
 ```
 
-## 7. 미해결 항목 (재부팅과 무관)
+## 7. 검증 결과 (2026-07-26 15:46 KST)
+
+부팅 15:44:05 → JVM 기동 15:46:15 (130초) → Spring 기동 완료 15:46:21. **10개 항목 전부 합격.**
+
+| # | 항목 | 실측값 |
+|---|---|---|
+| 1 | 서비스 상태 | `Running` |
+| 2 | 시작 유형 | `Auto` + `DelayedAutoStart=1` |
+| 3 | 서비스 계정 | `LocalSystem` |
+| 4 | JVM 세션 ID | `0` (검증 셸은 `1`) |
+| 5 | 부모 프로세스 | `nssm.exe` |
+| 6 | 부팅→기동 | 130초 |
+| 7 | postgres / cloudflared | 둘 다 `Running` |
+| 8 | 헬스 | `{"status":"UP","dbConnected":true,"reasons":[]}` |
+| 9 | 도메인 | `200` |
+| 10 | 로그 | `Started EconomicBriefingApplication` + `[Scheduler] ENABLED`, 부팅 이후 `ERROR`/`Exception` 없음 |
+
+`sc qc EconomicBriefing`의 `DEPENDENCIES : postgresql-x64-17`도 확인했고,
+postgres 뒤에 기동해 `dbConnected: true`로 DB 연결에 성공했습니다.
+
+**아무도 시작시키지 않았고, 로그인과 무관하게(세션 0), postgres 뒤에 자동으로 떴습니다.**
+
+## 8. 미해결 항목 (재부팅과 무관)
 
 - **UptimeRobot 모니터 미등록** — `docs/MONITORING.md` 참고, 사용자 계정 필요
 - **`.env` 개행 혼합** — PowerShell은 정상 파싱하지만 LF만 인식하는 도구로는 `ADMIN_TOKEN`이 깨져 보임. 동작에는 문제 없음
