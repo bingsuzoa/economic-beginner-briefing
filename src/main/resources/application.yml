@@ -2,6 +2,13 @@ spring:
   application:
     name: economic-briefing
 
+  # 인증은 AdminTokenFilter가 전담합니다(SecurityConfig는 STATELESS + permitAll).
+  # 이 자동설정을 켜두면 쓰지도 않는 인메모리 사용자가 만들어지고 매 부팅마다
+  # "Using generated security password: ..."가 운영 로그에 찍힙니다.
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/economic_briefing?stringtype=unspecified}
     username: ${SPRING_DATASOURCE_USERNAME}
@@ -10,6 +17,9 @@ spring:
   jpa:
     hibernate:
       ddl-auto: none
+    # 엔티티에 지연 로딩 연관관계가 없어 뷰 렌더링 중 세션이 필요하지 않습니다.
+    # 켜두면 응답을 쓰는 동안 커넥션을 계속 붙잡고, 기본값 경고도 매 부팅 출력됩니다.
+    open-in-view: false
 
   flyway:
     enabled: true
