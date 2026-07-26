@@ -412,8 +412,23 @@ npm run dev     # http://localhost:5173 (/api 는 :3000 으로 프록시)
 | `/images/**` | `max-age=86400, public` | `public/`에서 이름 그대로 복사되어 내용이 바뀌어도 URL이 같음 |
 | `index.html`, `/api/**` | `no-store` (유지) | index.html은 해시 번들을 가리키므로 캐시되면 배포 후 빈 화면이 됨 |
 
-이미지를 교체했는데 즉시 반영해야 한다면 **파일 이름을 바꾸세요.** 이 파일들에는 그것 말고
-캐시를 무효화할 수단이 없습니다(최대 하루).
+이미지를 교체했는데 즉시 반영해야 한다면 **URL을 바꿔야 합니다.** 파일 이름을 바꾸거나 쿼리
+문자열을 붙이는 방법뿐입니다. 내용만 바꾸고 URL이 그대로면 최대 하루 동안 예전 이미지가 나갑니다.
+Cloudflare가 엣지에도 캐시하므로 브라우저 강제 새로고침으로도 넘을 수 없습니다.
+
+**파비콘을 교체할 때**는 `frontend/public/images/favicon.png`를 덮어쓴 뒤 `index.html`의
+쿼리 값을 새 파일 해시로 바꿉니다.
+
+```powershell
+(Get-FileHash frontend\public\images\favicon.png -Algorithm SHA256).Hash.Substring(0,8).ToLower()
+```
+
+```html
+<link rel="icon" type="image/png" href="/images/favicon.png?v=여기에붙여넣기" />
+```
+
+이 한 줄을 잊으면 파일은 바뀌었는데 화면은 그대로입니다. Navbar·Footer가 쓰는
+`main-logo.png`도 같은 규칙이 적용되지만, 그쪽은 `<img src>`라 컴포넌트에서 바꿉니다.
 
 ## 상시 구동 (Windows 서비스)
 
