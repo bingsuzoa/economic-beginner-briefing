@@ -5,17 +5,26 @@ import ImpactSection from './ImpactSection'
 import TermsAccordion from './TermsAccordion'
 import SourceList from './SourceList'
 
+// Keys match the NewsCategory / NewsEvidenceStatus enums. Both serialise through @JsonValue as
+// name().toLowerCase(), so the API always sends lowercase and lookups are normalised below --
+// the previous uppercase-only lookup could never hit, and every badge rendered the raw code
+// ('loan' instead of '대출'). The old ECONOMY / REAL_ESTATE / FINANCE keys were not enum values
+// at all, and PROJECTED / UNCERTAIN are not evidence statuses; all of them are dropped.
 const CATEGORY_LABELS = {
-  ECONOMY: '경제', REAL_ESTATE: '부동산', FINANCE: '금융',
-  INTEREST_RATE: '금리', LOAN: '대출', HOUSING: '주택',
-  JEONSE_MONTHLY_RENT: '전월세', DEPOSIT_SAVING: '예적금',
-  GOVERNMENT_SUPPORT: '정부지원', OTHER: '기타',
+  INTEREST_RATE: '금리', DEPOSIT_SAVING: '예적금', LOAN: '대출',
+  HOUSING: '주택', JEONSE_MONTHLY_RENT: '전월세', SUBSCRIPTION: '청약',
+  TAX: '세금', PENSION: '연금', INSURANCE: '보험',
+  COST_OF_LIVING: '생활물가', EXCHANGE_RATE: '환율', INVESTMENT: '투자',
+  GOVERNMENT_SUPPORT: '정부지원', EMPLOYMENT_INCOME: '고용·소득',
+  HOUSEHOLD_DEBT: '가계부채', OTHER: '기타',
 }
 
 const EVIDENCE_LABELS = {
   CONFIRMED: '확정', PROPOSED: '검토중', EXPECTED: '예상',
-  PROJECTED: '전망', UNCERTAIN: '불확실',
 }
+
+const labelFor = (map, value, fallback) =>
+  (value && map[String(value).toUpperCase()]) || value || fallback
 
 export default function NewsCard({ news }) {
   const evidenceStatus = news.evidenceStatus || 'EXPECTED'
@@ -30,9 +39,9 @@ export default function NewsCard({ news }) {
   return (
     <article className={s.card} id={news.articleId || news.id}>
       <div className={s.header}>
-        <span className={s.category}>{CATEGORY_LABELS[news.category] || news.category || '기타'}</span>
+        <span className={s.category}>{labelFor(CATEGORY_LABELS, news.category, '기타')}</span>
         <span className={`${s.evidence} ${evidenceClass}`}>
-          {EVIDENCE_LABELS[evidenceStatus] || evidenceStatus}
+          {labelFor(EVIDENCE_LABELS, evidenceStatus, '예상')}
         </span>
         {news.teacherLabel && (
           <span className={s.teacherBadge}>

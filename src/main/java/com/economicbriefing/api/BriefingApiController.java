@@ -1,7 +1,9 @@
 package com.economicbriefing.api;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.economicbriefing.admin.dto.ApiResponse;
 import com.economicbriefing.classifier.entity.ArticleAnalysisEntity;
@@ -43,10 +45,19 @@ public class BriefingApiController {
 
     @GetMapping("/articles")
     public ApiResponse<List<JsonNode>> listAnalyzedArticles() {
-        List<ArticleAnalysisEntity> analyses = analysisRepo.findAll();
+        // Newest first, one card per article. The frontend renders this list in order and does
+        // no sorting of its own, so the ordering has to come from here. Re-analysing an article
+        // inserts another row instead of replacing one, so the same article could appear twice;
+        // keeping the first occurrence of each id keeps the newest analysis and drops the stale
+        // duplicates rather than deleting anything.
+        List<ArticleAnalysisEntity> analyses = analysisRepo.findAllByOrderByCreatedAtDesc();
         List<JsonNode> result = new ArrayList<>();
+        Set<String> seenArticleIds = new HashSet<>();
 
         for (ArticleAnalysisEntity analysis : analyses) {
+            if (!seenArticleIds.add(analysis.getArticleId())) {
+                continue;
+            }
             try {
                 ObjectNode node = (ObjectNode) objectMapper.readTree(analysis.getAnalysisJson());
                 // Enrich with article metadata
