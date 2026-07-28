@@ -1,5 +1,6 @@
 package com.economicbriefing.classifier.repository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import com.economicbriefing.classifier.entity.ArticleAnalysisEntity;
@@ -14,4 +15,9 @@ public interface ArticleAnalysisRepository extends JpaRepository<ArticleAnalysis
      * insertion order, so every fresh analysis landed at the bottom of the public page.
      */
     List<ArticleAnalysisEntity> findAllByOrderByCreatedAtDesc();
+
+    /**
+     * Newest first, filtered by created date >= startOfDay. Returns only today's analyses.
+     */
+    List<ArticleAnalysisEntity> findByCreatedAtGreaterThanEqualOrderByCreatedAtDesc(OffsetDateTime startOfDay);
 }

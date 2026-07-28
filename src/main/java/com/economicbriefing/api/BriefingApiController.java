@@ -1,5 +1,7 @@
 package com.economicbriefing.api;
 
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -50,7 +52,9 @@ public class BriefingApiController {
         // inserts another row instead of replacing one, so the same article could appear twice;
         // keeping the first occurrence of each id keeps the newest analysis and drops the stale
         // duplicates rather than deleting anything.
-        List<ArticleAnalysisEntity> analyses = analysisRepo.findAllByOrderByCreatedAtDesc();
+        // Only show today's articles (from 00:00:00 of current day)
+        OffsetDateTime startOfToday = OffsetDateTime.now().truncatedTo(ChronoUnit.DAYS);
+        List<ArticleAnalysisEntity> analyses = analysisRepo.findByCreatedAtGreaterThanEqualOrderByCreatedAtDesc(startOfToday);
         List<JsonNode> result = new ArrayList<>();
         Set<String> seenArticleIds = new HashSet<>();
 
