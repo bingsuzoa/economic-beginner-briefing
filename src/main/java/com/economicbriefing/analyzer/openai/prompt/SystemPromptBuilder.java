@@ -79,6 +79,7 @@ public final class SystemPromptBuilder {
 
             ### terms
             필수 용어만 설명하며 실생활 의미를 우선합니다.
+            배열 형식: [{"term": "용어명", "explanation": "설명", "example": "예시"}]
 
             ### uncertainties
             미확정 사항만 작성합니다.
@@ -98,6 +99,10 @@ public final class SystemPromptBuilder {
 
             JSON 외의 설명은 출력하지 않습니다.
 
+            중요: terms는 반드시 객체 배열입니다. 문자열 배열이 아닙니다.
+            올바른 예: "terms": [{"term": "기준금리", "explanation": "한국은행이 정하는 기본 금리", "example": ""}]
+            잘못된 예: "terms": ["기준금리"]
+
             {
               "overallSummary": [],
               "news": [
@@ -116,10 +121,21 @@ public final class SystemPromptBuilder {
                   "positiveImpact": "",
                   "negativeImpact": "",
                   "actionItems": [],
-                  "terms": [],
+                  "terms": [
+                    {
+                      "term": "용어명",
+                      "explanation": "쉬운 설명",
+                      "example": "예시 (선택사항)"
+                    }
+                  ],
                   "evidenceStatus": "confirmed",
                   "uncertainties": [],
-                  "sources": []
+                  "sources": [
+                    {
+                      "articleId": "article-id",
+                      "isPrimary": true
+                    }
+                  ]
                 }
               ],
               "glossary": []

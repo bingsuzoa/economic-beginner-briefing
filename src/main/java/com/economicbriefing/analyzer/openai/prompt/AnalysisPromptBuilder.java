@@ -51,7 +51,7 @@ public final class AnalysisPromptBuilder {
                 5. 다양한 카테고리의 뉴스가 골고루 포함되도록 하세요.
                 6. 근거 없는 영향이나 예상을 만들어내지 마세요. 기사에 나온 사실만 활용하세요.
                 7. 각 뉴스의 "쉬운 제목"(easyTitle)은 경제 초보자가 바로 이해할 수 있도록 전문 용어를 풀어서 작성하세요.
-                8. 시스템 프롬프트에 정의된 12섹션 JSON 형식으로 응답하세요. 각 뉴스에 easyTitle, threeLineSummary, whatHappened, whyItHappened, economicImpact, householdImpact, affectedPeople, positiveImpact, negativeImpact, actionItems, terms, uncertainties 필드를 포함하세요."""
+                8. 시스템 프롬프트에 정의된 JSON 형식으로 응답하세요. 각 뉴스에 easyTitle, threeLineSummary, whatHappened, whyItHappened, beginnerExplanation, economicImpact, householdImpact, affectedPeople, positiveImpact, negativeImpact, actionItems, terms, uncertainties 필드를 포함하세요."""
                 .formatted(
                         targetDate.toString(),
                         maxSelectedNews,
