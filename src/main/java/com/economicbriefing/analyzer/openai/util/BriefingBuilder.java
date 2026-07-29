@@ -121,6 +121,7 @@ public final class BriefingBuilder {
                 aiNews.threeLineSummary() != null ? aiNews.threeLineSummary() : Collections.emptyList(),
                 aiNews.whatHappened(),
                 aiNews.whyItHappened(),
+                aiNews.beginnerExplanation(),
                 aiNews.economicImpact(),
                 aiNews.householdImpact(),
                 aiNews.affectedPeople() != null ? aiNews.affectedPeople() : Collections.emptyList(),

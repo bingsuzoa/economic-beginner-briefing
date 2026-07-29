@@ -20,6 +20,7 @@ public record AiResponse(
         @JsonProperty("threeLineSummary") List<String> threeLineSummary,
         @JsonProperty("whatHappened") String whatHappened,
         @JsonProperty("whyItHappened") String whyItHappened,
+        @JsonProperty("beginnerExplanation") String beginnerExplanation,
         @JsonProperty("economicImpact") String economicImpact,
         @JsonProperty("householdImpact") String householdImpact,
         @JsonProperty("affectedPeople") List<String> affectedPeople,

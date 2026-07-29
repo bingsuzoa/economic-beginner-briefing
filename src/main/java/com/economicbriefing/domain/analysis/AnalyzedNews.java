@@ -12,6 +12,7 @@ public record AnalyzedNews(
     List<String> threeLineSummary,
     String whatHappened,
     String whyItHappened,
+    String beginnerExplanation,
     String economicImpact,
     String householdImpact,
     List<String> affectedPeople,
