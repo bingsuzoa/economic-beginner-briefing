@@ -99,9 +99,17 @@ public final class SystemPromptBuilder {
 
             JSON 외의 설명은 출력하지 않습니다.
 
-            중요: terms는 반드시 객체 배열입니다. 문자열 배열이 아닙니다.
-            올바른 예: "terms": [{"term": "기준금리", "explanation": "한국은행이 정하는 기본 금리", "example": ""}]
-            잘못된 예: "terms": ["기준금리"]
+            중요:
+            1. terms는 반드시 객체 배열입니다. 문자열 배열이 아닙니다.
+            2. 용어 설명이 없으면 빈 배열 []을 사용하세요.
+
+            올바른 예:
+            - "terms": [{"term": "기준금리", "explanation": "한국은행이 정하는 기본 금리", "example": ""}]
+            - "terms": []
+
+            잘못된 예:
+            - "terms": ["기준금리"]
+            - "terms": ["기준금리", "주담대"]
 
             {
               "overallSummary": [],
