@@ -79,7 +79,6 @@ public final class SystemPromptBuilder {
 
             ### terms
             필수 용어만 설명하며 실생활 의미를 우선합니다.
-            배열 형식: [{"term": "용어명", "explanation": "설명", "example": "예시"}]
 
             ### uncertainties
             미확정 사항만 작성합니다.
@@ -98,18 +97,6 @@ public final class SystemPromptBuilder {
             ## Output
 
             JSON 외의 설명은 출력하지 않습니다.
-
-            중요:
-            1. terms는 반드시 객체 배열입니다. 문자열 배열이 아닙니다.
-            2. 용어 설명이 없으면 빈 배열 []을 사용하세요.
-
-            올바른 예:
-            - "terms": [{"term": "기준금리", "explanation": "한국은행이 정하는 기본 금리", "example": ""}]
-            - "terms": []
-
-            잘못된 예:
-            - "terms": ["기준금리"]
-            - "terms": ["기준금리", "주담대"]
 
             {
               "overallSummary": [],

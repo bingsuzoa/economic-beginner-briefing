@@ -99,35 +99,56 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
     }
 
     private AiResponse parseAndValidate(String content) {
+        log.info("=== PARSING JSON START ===");
+        log.info("Content length: {} characters", content.length());
+        log.info("First 500 chars: {}", content.substring(0, Math.min(500, content.length())));
+        log.info("=== PARSING JSON END ===");
+
         AiResponse response;
         try {
             response = objectMapper.readValue(content, AiResponse.class);
+            log.info("=== PARSED SUCCESSFULLY ===");
+            log.info("Parsed news count: {}", response.news() != null ? response.news().size() : 0);
+            if (response.news() != null && !response.news().isEmpty()) {
+                var firstNews = response.news().get(0);
+                log.info("First news terms: {}", firstNews.terms());
+            }
         } catch (JsonProcessingException e) {
+            log.error("=== PARSE FAILED ===");
             log.error("Failed to parse AI response as JSON", e);
+            log.error("Full content for debugging:");
+            log.error(content);
             throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR, e);
         }
 
-        if (response.overallSummary() == null || response.overallSummary().isEmpty()) {
-            throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR);
-        }
+        // overallSummary is optional - null or empty is valid
         if (response.news() == null || response.news().isEmpty()) {
+            log.error("Validation failed: news is null or empty");
             throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR);
         }
 
-        for (AiResponse.AiAnalyzedNews news : response.news()) {
+        for (int i = 0; i < response.news().size(); i++) {
+            AiResponse.AiAnalyzedNews news = response.news().get(i);
+            String newsPrefix = "News[" + i + "] ";
+
             if (news.id() == null || news.id().isBlank()) {
+                log.error("{}id is null or blank", newsPrefix);
                 throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR);
             }
             if (news.easyTitle() == null || news.easyTitle().isBlank()) {
+                log.error("{}easyTitle is null or blank", newsPrefix);
                 throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR);
             }
             if (news.threeLineSummary() == null || news.threeLineSummary().isEmpty()) {
+                log.error("{}threeLineSummary is null or empty", newsPrefix);
                 throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR);
             }
             if (news.whatHappened() == null || news.whatHappened().isBlank()) {
+                log.error("{}whatHappened is null or blank", newsPrefix);
                 throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR);
             }
             if (news.sources() == null || news.sources().isEmpty()) {
+                log.error("{}sources is null or empty", newsPrefix);
                 throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR);
             }
         }

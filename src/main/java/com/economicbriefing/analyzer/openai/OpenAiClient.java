@@ -78,8 +78,12 @@ public class OpenAiClient {
                 throw new AnalyzeException(ErrorCode.ANALYZE_API_ERROR);
             }
 
+            String rawContent = content.asText();
             log.info("OpenAI API call succeeded");
-            return content.asText();
+            log.info("=== RAW RESPONSE START ===");
+            log.info(rawContent);
+            log.info("=== RAW RESPONSE END ===");
+            return rawContent;
 
         } catch (AnalyzeException e) {
             throw e;

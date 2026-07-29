@@ -182,6 +182,50 @@ class BriefingBuilderTest {
         );
     }
 
+    @Test
+    void shouldHandleEmptyOverallSummary() {
+        AiResponse aiResponse = new AiResponse(
+                List.of(),
+                List.of(new AiResponse.AiAnalyzedNews(
+                        "news-1", "제목", "interest_rate", 3,
+                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향", "생활영향",
+                        List.of(), "긍정", "부정", List.of(),
+                        List.of(), "confirmed", List.of(),
+                        List.of(new AiResponse.AiSourceReference("article-1", true))
+                )),
+                List.of()
+        );
+
+        Briefing briefing = BriefingBuilder.build(
+                aiResponse, LocalDate.of(2025, 1, 15),
+                createArticles(), "gpt-4o", "v2", null, null);
+
+        assertNotNull(briefing.overallSummary());
+        assertTrue(briefing.overallSummary().isEmpty());
+    }
+
+    @Test
+    void shouldHandleNullOverallSummary() {
+        AiResponse aiResponse = new AiResponse(
+                null,
+                List.of(new AiResponse.AiAnalyzedNews(
+                        "news-1", "제목", "interest_rate", 3,
+                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향", "생활영향",
+                        List.of(), "긍정", "부정", List.of(),
+                        List.of(), "confirmed", List.of(),
+                        List.of(new AiResponse.AiSourceReference("article-1", true))
+                )),
+                List.of()
+        );
+
+        Briefing briefing = BriefingBuilder.build(
+                aiResponse, LocalDate.of(2025, 1, 15),
+                createArticles(), "gpt-4o", "v2", null, null);
+
+        assertNotNull(briefing.overallSummary());
+        assertTrue(briefing.overallSummary().isEmpty());
+    }
+
     private List<Article> createArticles() {
         OffsetDateTime now = LocalDate.of(2025, 1, 15)
                 .atTime(10, 0).atOffset(ZoneOffset.ofHours(9));

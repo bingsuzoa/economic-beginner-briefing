@@ -62,12 +62,16 @@ public final class BriefingBuilder {
                 ? IdGenerator.briefingId(targetDate, targetHour)
                 : IdGenerator.briefingId(targetDate);
 
+        List<String> overallSummary = aiResponse.overallSummary() != null
+                ? aiResponse.overallSummary()
+                : Collections.emptyList();
+
         return new Briefing(
                 briefingId,
                 targetDate,
                 KstDateTimeUtil.now(),
                 title,
-                aiResponse.overallSummary(),
+                overallSummary,
                 news,
                 glossary,
                 metadata
