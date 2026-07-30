@@ -51,7 +51,7 @@ class AnalysisPromptBuilderTest {
     }
 
     @Test
-    void shouldFormatArticleDetails() {
+    void shouldFormatArticleInOneLineFormat() {
         List<Article> articles = createArticles();
         AudienceProfile audience = new AudienceProfile(
                 "beginner",
@@ -62,29 +62,12 @@ class AnalysisPromptBuilderTest {
         String prompt = AnalysisPromptBuilder.build(
                 articles, LocalDate.of(2025, 1, 15), 5, audience);
 
-        assertTrue(prompt.contains("--- 기사 1 ---"));
-        assertTrue(prompt.contains("ID: article-1"));
-        assertTrue(prompt.contains("제목: 기준금리 인하"));
-        assertTrue(prompt.contains("출처: 한국은행"));
-        assertTrue(prompt.contains("--- 기사 2 ---"));
-    }
-
-    @Test
-    void shouldIncludeContentWhenPresent() {
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.ofHours(9));
-        Article articleWithContent = new Article(
-                "article-with-content", "제목", "요약",
-                "출처", ArticleSourceType.NEWS_MEDIA,
-                now, now, "https://example.com/test",
-                List.of(NewsCategory.OTHER), "ko", "본문 내용입니다."
-        );
-        AudienceProfile audience = new AudienceProfile(
-                "beginner", List.of(NewsCategory.OTHER), List.of("테스트"));
-
-        String prompt = AnalysisPromptBuilder.build(
-                List.of(articleWithContent), LocalDate.of(2025, 1, 15), 5, audience);
-
-        assertTrue(prompt.contains("본문:\n본문 내용입니다."));
+        // New lightweight one-line format
+        assertTrue(prompt.contains("[1] article-1 | 한국은행 | 기준금리 인하 — 기준금리가 인하되었습니다."));
+        assertTrue(prompt.contains("[2] article-2 | 연합뉴스 | 전세 시장 동향 — 전세 시장이 변화하고 있습니다."));
+        // Old verbose format should not be present
+        assertFalse(prompt.contains("--- 기사 1 ---"));
+        assertFalse(prompt.contains("본문:"));
     }
 
     @Test

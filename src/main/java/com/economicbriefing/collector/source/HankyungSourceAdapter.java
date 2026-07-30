@@ -9,7 +9,7 @@ import com.economicbriefing.domain.article.ArticleSourceType;
 import com.economicbriefing.domain.article.NewsCategory;
 import org.springframework.stereotype.Component;
 
-@Component
+// @Component — disabled: pipeline uses only Yonhap 6-feed adapter
 public class HankyungSourceAdapter extends AbstractRssSourceAdapter {
 
     public HankyungSourceAdapter(RssParser rssParser, ArticleNormalizer normalizer, CategoryClassifier categoryClassifier) {

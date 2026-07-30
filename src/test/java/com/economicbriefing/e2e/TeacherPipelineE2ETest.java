@@ -100,31 +100,10 @@ class TeacherPipelineE2ETest {
         }
         assertEquals(3, savedCount, "Mock 기사 3건이 저장되어야 함");
 
-        // 4. Teacher Label 생성 확인
+        // 4. Teacher Label — disabled in simplified pipeline, should be 0
         List<TeacherLabelEntity> labels = teacherLabelRepository.findAll();
-        log.info("[4] Teacher Label 생성 수: {}", labels.size());
-        assertEquals(savedCount, labels.size(), "모든 기사에 대해 Label이 생성되어야 함");
-
-        long relevantCount = labels.stream().filter(l -> "RELEVANT".equals(l.getLabel())).count();
-        long irrelevantCount = labels.stream().filter(l -> "IRRELEVANT".equals(l.getLabel())).count();
-        long uncertainCount = labels.stream().filter(l -> "UNCERTAIN".equals(l.getLabel())).count();
-        log.info("[4] RELEVANT={}, IRRELEVANT={}, UNCERTAIN={}", relevantCount, irrelevantCount, uncertainCount);
-
-        // Mock은 모두 RELEVANT 반환
-        assertEquals(savedCount, relevantCount, "MockTeacherClassifier는 모두 RELEVANT 반환");
-
-        // 5. Teacher Label + Metadata DB 저장 확인
-        log.info("[5] Teacher Label DB 저장 상세:");
-        for (TeacherLabelEntity label : labels) {
-            log.info("  - articleId={}, label={}, confidence={}, severity={}, promptVer={}, model={}",
-                    label.getArticleId(), label.getLabel(), label.getConfidence(),
-                    label.getSeverity(), label.getTeacherPromptVersion(), label.getTeacherModelName());
-            assertNotNull(label.getLabel());
-            assertNotNull(label.getConfidence());
-            assertNotNull(label.getReason());
-            assertNotNull(label.getTeacherPromptVersion());
-            assertNotNull(label.getLabeledAt());
-        }
+        log.info("[4] Teacher Label 생성 수: {} (teacher disabled)", labels.size());
+        assertEquals(0, labels.size(), "Teacher가 비활성화되어 Label이 생성되지 않아야 함");
 
         // 6 & 7. Embedding (기본 disabled)
         long embeddingCount = embeddingRepository.count();
@@ -252,8 +231,8 @@ class TeacherPipelineE2ETest {
         // Assertions
         assertEquals(ExecutionStatus.SUCCESS, result.getStatus());
         assertEquals(3, articles.size());
-        assertEquals(3, labels.size());
-        assertEquals(3, relevant);
+        assertEquals(0, labels.size(), "Teacher disabled — no labels created");
+        assertEquals(0, relevant);
         assertEquals(0, result.getErrors().size());
     }
 }
