@@ -186,49 +186,13 @@ public class BriefingPipeline {
         executionTracker.log(runId, "INFO", "COLLECT", "COLLECT_DONE",
                 validArticles.size() + "건의 기사를 수집했습니다.");
 
-        // 1.6 Persist articles + Teacher classification
+        // 1.6 Persist articles
         articlePersistenceService.saveAll(validArticles);
 
-        List<Article> teacherFiltered = validArticles;
-        if (appProperties.teacher() != null && appProperties.teacher().enabled()) {
-            teacherFiltered = applyTeacherClassification(validArticles);
-            log.info("Teacher classification: before={}, after={}", validArticles.size(), teacherFiltered.size());
-            executionTracker.log(runId, "INFO", "CLASSIFY", "TEACHER_DONE",
-                    validArticles.size() + "건 중 " + teacherFiltered.size() + "건이 관련 기사로 분류되었습니다.");
-
-            if (teacherFiltered.isEmpty()) {
-                teacherFiltered = validArticles; // fallback: use all if teacher filters everything
-                log.warn("Teacher filtered all articles, falling back to all valid articles");
-            }
-        }
-
-        // 1.65 Embedding (non-blocking, failures don't stop pipeline)
-        if (embeddingService != null && appProperties.embedding() != null && appProperties.embedding().enabled()) {
-            embeddingService.embedAll(teacherFiltered);
-            executionTracker.log(runId, "INFO", "EMBED", "EMBED_DONE",
-                    teacherFiltered.size() + "건의 임베딩을 처리했습니다.");
-        } else {
-            executionTracker.log(runId, "INFO", "EMBED", "EMBED_SKIPPED", "임베딩이 비활성화되어 건너뜁니다.");
-        }
-
-        // 1.7 Apply relevance scoring and diversity selection
-        int minRelevance = appProperties.diversity().minPersonalFinanceRelevance();
-        RelevanceScorer.RelevanceScoringResult relevanceResult =
-                relevanceScorer.score(teacherFiltered, minRelevance);
-        DiversitySelector.DiversitySelectionResult diversityResult =
-                diversitySelector.select(relevanceResult.filtered(), relevanceResult.scores(),
-                        DiversitySelector.DiversityOptions.defaults());
-
-        List<Article> articlesForAnalysis = diversityResult.selected();
-
-        log.info("Filtering stats: teacherFiltered={}, relevance_passed={}, diversity_selected={}",
-                teacherFiltered.size(), relevanceResult.filtered().size(), articlesForAnalysis.size());
-
-        // Fallback: if all filtered out, use top teacher-filtered articles
-        if (articlesForAnalysis.isEmpty() && !teacherFiltered.isEmpty()) {
-            articlesForAnalysis = teacherFiltered.subList(0,
-                    Math.min(teacherFiltered.size(), openAiProperties.maxSelectedNews()));
-        }
+        // Teacher/embedding/relevance/diversity skipped — GPT-4o handles selection directly
+        List<Article> articlesForAnalysis = validArticles;
+        log.info("Passing {} articles directly to analysis (filtering delegated to GPT-4o)",
+                articlesForAnalysis.size());
 
         if (articlesForAnalysis.isEmpty()) {
             executionTracker.log(runId, "WARN", "ANALYZE", "ANALYZE_NO_CANDIDATES",

@@ -63,27 +63,10 @@ public final class AnalysisPromptBuilder {
     }
 
     private static String formatArticle(Article article, int index) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("--- 기사 ").append(index).append(" ---\n");
-        sb.append("ID: ").append(article.id()).append("\n");
-        sb.append("제목: ").append(article.title()).append("\n");
-        sb.append("요약: ").append(article.summary()).append("\n");
-        sb.append("출처: ").append(article.sourceName())
-                .append(" (").append(article.sourceType().toValue()).append(")\n");
-        sb.append("게시일: ").append(article.publishedAt()).append("\n");
-        sb.append("URL: ").append(article.url()).append("\n");
-        sb.append("카테고리: ").append(
-                article.categories().stream()
-                        .map(c -> c.toValue())
-                        .reduce((a, b) -> a + ", " + b)
-                        .orElse("")
-        );
-
-        if (article.content() != null && !article.content().isBlank()) {
-            sb.append("\n본문:\n").append(article.content());
-        }
-
-        return sb.toString();
+        // ponytail: one-line format to fit ~600 articles in 128K context window
+        String summary = article.summary() != null ? article.summary() : "";
+        return "[" + index + "] " + article.id() + " | " + article.sourceName()
+                + " | " + article.title() + " — " + summary;
     }
 
     private static String formatKnowledgeLevel(String level) {

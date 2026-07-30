@@ -87,7 +87,7 @@ briefing:
     max-success-age: ${HEALTH_MAX_SUCCESS_AGE:3h}
 
   teacher:
-    enabled: ${TEACHER_ENABLED:true}
+    enabled: ${TEACHER_ENABLED:false}
     prompt-version: "teacher-v1"
     # Cheap model on purpose: one call per article, so this stage would otherwise drain
     # the main model's tokens-per-minute budget before the analysis call runs.
@@ -95,7 +95,7 @@ briefing:
     concurrency: ${TEACHER_CONCURRENCY:6}
 
   embedding:
-    enabled: ${EMBEDDING_ENABLED:true}
+    enabled: ${EMBEDDING_ENABLED:false}
     model: text-embedding-3-small
     dimensions: 1536
 
@@ -104,7 +104,7 @@ openai:
   model: ${OPENAI_MODEL:gpt-4o}
   temperature: 0.3
   timeout: 60s
-  max-selected-news: 10
+  max-selected-news: 5
 
 admin:
   # No default: a blank token is rejected at startup and by the admin filter.
