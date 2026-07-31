@@ -10,6 +10,20 @@ const menus = [
     isImage: true
   },
   {
+    id: 'stock',
+    icon: '/images/stock-hero.png',
+    title: '주식',
+    path: '/stock',
+    isImage: true
+  },
+  {
+    id: 'realestate',
+    icon: '/images/realestate-hero.png',
+    title: '부동산',
+    path: '/realestate',
+    isImage: true
+  },
+  {
     id: 'loan',
     icon: '/images/loan-icon.png',
     title: '대출계산기',
