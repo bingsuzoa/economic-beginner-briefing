@@ -8,6 +8,9 @@ import Footer from './components/Footer'
 
 const API_BASE = '/api/briefing'
 
+const STOCK_CATEGORIES = ['investment']
+const REALESTATE_CATEGORIES = ['housing', 'jeonse_monthly_rent', 'subscription']
+
 export default function App() {
   const [news, setNews] = useState([])
   const [loading, setLoading] = useState(true)
@@ -37,13 +40,23 @@ export default function App() {
         <Sidebar onMenuChange={setActiveMenu} />
         <main className={s.main}>
           {activeMenu === 'news' && <HeroSection />}
+          {activeMenu === 'stock' && (
+            <section className={s.loanHero}>
+              <img src="/images/stock-hero.png" alt="주식" className={s.loanImage} />
+            </section>
+          )}
+          {activeMenu === 'realestate' && (
+            <section className={s.loanHero}>
+              <img src="/images/realestate-hero.png" alt="부동산" className={s.loanImage} />
+            </section>
+          )}
           {activeMenu === 'loan' && (
             <div className={s.loanHero}>
               <img src="/images/loan-hero.png" alt="대출계산기" className={s.loanImage} />
               <p className={s.loanMessage}>대출계산기는 업데이트중이예요.</p>
             </div>
           )}
-          {activeMenu === 'news' && (
+          {activeMenu !== 'loan' && (
             <>
               {loading && (
                 <div className={s.status}>
@@ -61,7 +74,12 @@ export default function App() {
                   아직 분석이 완료된 경제 뉴스가 없어요.<br />잠시 후 다시 확인해주세요.
                 </div>
               )}
-              {news.map((n, i) => (
+              {news.filter((n) => {
+                const cat = (n.category || '').toLowerCase()
+                if (activeMenu === 'stock') return STOCK_CATEGORIES.includes(cat)
+                if (activeMenu === 'realestate') return REALESTATE_CATEGORIES.includes(cat)
+                return !STOCK_CATEGORIES.includes(cat) && !REALESTATE_CATEGORIES.includes(cat)
+              }).map((n, i) => (
                 <NewsCard key={n.articleId || n.id || i} news={n} />
               ))}
             </>
