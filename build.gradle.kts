@@ -78,7 +78,11 @@ tasks.bootRun {
             .filter { it.isNotBlank() && !it.startsWith("#") && '=' in it }
             .forEach { line ->
                 val (key, value) = line.split("=", limit = 2)
-                environment(key.trim(), value.trim())
+                val k = key.trim()
+                // 커맨드라인 환경변수가 .env보다 우선
+                if (System.getenv(k) == null) {
+                    environment(k, value.trim())
+                }
             }
     }
 }
