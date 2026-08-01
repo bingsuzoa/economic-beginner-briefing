@@ -31,7 +31,9 @@ import static org.junit.jupiter.api.Assertions.*;
     "openai.api-key=test-key",
     "admin.token=test-admin-token",
     // stops the real pipeline from firing if a tick lands mid-test
-    "briefing.dry-run=true"
+    "briefing.dry-run=true",
+    "spring.mail.host=localhost",
+    "spring.mail.port=25"
 })
 class DefaultConfigSchedulerTest {
 

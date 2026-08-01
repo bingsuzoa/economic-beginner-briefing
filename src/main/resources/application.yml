@@ -2,13 +2,6 @@ spring:
   application:
     name: economic-briefing
 
-  # 인증은 AdminTokenFilter가 전담합니다(SecurityConfig는 STATELESS + permitAll).
-  # 이 자동설정을 켜두면 쓰지도 않는 인메모리 사용자가 만들어지고 매 부팅마다
-  # "Using generated security password: ..."가 운영 로그에 찍힙니다.
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
-
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/economic_briefing?stringtype=unspecified}
     username: ${SPRING_DATASOURCE_USERNAME}
@@ -36,6 +29,13 @@ spring:
 
 server:
   port: ${ADMIN_PORT:3000}
+  servlet:
+    session:
+      cookie:
+        same-site: ${SESSION_COOKIE_SAME_SITE:lax}
+        secure: ${SESSION_COOKIE_SECURE:false}
+        http-only: true
+      timeout: 7d
 
 briefing:
   # false = real RSS + real OpenAI. When true, every external call is mocked.
@@ -105,6 +105,12 @@ openai:
   temperature: 0.3
   timeout: 60s
   max-selected-news: 15
+
+sms:
+  provider: ${SMS_PROVIDER:dev}
+  api-key: ${SMS_API_KEY:}
+  api-secret: ${SMS_API_SECRET:}
+  sender-number: ${SMS_SENDER_NUMBER:}
 
 admin:
   # No default: a blank token is rejected at startup and by the admin filter.

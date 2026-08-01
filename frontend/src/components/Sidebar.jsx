@@ -5,7 +5,7 @@ const menus = [
   {
     id: 'news',
     icon: '/images/news-icon.png',
-    title: '오늘의 병아리 뉴스',
+    title: '오늘의 토트',
     path: '/',
     isImage: true
   },
