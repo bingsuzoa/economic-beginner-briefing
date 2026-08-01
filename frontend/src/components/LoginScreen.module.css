@@ -1,0 +1,360 @@
+/* ── Page ── */
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #FFD43B 0%, #FFF3BF 100%);
+  padding: 16px;
+}
+
+/* ── Initial card ── */
+.card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 56px 40px 48px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  max-width: 400px;
+  width: 100%;
+}
+
+.logo {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  animation: wiggle 1s ease-in-out infinite;
+  margin-bottom: 20px;
+}
+
+.heroTitle {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #1A1A1A;
+  margin: 0 0 6px;
+}
+
+.heroSub {
+  font-size: 0.95rem;
+  color: #888;
+  margin: 0 0 32px;
+}
+
+.heroButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Step card ── */
+.stepCard {
+  background: #fff;
+  border-radius: 24px;
+  padding: 0 32px 40px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  max-width: 400px;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* ── Progress bar ── */
+.progressBar {
+  height: 3px;
+  background: #F0F0F0;
+  border-radius: 0 0 2px 2px;
+  margin: 0 -32px 24px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: #FFD43B;
+  border-radius: 0 2px 2px 0;
+  transition: width 0.4s ease;
+}
+
+/* ── Completed steps ── */
+.completed {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.done {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid #F5F5F5;
+  font-size: 0.85rem;
+}
+
+.doneIcon {
+  color: #FFD43B;
+  font-weight: 700;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.doneLabel {
+  color: #AAA;
+  min-width: 52px;
+}
+
+.doneValue {
+  color: #1A1A1A;
+  font-weight: 500;
+}
+
+/* ── Step area (current step) ── */
+.stepArea {
+  animation: slideUp 0.35s ease-out;
+  padding-top: 8px;
+}
+
+/* ── Question label ── */
+.question {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1A1A1A;
+  line-height: 1.5;
+  margin: 16px 0 24px;
+}
+
+/* ── Input ── */
+.input {
+  display: block;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1.5px solid #E8E8E8;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  background: #FAFAFA;
+}
+
+.input:focus {
+  border-color: #FFD43B;
+  background: #fff;
+}
+
+.input::placeholder {
+  color: #CCC;
+}
+
+.codeInput {
+  text-align: center;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.5em;
+  padding: 16px;
+}
+
+/* ── RRN (resident registration number) row ── */
+.rrnRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rrnBirth {
+  flex: 1;
+  text-align: center;
+  font-size: 1.1rem;
+  letter-spacing: 0.15em;
+}
+
+.rrnDash {
+  color: #CCC;
+  font-size: 1.2rem;
+  font-weight: 300;
+}
+
+.rrnGender {
+  width: 48px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 1.1rem;
+}
+
+.rrnDots {
+  color: #CCC;
+  font-size: 0.7rem;
+  letter-spacing: 0.25em;
+  flex-shrink: 0;
+}
+
+/* ── Nickname ── */
+.nicknameWrap {
+  position: relative;
+}
+
+.nickOk {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.8rem;
+  color: #40C057;
+  font-weight: 600;
+}
+
+.nickBad {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.8rem;
+  color: #FA5252;
+  font-weight: 600;
+}
+
+/* ── Timer ── */
+.timer {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #FFD43B;
+  text-align: center;
+  margin: 0 0 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.timerExpired {
+  font-size: 0.85rem;
+  color: #FA5252;
+  text-align: center;
+  margin: 0 0 8px;
+}
+
+/* ── Error ── */
+.error {
+  color: #FA5252;
+  font-size: 0.85rem;
+  margin: 8px 0 0;
+  text-align: center;
+}
+
+/* ── Buttons ── */
+.btn {
+  display: block;
+  width: 100%;
+  padding: 15px;
+  border-radius: 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  text-align: center;
+  text-decoration: none;
+}
+
+.btn:hover { opacity: 0.88; }
+.btn:active { transform: scale(0.985); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.primary {
+  background: #FFD43B;
+  color: #1A1A1A;
+}
+
+.outline {
+  background: #fff;
+  color: #1A1A1A;
+  border: 1.5px solid #E8E8E8;
+}
+
+.fixedBtn {
+  margin-top: 20px;
+}
+
+.resendBtn {
+  margin-top: 8px;
+}
+
+/* ── Back link ── */
+.back {
+  font-size: 0.85rem;
+  color: #AAA;
+  cursor: pointer;
+  text-align: center;
+  margin-top: 16px;
+}
+
+.back:hover { color: #1A1A1A; }
+
+/* ── Checking spinner ── */
+.checkingArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 0;
+  gap: 16px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #F0F0F0;
+  border-top-color: #FFD43B;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.checkingText {
+  font-size: 0.95rem;
+  color: #888;
+  margin: 0;
+}
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: #fff;
+  padding: 14px 28px;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  animation: toastIn 0.3s ease-out;
+  z-index: 1000;
+  white-space: nowrap;
+  max-width: 90vw;
+}
+
+/* ── Animations ── */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-5deg); }
+  75% { transform: rotate(5deg); }
+}
+
+/* ── Mobile ── */
+@media (max-width: 440px) {
+  .card { padding: 40px 24px 36px; }
+  .stepCard { padding: 0 20px 32px; }
+  .progressBar { margin: 0 -20px 20px; }
+  .question { font-size: 1.2rem; }
+  .codeInput { font-size: 1.4rem; }
+  .toast { font-size: 0.82rem; padding: 12px 20px; white-space: normal; text-align: center; }
+}

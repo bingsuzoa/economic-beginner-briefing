@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar'
 import HeroSection from './components/HeroSection'
 import NewsCard from './components/NewsCard'
 import Footer from './components/Footer'
+import LoginScreen from './components/LoginScreen'
 
 const API_BASE = '/api/briefing'
 
@@ -12,12 +13,26 @@ const STOCK_CATEGORIES = ['investment']
 const REALESTATE_CATEGORIES = ['housing', 'jeonse_monthly_rent', 'subscription']
 
 export default function App() {
+  const [user, setUser] = useState(undefined) // undefined = loading, null = not logged in
   const [news, setNews] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeMenu, setActiveMenu] = useState('news')
 
   useEffect(() => {
+    fetch('/api/auth/me')
+      .then(r => r.ok ? r.json() : null)
+      .then(setUser)
+      .catch(() => setUser(null))
+  }, [])
+
+  useEffect(() => {
+    const titles = { news: 'Thoth - 오늘의 토트', stock: 'Thoth - 주식', realestate: 'Thoth - 부동산', loan: 'Thoth - 대출계산기' }
+    document.title = titles[activeMenu] || 'Thoth'
+  }, [activeMenu])
+
+  useEffect(() => {
+    if (user === undefined || user === null) return
     fetch(`${API_BASE}/articles`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -31,11 +46,17 @@ export default function App() {
         setError(err.message)
         setLoading(false)
       })
-  }, [])
+  }, [user])
+
+  // loading auth state
+  if (user === undefined) return null
+
+  // not logged in → login screen
+  if (user === null) return <LoginScreen onLoginSuccess={setUser} />
 
   return (
     <>
-      <Navbar />
+      <Navbar user={user} onLogout={() => setUser(null)} />
       <div className={s.layout}>
         <Sidebar onMenuChange={setActiveMenu} />
         <main className={s.main}>
@@ -61,7 +82,7 @@ export default function App() {
               {loading && (
                 <div className={s.status}>
                   <span className={s.chick}>🐥</span>
-                  병아리가 경제 뉴스를 공부하고 있어요...
+                  토트가 경제 뉴스를 공부하고 있어요...
                 </div>
               )}
               {error && (
