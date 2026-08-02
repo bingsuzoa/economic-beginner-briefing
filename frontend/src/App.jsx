@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar'
 import HeroSection from './components/HeroSection'
 import NewsCard from './components/NewsCard'
 import Footer from './components/Footer'
+import BottomNav from './components/BottomNav'
 import LoginScreen from './components/LoginScreen'
 
 const API_BASE = '/api/briefing'
@@ -58,7 +59,7 @@ export default function App() {
     <>
       <Navbar user={user} onLogout={() => setUser(null)} />
       <div className={s.layout}>
-        <Sidebar onMenuChange={setActiveMenu} />
+        <Sidebar activeMenu={activeMenu} onMenuChange={setActiveMenu} />
         <main className={s.main}>
           {activeMenu === 'news' && <HeroSection />}
           {activeMenu === 'stock' && (
@@ -108,6 +109,7 @@ export default function App() {
         </main>
       </div>
       <Footer />
+      <BottomNav activeMenu={activeMenu} onMenuChange={setActiveMenu} />
     </>
   )
 }
