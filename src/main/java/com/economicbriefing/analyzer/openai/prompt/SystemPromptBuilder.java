@@ -83,20 +83,6 @@ public final class SystemPromptBuilder {
             원인 → 변화 → 행동 → 경제 영향 순으로 설명합니다.
             주장·전망은 반드시 "○○은(는) ~라고 주장/전망했다" 형식으로 발화자를 명시합니다.
 
-            ### householdImpact
-            생활 영향을 설명합니다.
-            주장·전망은 반드시 발화자를 명시합니다.
-            직접 영향이 없으면 "일반 가정에 미치는 직접적인 영향은 크지 않습니다."를 작성합니다.
-
-            ### affectedPeople
-            직접 영향을 받는 대상만 작성합니다.
-
-            ### positiveImpact / negativeImpact
-            기사에서 확인된 사실만 작성합니다. 주장·전망은 발화자를 명시합니다. 없으면 "없음".
-
-            ### actionItems
-            실제로 확인해야 하는 일정·신청·절차만 작성합니다.
-
             ### terms
             필수 용어만 설명하며 실생활 의미를 우선합니다.
 
@@ -106,8 +92,13 @@ public final class SystemPromptBuilder {
             - proposed: 검토·논의·발표 예정 단계 ("임박", "검토 중", "논의 중" 포함)
             - expected: 전망·예측·추정
 
-            ### uncertainties
-            미확정 사항만 작성합니다.
+            ### sources
+            **중요**: sources.articleId에는 반드시 "수집된 기사 목록"에서 제공된 정확한 article ID를 사용해야 합니다.
+            기사 포맷: [번호] {articleId} | 출처 | 제목 — 요약
+            - articleId는 기사 목록의 두 번째 필드(파이프 앞)에 있는 문자열입니다
+            - 절대로 articleId를 추측하거나 만들어내지 마세요
+            - 분석한 기사의 정확한 articleId를 복사해서 사용하세요
+            - 여러 기사를 참조했다면 모두 sources에 포함하고, 대표 기사는 isPrimary: true로 표시하세요
 
             ---
 
@@ -117,6 +108,7 @@ public final class SystemPromptBuilder {
             - 사실과 주장을 구분했는가? 주장에 발화자가 명시되어 있는가?
             - 기사에 없는 내용을 만들지 않았는가?
             - 경제 초보자가 이해할 수 있는가?
+            - **sources.articleId가 입력된 기사 목록의 정확한 ID인가?** (매우 중요)
 
             ---
 
@@ -137,11 +129,6 @@ public final class SystemPromptBuilder {
                   "whyItHappened": "",
                   "beginnerExplanation": "",
                   "economicImpact": "",
-                  "householdImpact": "",
-                  "affectedPeople": [],
-                  "positiveImpact": "",
-                  "negativeImpact": "",
-                  "actionItems": [],
                   "terms": [
                     {
                       "term": "용어명",
@@ -150,7 +137,6 @@ public final class SystemPromptBuilder {
                     }
                   ],
                   "evidenceStatus": "confirmed",
-                  "uncertainties": [],
                   "sources": [
                     {
                       "articleId": "article-id",

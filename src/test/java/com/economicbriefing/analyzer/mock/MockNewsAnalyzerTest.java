@@ -70,7 +70,6 @@ class MockNewsAnalyzerTest {
         assertNotNull(firstNews.whatHappened());
         assertTrue(firstNews.whatHappened().contains("기준금리"));
         assertNotNull(firstNews.whyItHappened());
-        assertNotNull(firstNews.householdImpact());
         assertEquals(3, firstNews.threeLineSummary().size());
         assertFalse(firstNews.terms().isEmpty());
         assertEquals("기준금리", firstNews.terms().get(0).term());

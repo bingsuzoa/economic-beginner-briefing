@@ -47,11 +47,18 @@ public final class AnalysisPromptBuilder {
                 1. 위 기사 중 대상 독자에게 가장 중요한 뉴스를 최대 %d개 선별하세요.
                 2. 같은 사건에 대한 기사는 반드시 하나로 그룹화하고, 대표 출처를 선정하세요. 같은 사건을 별도 뉴스로 분리하지 마세요.
                 3. 각 뉴스에 대해 "오늘 내 돈과 무슨 관련이 있는지"를 경제 초보자가 이해할 수 있도록 해설하세요. 특히 beginnerExplanation에서는 기사 내용을 반복하지 말고, 기사를 이해하기 위해 필요한 경제 원리와 배경지식을 설명하세요.
-                4. 가계 생활·재테크와 직접 관련 없는 기사(기업 인사, 외교 의전, 날씨 정보, 스포츠, 연예)만 제외하세요. 종목 분석·산업 뉴스라도 가계에 영향이 있으면 선별하세요.
+                4. 다음 기사는 반드시 제외하세요:
+                   - 기업 인사, 외교 의전, 정치 스캔들
+                   - 날씨 정보, 기상 특보, 폭염/폭설 뉴스
+                   - 스포츠, 연예, 문화행사
+                   - 사건사고, 범죄, 재난, 안전사고
+                   - 지역 소식, 인물 동정
+                   단, 종목 분석·산업 뉴스는 가계 재정에 영향이 있으면 선별하세요.
                 5. 다양한 카테고리의 뉴스가 골고루 포함되도록 하세요.
                 6. 근거 없는 영향이나 예상을 만들어내지 마세요. 기사에 나온 사실만 활용하세요.
                 7. 각 뉴스의 "쉬운 제목"(easyTitle)은 경제 초보자가 바로 이해할 수 있도록 전문 용어를 풀어서 작성하세요.
-                8. 시스템 프롬프트에 정의된 JSON 형식으로 응답하세요. 각 뉴스에 easyTitle, threeLineSummary, whatHappened, whyItHappened, beginnerExplanation, economicImpact, householdImpact, affectedPeople, positiveImpact, negativeImpact, actionItems, terms, uncertainties 필드를 포함하세요."""
+                8. 시스템 프롬프트에 정의된 JSON 형식으로 응답하세요. 각 뉴스에 easyTitle, threeLineSummary, whatHappened, whyItHappened, beginnerExplanation, economicImpact, terms 필드를 포함하세요.
+                9. **중요**: 각 뉴스의 sources.articleId에는 위 "수집된 기사 목록"에서 제공된 정확한 article ID(파이프 앞의 문자열)를 복사해서 사용하세요. 절대로 articleId를 추측하거나 만들어내지 마세요."""
                 .formatted(
                         targetDate.toString(),
                         maxSelectedNews,

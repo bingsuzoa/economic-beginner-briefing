@@ -69,9 +69,8 @@ class BriefingBuilderTest {
                 List.of("요약"),
                 List.of(new AiResponse.AiAnalyzedNews(
                         "news-1", "제목", "interest_rate", 5,
-                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향", "생활영향",
-                        List.of(), "긍정", "부정", List.of(),
-                        List.of(), "confirmed", List.of(),
+                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향",
+                        List.of(), "confirmed",
                         List.of(new AiResponse.AiSourceReference("non-existent-id", true))
                 )),
                 List.of()
@@ -102,9 +101,8 @@ class BriefingBuilderTest {
                 List.of("요약"),
                 List.of(new AiResponse.AiAnalyzedNews(
                         "news-1", "제목", "interest_rate", 5,
-                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향", "생활영향",
-                        List.of(), "긍정", "부정", List.of(),
-                        List.of(), "confirmed", List.of(),
+                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향",
+                        List.of(), "confirmed",
                         List.of(new AiResponse.AiSourceReference("article-1", true))
                 )),
                 List.of(new AiResponse.AiEconomicTerm("기준금리", "설명", "예시"))
@@ -140,9 +138,8 @@ class BriefingBuilderTest {
                 List.of("요약"),
                 List.of(new AiResponse.AiAnalyzedNews(
                         "news-1", "제목", "unknown_category", 3,
-                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향", "생활영향",
-                        List.of(), "긍정", "부정", List.of(),
-                        List.of(), "confirmed", List.of(),
+                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향",
+                        List.of(), "confirmed",
                         List.of(new AiResponse.AiSourceReference("article-1", true))
                 )),
                 List.of()
@@ -168,14 +165,8 @@ class BriefingBuilderTest {
                         "경기 둔화 우려",
                         "경기가 나빠질 것 같아서 금리를 낮췄어요",
                         "시중금리 하락",
-                        "대출 이자 감소",
-                        List.of("변동금리 대출자"),
-                        "대출 이자 부담 감소",
-                        "예금 이자 수입 감소",
-                        List.of(),
                         List.of(new AiResponse.AiEconomicTerm("기준금리", "설명", null)),
                         "confirmed",
-                        List.of(),
                         List.of(new AiResponse.AiSourceReference("article-1", true))
                 )),
                 List.of()
@@ -188,9 +179,8 @@ class BriefingBuilderTest {
                 List.of(),
                 List.of(new AiResponse.AiAnalyzedNews(
                         "news-1", "제목", "interest_rate", 3,
-                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향", "생활영향",
-                        List.of(), "긍정", "부정", List.of(),
-                        List.of(), "confirmed", List.of(),
+                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향",
+                        List.of(), "confirmed",
                         List.of(new AiResponse.AiSourceReference("article-1", true))
                 )),
                 List.of()
@@ -210,9 +200,8 @@ class BriefingBuilderTest {
                 null,
                 List.of(new AiResponse.AiAnalyzedNews(
                         "news-1", "제목", "interest_rate", 3,
-                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향", "생활영향",
-                        List.of(), "긍정", "부정", List.of(),
-                        List.of(), "confirmed", List.of(),
+                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향",
+                        List.of(), "confirmed",
                         List.of(new AiResponse.AiSourceReference("article-1", true))
                 )),
                 List.of()

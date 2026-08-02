@@ -22,14 +22,8 @@ public record AiResponse(
         @JsonProperty("whyItHappened") String whyItHappened,
         @JsonProperty("beginnerExplanation") String beginnerExplanation,
         @JsonProperty("economicImpact") String economicImpact,
-        @JsonProperty("householdImpact") String householdImpact,
-        @JsonProperty("affectedPeople") List<String> affectedPeople,
-        @JsonProperty("positiveImpact") String positiveImpact,
-        @JsonProperty("negativeImpact") String negativeImpact,
-        @JsonProperty("actionItems") List<String> actionItems,
         @JsonProperty("terms") List<AiEconomicTerm> terms,
         @JsonProperty("evidenceStatus") String evidenceStatus,
-        @JsonProperty("uncertainties") List<String> uncertainties,
         @JsonProperty("sources") List<AiSourceReference> sources
     ) {}
 

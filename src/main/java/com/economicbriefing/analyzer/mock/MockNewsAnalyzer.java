@@ -38,13 +38,7 @@ public class MockNewsAnalyzer implements NewsAnalyzer {
         String whatHappened,
         String whyItHappened,
         String economicImpact,
-        String householdImpact,
-        List<String> affectedPeople,
-        String positiveImpact,
-        String negativeImpact,
-        List<String> actionItems,
         NewsEvidenceStatus evidenceStatus,
-        List<String> uncertainties,
         List<EconomicTerm> terms
     ) {}
 
@@ -66,17 +60,10 @@ public class MockNewsAnalyzer implements NewsAnalyzer {
                 "경기 둔화 우려와 물가 안정세를 고려한 판단입니다. "
                         + "쉽게 말해 경제가 힘들어지고 있으니 돈을 빌리는 비용을 낮춰서 경기를 살려보자는 의도예요.",
                 "기준금리가 내려가면 시중은행의 대출금리와 예금금리가 함께 내려가는 경향이 있습니다. "
-                        + "이는 소비와 투자를 촉진하려는 통화정책의 일환입니다.",
-                "변동금리 대출을 가지고 계신 분들의 이자 부담이 줄어들 수 있습니다. "
-                        + "주택담보대출을 준비하는 신혼부부에게는 유리한 소식입니다. "
-                        + "반면 예금이나 적금에 돈을 넣어두신 분들은 이자 수입이 줄어들 수 있어요. "
-                        + "고정금리 대출자에게는 직접적인 영향이 거의 없습니다.",
-                List.of("변동금리 대출자", "주택담보대출 예정자", "신혼부부", "예금·적금 보유자"),
-                "변동금리 대출자의 이자 부담 감소, 주택담보대출 예정자의 대출 조건 개선 가능성",
-                "예금·적금 이자 수입 감소 가능성",
-                List.of("변동금리 대출 보유자는 다음 달 이자 변동 확인"),
+                        + "이는 소비와 투자를 촉진하려는 통화정책의 일환입니다. "
+                        + "변동금리 대출자의 이자 부담이 줄어들 수 있으며, 주택담보대출 예정자에게는 유리한 소식입니다. "
+                        + "반면 예금·적금 이자 수입은 줄어들 수 있습니다.",
                 NewsEvidenceStatus.CONFIRMED,
-                List.of(),
                 List.of(new EconomicTerm(
                         "기준금리",
                         "한국은행이 정하는 금리로, 은행들이 서로 돈을 빌려줄 때 기준이 되는 금리입니다. "
@@ -98,15 +85,9 @@ public class MockNewsAnalyzer implements NewsAnalyzer {
                 "최근 전세 사기와 보증금 미반환 피해가 사회적 문제로 대두되면서, "
                         + "세입자의 보증금을 더 안전하게 보호할 방법을 찾고 있는 겁니다.",
                 "전세보증금 별도관리가 시행되면 집주인의 자금 운용에 제약이 생기고, "
-                        + "전세 시장의 자금 흐름에 변화가 있을 수 있습니다.",
-                "전세 계약을 앞두고 있는 사람은 보증금 보호 장치(보증보험, 확정일자)를 더 꼼꼼히 확인할 필요가 있습니다. "
-                        + "자가에 거주하는 사람은 이번 뉴스의 직접적인 영향은 거의 없습니다.",
-                List.of("전세 계약 예정자", "신혼부부", "현재 전세 세입자"),
-                "세입자 보증금 보호 강화 가능성",
-                "집주인의 전세금 활용 제한 가능성",
-                List.of(),
+                        + "전세 시장의 자금 흐름에 변화가 있을 수 있습니다. "
+                        + "전세 계약 예정자는 보증금 보호 장치를 더 꼼꼼히 확인할 필요가 있습니다.",
                 NewsEvidenceStatus.PROPOSED,
-                List.of("전세보증금 별도관리 제도는 아직 검토 단계이며, 확정된 것은 아닙니다."),
                 List.of(new EconomicTerm(
                         "전세보증금",
                         "세입자가 집주인에게 맡기는 큰 금액의 보증금입니다. "
@@ -129,16 +110,9 @@ public class MockNewsAnalyzer implements NewsAnalyzer {
                         + "이에 따라 예금금리도 함께 내려간 겁니다. "
                         + "기준금리와 예금금리는 보통 같은 방향으로 움직이기 때문에 예상된 변화라고 할 수 있습니다.",
                 "예금금리 인하는 은행의 수익 구조에 영향을 주고, "
-                        + "예금에서 다른 투자처로 자금이 이동할 가능성이 있습니다.",
-                "예금으로 이자 수입을 얻고 있는 가계는 수익이 줄어들 수 있습니다. "
-                        + "결혼 자금을 예금에 넣어둔 신혼부부라면 이자 수입이 다소 줄어들 수 있습니다. "
-                        + "반면 대출금리도 함께 내려갈 수 있어서, 대출을 가지고 계신 분들에게는 오히려 유리한 상황이에요.",
-                List.of("정기예금 보유자", "결혼 자금 저축 중인 사람"),
-                "대출 보유자의 이자 부담 감소 가능성",
-                "예금 이자 수입 감소",
-                List.of(),
+                        + "예금에서 다른 투자처로 자금이 이동할 가능성이 있습니다. "
+                        + "예금 보유자의 이자 수입이 줄어들지만, 대출 보유자의 이자 부담도 줄어들 수 있습니다.",
                 NewsEvidenceStatus.CONFIRMED,
-                List.of(),
                 List.of(new EconomicTerm(
                         "정기예금",
                         "일정 기간 동안 돈을 은행에 맡기고, 만기 때 원금과 이자를 함께 돌려받는 상품입니다. "
@@ -230,14 +204,8 @@ public class MockNewsAnalyzer implements NewsAnalyzer {
                     detail.whyItHappened(),
                     detail.whyItHappened(),
                     detail.economicImpact(),
-                    detail.householdImpact(),
-                    detail.affectedPeople(),
-                    detail.positiveImpact(),
-                    detail.negativeImpact(),
-                    detail.actionItems(),
                     detail.terms(),
                     detail.evidenceStatus(),
-                    detail.uncertainties(),
                     List.of(new SourceReference(
                             article.id(), article.sourceName(), article.title(),
                             article.url(), article.publishedAt(), true
@@ -255,14 +223,8 @@ public class MockNewsAnalyzer implements NewsAnalyzer {
                 "확인된 내용이 부족합니다.",
                 "확인된 내용이 부족합니다.",
                 "확인된 내용이 부족합니다.",
-                "일반 가계나 개인 재테크에는 직접적인 영향이 거의 없는 뉴스입니다.",
-                List.of("일반 가계"),
-                "뚜렷한 긍정적 영향은 확인되지 않습니다.",
-                "뚜렷한 부정적 영향은 확인되지 않습니다.",
-                List.of(),
                 List.of(),
                 NewsEvidenceStatus.EXPECTED,
-                List.of(),
                 List.of(new SourceReference(
                         article.id(), article.sourceName(), article.title(),
                         article.url(), article.publishedAt(), true
