@@ -67,6 +67,9 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                 appProperties.retry()
         );
 
+        // Validate article IDs from AI response
+        validateArticleIds(aiResponse, request.articles());
+
         Briefing briefing = BriefingBuilder.build(
                 aiResponse,
                 request.targetDate(),
@@ -154,5 +157,27 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         }
 
         return response;
+    }
+
+    private void validateArticleIds(AiResponse response, List<com.economicbriefing.domain.article.Article> inputArticles) {
+        Set<String> validArticleIds = inputArticles.stream()
+                .map(a -> a.id())
+                .collect(Collectors.toSet());
+
+        for (int i = 0; i < response.news().size(); i++) {
+            AiResponse.AiAnalyzedNews news = response.news().get(i);
+            for (AiResponse.AiSourceReference source : news.sources()) {
+                if (!validArticleIds.contains(source.articleId())) {
+                    log.error("AI returned invalid article ID: newsIndex={}, invalidId={}, validIds={}",
+                            i, source.articleId(), validArticleIds);
+                    log.error("News easyTitle: {}", news.easyTitle());
+                    log.error("This indicates AI hallucinated or mixed up article IDs");
+                    throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR,
+                            new IllegalStateException("AI returned article ID that doesn't exist in input: " + source.articleId()));
+                }
+            }
+        }
+        log.info("Article ID validation passed: all {} article IDs are valid",
+                response.news().stream().flatMap(n -> n.sources().stream()).count());
     }
 }

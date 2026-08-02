@@ -37,14 +37,8 @@ class BriefingTest {
             "경기 둔화 우려",
             "경기가 나빠질 것 같아서 금리를 낮췄어요",
             "시중금리 하락",
-            "대출 이자 감소",
-            List.of("변동금리 대출자"),
-            "대출 이자 부담 감소",
-            "예금 이자 수입 감소",
-            List.of(),
             List.of(term),
             NewsEvidenceStatus.CONFIRMED,
-            List.of(),
             List.of(source)
         );
 

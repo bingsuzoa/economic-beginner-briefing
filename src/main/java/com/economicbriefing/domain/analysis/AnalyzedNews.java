@@ -14,13 +14,7 @@ public record AnalyzedNews(
     String whyItHappened,
     String beginnerExplanation,
     String economicImpact,
-    String householdImpact,
-    List<String> affectedPeople,
-    String positiveImpact,
-    String negativeImpact,
-    List<String> actionItems,
     List<EconomicTerm> terms,
     NewsEvidenceStatus evidenceStatus,
-    List<String> uncertainties,
     List<SourceReference> sources
 ) {}

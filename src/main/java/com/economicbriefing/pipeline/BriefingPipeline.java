@@ -241,10 +241,18 @@ public class BriefingPipeline {
             return executionLog;
         }
 
-        executionLog.setSelectedNewsCount(analyzeResult.briefing().news().size());
+        // 2.6 Filter out irrelevant news (accidents, disasters, etc.)
+        Briefing filteredBriefing = filterIrrelevantNews(analyzeResult.briefing());
+        if (filteredBriefing.news().isEmpty()) {
+            log.warn("All news filtered out as irrelevant");
+            executionTracker.log(runId, "WARN", "ANALYZE", "ANALYZE_ALL_FILTERED",
+                    "모든 뉴스가 무관한 내용으로 필터링되었습니다.");
+        }
+
+        executionLog.setSelectedNewsCount(filteredBriefing.news().size());
 
         // 2.7 Save article analyses to DB — this is what the public API serves
-        saveArticleAnalyses(analyzeResult.briefing());
+        saveArticleAnalyses(filteredBriefing);
         executionTracker.markAnalyzed(runId, analyzedUrls(analyzeResult.briefing()));
         executionTracker.log(runId, "INFO", "ANALYZE", "ANALYZE_DONE",
                 analyzeResult.briefing().news().size() + "건의 분석 결과를 저장했습니다.");
@@ -259,6 +267,40 @@ public class BriefingPipeline {
             news.sources().forEach(source -> urls.add(source.url()));
         }
         return urls;
+    }
+
+    private Briefing filterIrrelevantNews(Briefing briefing) {
+        List<AnalyzedNews> relevant = briefing.news().stream()
+                .filter(news -> {
+                    // Filter out accidents, disasters, local incidents
+                    if (news.category() == NewsCategory.OTHER && news.importance() <= 1) {
+                        log.info("Filtered out low-importance 'other' category: {}", news.easyTitle());
+                        return false;
+                    }
+
+                    // Filter out news explicitly stating no economic impact
+                    String economicImpact = news.economicImpact() != null ? news.economicImpact() : "";
+
+                    if (economicImpact.contains("경제적 영향과는 관련이 없") ||
+                        economicImpact.contains("경제적 영향은 없")) {
+                        log.info("Filtered out news with no economic impact: {}", news.easyTitle());
+                        return false;
+                    }
+
+                    return true;
+                })
+                .toList();
+
+        return new Briefing(
+                briefing.id(),
+                briefing.targetDate(),
+                briefing.generatedAt(),
+                briefing.title(),
+                briefing.overallSummary(),
+                relevant,  // filtered news list
+                briefing.glossary(),
+                briefing.metadata()
+        );
     }
 
     private void saveArticleAnalyses(Briefing briefing) {

@@ -122,7 +122,6 @@ class AiResponseTest {
 
         AiResponse response = objectMapper.readValue(json, AiResponse.class);
 
-        assertNull(response.news().get(0).uncertainties());
         assertNull(response.news().get(0).terms());
         assertNull(response.glossary());
     }

@@ -133,11 +133,9 @@ class PipelineDataValidatorTest {
     private AnalyzedNews createAnalyzedNews(String id, List<SourceReference> sources) {
         return new AnalyzedNews(id, "제목", NewsCategory.OTHER, 3,
                 List.of("핵심"),
-                "사건", "원인", "초보자 설명", "경제영향", "생활영향",
-                List.of(), "긍정", "부정", List.of(),
+                "사건", "원인", "초보자 설명", "경제영향",
                 List.of(),
                 NewsEvidenceStatus.CONFIRMED,
-                List.of(),
                 sources);
     }
 

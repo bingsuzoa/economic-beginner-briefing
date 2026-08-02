@@ -127,14 +127,8 @@ public final class BriefingBuilder {
                 aiNews.whyItHappened(),
                 aiNews.beginnerExplanation(),
                 aiNews.economicImpact(),
-                aiNews.householdImpact(),
-                aiNews.affectedPeople() != null ? aiNews.affectedPeople() : Collections.emptyList(),
-                aiNews.positiveImpact(),
-                aiNews.negativeImpact(),
-                aiNews.actionItems() != null ? aiNews.actionItems() : Collections.emptyList(),
                 terms,
                 evidenceStatus,
-                aiNews.uncertainties() != null ? aiNews.uncertainties() : Collections.emptyList(),
                 sources
         );
     }
