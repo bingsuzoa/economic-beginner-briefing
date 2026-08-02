@@ -14,13 +14,18 @@ import com.economicbriefing.classifier.entity.TeacherLabelEntity;
 import com.economicbriefing.classifier.repository.ArticleAnalysisRepository;
 import com.economicbriefing.classifier.repository.ArticleRepository;
 import com.economicbriefing.classifier.repository.TeacherLabelRepository;
+import com.economicbriefing.reading.entity.ArticleReadingHistoryEntity;
+import com.economicbriefing.reading.repository.ArticleReadingHistoryRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -29,24 +34,29 @@ import org.springframework.web.bind.annotation.RestController;
 @CrossOrigin(origins = "*")
 public class BriefingApiController {
 
+    private static final String SESSION_USER_ID = "USER_ID";
+
     private final ArticleAnalysisRepository analysisRepo;
     private final ArticleRepository articleRepo;
     private final TeacherLabelRepository labelRepo;
+    private final ArticleReadingHistoryRepository readingHistoryRepo;
     private final ObjectMapper objectMapper;
 
     public BriefingApiController(
             ArticleAnalysisRepository analysisRepo,
             ArticleRepository articleRepo,
             TeacherLabelRepository labelRepo,
+            ArticleReadingHistoryRepository readingHistoryRepo,
             ObjectMapper objectMapper) {
         this.analysisRepo = analysisRepo;
         this.articleRepo = articleRepo;
         this.labelRepo = labelRepo;
+        this.readingHistoryRepo = readingHistoryRepo;
         this.objectMapper = objectMapper;
     }
 
     @GetMapping("/articles")
-    public ApiResponse<List<JsonNode>> listAnalyzedArticles() {
+    public ApiResponse<List<JsonNode>> listAnalyzedArticles(HttpServletRequest request) {
         // Newest first, one card per article. The frontend renders this list in order and does
         // no sorting of its own, so the ordering has to come from here. Re-analysing an article
         // inserts another row instead of replacing one, so the same article could appear twice;
@@ -57,6 +67,23 @@ public class BriefingApiController {
         List<ArticleAnalysisEntity> analyses = analysisRepo.findByCreatedAtGreaterThanEqualOrderByCreatedAtDesc(startOfToday);
         List<JsonNode> result = new ArrayList<>();
         Set<String> seenArticleIds = new HashSet<>();
+
+        // Get user ID from session (optional - may be null if not logged in)
+        HttpSession session = request.getSession(false);
+        String userId = (session != null) ? (String) session.getAttribute(SESSION_USER_ID) : null;
+
+        // Fetch reading history for this user (if logged in)
+        java.util.Map<String, ArticleReadingHistoryEntity> readingHistory = new java.util.HashMap<>();
+        if (userId != null) {
+            List<String> articleIds = analyses.stream()
+                    .map(ArticleAnalysisEntity::getArticleId)
+                    .distinct()
+                    .toList();
+            List<ArticleReadingHistoryEntity> historyList = readingHistoryRepo.findByUserIdAndArticleIdIn(userId, articleIds);
+            for (ArticleReadingHistoryEntity h : historyList) {
+                readingHistory.put(h.getArticleId(), h);
+            }
+        }
 
         for (ArticleAnalysisEntity analysis : analyses) {
             if (!seenArticleIds.add(analysis.getArticleId())) {
@@ -87,6 +114,12 @@ public class BriefingApiController {
                     node.put("teacherConfidence", label.getConfidence());
                 }
 
+                // Add reading history info
+                ArticleReadingHistoryEntity history = readingHistory.get(analysis.getArticleId());
+                if (history != null) {
+                    node.put("readAt", history.getReadAt().toString());
+                }
+
                 result.add(node);
             } catch (Exception e) {
                 // Skip malformed analysis
@@ -94,6 +127,41 @@ public class BriefingApiController {
         }
 
         return ApiResponse.ok(result);
+    }
+
+    @PostMapping("/articles/{articleId}/mark-read")
+    public ResponseEntity<ApiResponse<?>> markArticleAsRead(@PathVariable String articleId,
+                                                             HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return ResponseEntity.status(401)
+                    .body(ApiResponse.error("UNAUTHORIZED", "로그인이 필요합니다."));
+        }
+
+        String userId = (String) session.getAttribute(SESSION_USER_ID);
+        if (userId == null) {
+            return ResponseEntity.status(401)
+                    .body(ApiResponse.error("UNAUTHORIZED", "로그인이 필요합니다."));
+        }
+
+        // Check if already read
+        var existing = readingHistoryRepo.findByUserIdAndArticleId(userId, articleId);
+        if (existing.isPresent()) {
+            // Already marked as read - return existing
+            return ResponseEntity.ok(ApiResponse.ok(java.util.Map.of(
+                    "readAt", existing.get().getReadAt().toString()
+            )));
+        }
+
+        // Create new reading history entry
+        ArticleReadingHistoryEntity history = new ArticleReadingHistoryEntity();
+        history.setUserId(userId);
+        history.setArticleId(articleId);
+        readingHistoryRepo.save(history);
+
+        return ResponseEntity.ok(ApiResponse.ok(java.util.Map.of(
+                "readAt", history.getReadAt().toString()
+        )));
     }
 
     @GetMapping("/articles/{articleId}")
