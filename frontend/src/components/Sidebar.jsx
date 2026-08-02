@@ -1,47 +1,7 @@
-import { useState } from 'react'
 import s from './Sidebar.module.css'
+import { menus } from '../menus'
 
-const menus = [
-  {
-    id: 'news',
-    icon: '/images/news-icon.png',
-    title: '오늘의 토트',
-    path: '/',
-    isImage: true
-  },
-  {
-    id: 'stock',
-    icon: '/images/stock-hero.png',
-    title: '주식',
-    path: '/stock',
-    isImage: true
-  },
-  {
-    id: 'realestate',
-    icon: '/images/realestate-hero.png',
-    title: '부동산',
-    path: '/realestate',
-    isImage: true
-  },
-  {
-    id: 'loan',
-    icon: '/images/loan-icon.png',
-    title: '대출계산기',
-    path: '/loan',
-    isImage: true
-  }
-]
-
-export default function Sidebar({ onMenuChange }) {
-  const [activeMenu, setActiveMenu] = useState('news')
-
-  const handleMenuClick = (menu) => {
-    setActiveMenu(menu.id)
-    if (onMenuChange) {
-      onMenuChange(menu.id)
-    }
-  }
-
+export default function Sidebar({ activeMenu, onMenuChange }) {
   return (
     <aside className={s.sidebar}>
       <nav className={s.menu}>
@@ -49,13 +9,9 @@ export default function Sidebar({ onMenuChange }) {
           <button
             key={menu.id}
             className={`${s.item} ${activeMenu === menu.id ? s.active : ''}`}
-            onClick={() => handleMenuClick(menu)}
+            onClick={() => onMenuChange(menu.id)}
           >
-            {menu.isImage ? (
-              <img src={menu.icon} alt="" className={s.icon} />
-            ) : (
-              <span className={s.icon}>{menu.icon}</span>
-            )}
+            <img src={menu.icon} alt="" className={s.icon} />
             <span className={s.title}>{menu.title}</span>
           </button>
         ))}
