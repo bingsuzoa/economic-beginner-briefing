@@ -9,8 +9,10 @@ import com.economicbriefing.classifier.entity.ArticleAnalysisEntity;
 import com.economicbriefing.classifier.repository.ArticleAnalysisRepository;
 import com.economicbriefing.classifier.repository.ArticleRepository;
 import com.economicbriefing.classifier.repository.TeacherLabelRepository;
+import com.economicbriefing.reading.repository.ArticleReadingHistoryRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -39,9 +41,11 @@ class BriefingApiControllerTest {
     private static BriefingApiController controller(ArticleAnalysisRepository analysisRepo) {
         ArticleRepository articleRepo = mock(ArticleRepository.class);
         TeacherLabelRepository labelRepo = mock(TeacherLabelRepository.class);
+        ArticleReadingHistoryRepository readingHistoryRepo = mock(ArticleReadingHistoryRepository.class);
         when(articleRepo.findById(anyString())).thenReturn(Optional.empty());
         when(labelRepo.findAllByArticleId(anyString())).thenReturn(List.of());
-        return new BriefingApiController(analysisRepo, articleRepo, labelRepo, new ObjectMapper());
+        when(readingHistoryRepo.findByUserIdAndArticleIdIn(anyString(), any())).thenReturn(List.of());
+        return new BriefingApiController(analysisRepo, articleRepo, labelRepo, readingHistoryRepo, new ObjectMapper());
     }
 
     @Test
@@ -52,7 +56,8 @@ class BriefingApiControllerTest {
                 analysis("new", "오늘 16시 분석", now),
                 analysis("mid", "오늘 12시 분석", now.minusHours(4))));
 
-        ApiResponse<List<JsonNode>> response = controller(repo).listAnalyzedArticles();
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        ApiResponse<List<JsonNode>> response = controller(repo).listAnalyzedArticles(mockRequest);
 
         assertEquals(2, response.data().size());
         assertEquals("오늘 16시 분석", response.data().get(0).get("easyTitle").asText());
@@ -69,7 +74,8 @@ class BriefingApiControllerTest {
                 analysis("dup", "처음 분석한 것", now.minusHours(2)),
                 analysis("other", "다른 기사", now.minusHours(3))));
 
-        ApiResponse<List<JsonNode>> response = controller(repo).listAnalyzedArticles();
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        ApiResponse<List<JsonNode>> response = controller(repo).listAnalyzedArticles(mockRequest);
 
         assertEquals(2, response.data().size(), "duplicate articleId must render once");
         assertEquals("다시 분석한 것", response.data().get(0).get("easyTitle").asText());
@@ -81,7 +87,8 @@ class BriefingApiControllerTest {
         ArticleAnalysisRepository repo = mock(ArticleAnalysisRepository.class);
         when(repo.findByCreatedAtGreaterThanEqualOrderByCreatedAtDesc(any(OffsetDateTime.class))).thenReturn(List.of());
 
-        controller(repo).listAnalyzedArticles();
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        controller(repo).listAnalyzedArticles(mockRequest);
 
         verify(repo, never()).findAll();
     }
