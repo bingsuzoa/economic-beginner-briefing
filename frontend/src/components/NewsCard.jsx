@@ -1,3 +1,4 @@
+import { useRef, useEffect, useState } from 'react'
 import s from './NewsCard.module.css'
 import SummaryBox from './SummaryBox'
 import FlowSection from './FlowSection'
@@ -26,7 +27,38 @@ const EVIDENCE_LABELS = {
 const labelFor = (map, value, fallback) =>
   (value && map[String(value).toUpperCase()]) || value || fallback
 
-export default function NewsCard({ news }) {
+const formatRelativeTime = (timestamp) => {
+  if (!timestamp) return ''
+  const now = new Date()
+  const readTime = new Date(timestamp)
+  const diffMs = now - readTime
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return '방금'
+  if (diffMins < 60) return `${diffMins}분 전`
+  if (diffHours < 24) {
+    const hours = readTime.getHours()
+    const mins = readTime.getMinutes()
+    const period = hours < 12 ? '오전' : '오후'
+    const displayHour = hours % 12 || 12
+    return `오늘 ${period} ${displayHour}:${String(mins).padStart(2, '0')}`
+  }
+  if (diffDays === 1) return '어제'
+  if (diffDays < 7) return `${diffDays}일 전`
+  return readTime.toLocaleDateString('ko-KR')
+}
+
+const markAsRead = async (articleId) => {
+  try {
+    await fetch(`/api/briefing/articles/${articleId}/mark-read`, { method: 'POST' })
+  } catch (err) {
+    // Silent fail - reading history is not critical
+  }
+}
+
+export default function NewsCard({ news, onMarkRead }) {
   const evidenceStatus = news.evidenceStatus || 'EXPECTED'
   const evidenceClass = s[evidenceStatus.toLowerCase()] || ''
   const summary = news.threeLineSummary || []
@@ -36,9 +68,60 @@ export default function NewsCard({ news }) {
   const terms = news.terms || []
   const sources = news.sources || []
 
+  const cardRef = useRef(null)
+  const [isRead, setIsRead] = useState(!!news.readAt)
+  const [readAt, setReadAt] = useState(news.readAt)
+  const visibilityTimerRef = useRef(null)
+
+  useEffect(() => {
+    // Skip if already read
+    if (isRead) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          // Start 3-second timer when card enters viewport
+          visibilityTimerRef.current = setTimeout(async () => {
+            const now = new Date().toISOString()
+            setIsRead(true)
+            setReadAt(now)
+            await markAsRead(news.articleId)
+            if (onMarkRead) onMarkRead(news.articleId, now)
+          }, 3000)
+        } else {
+          // Clear timer if card leaves viewport before 3 seconds
+          if (visibilityTimerRef.current) {
+            clearTimeout(visibilityTimerRef.current)
+            visibilityTimerRef.current = null
+          }
+        }
+      },
+      { threshold: 0.5 } // 50% of card must be visible
+    )
+
+    if (cardRef.current) {
+      observer.observe(cardRef.current)
+    }
+
+    return () => {
+      if (visibilityTimerRef.current) {
+        clearTimeout(visibilityTimerRef.current)
+      }
+      observer.disconnect()
+    }
+  }, [news.articleId, isRead, onMarkRead])
+
   return (
-    <article className={s.card} id={news.articleId || news.id}>
+    <article
+      ref={cardRef}
+      className={`${s.card} ${isRead ? s.read : ''}`}
+      id={news.articleId || news.id}>
       <div className={s.header}>
+        {isRead && readAt && (
+          <span className={s.readBadge}>
+            읽음 · {formatRelativeTime(readAt)}
+          </span>
+        )}
         <span className={s.category}>{labelFor(CATEGORY_LABELS, news.category, '기타')}</span>
         <span className={`${s.evidence} ${evidenceClass}`}>
           {labelFor(EVIDENCE_LABELS, evidenceStatus, '예상')}
