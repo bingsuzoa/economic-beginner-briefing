@@ -1,12 +1,9 @@
 package com.economicbriefing.analyzer.openai.util;
 
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import com.economicbriefing.analyzer.openai.dto.AiResponse;
 import com.economicbriefing.domain.analysis.AnalyzedNews;
@@ -27,17 +24,20 @@ public final class BriefingBuilder {
     public static Briefing build(
             AiResponse aiResponse,
             LocalDate targetDate,
-            List<Article> articles,
+            List<Article> selectedArticles,
+            int totalArticleCount,
             String modelName,
             String promptVersion,
             String briefingTitle,
             Integer targetHour) {
 
-        Map<String, Article> articleMap = articles.stream()
-                .collect(Collectors.toMap(Article::id, Function.identity()));
-
-        List<AnalyzedNews> news = aiResponse.news().stream()
-                .map(aiNews -> mapToAnalyzedNews(aiNews, articleMap))
+        // 순서 기반 매핑: aiResponse.news()[i] = selectedArticles[i]
+        List<AnalyzedNews> news = IntStream.range(0, aiResponse.news().size())
+                .mapToObj(i -> {
+                    AiResponse.AiAnalyzedNews aiNews = aiResponse.news().get(i);
+                    Article article = selectedArticles.get(i);
+                    return mapToAnalyzedNews(aiNews, article);
+                })
                 .toList();
 
         List<EconomicTerm> glossary = aiResponse.glossary() != null
@@ -47,8 +47,8 @@ public final class BriefingBuilder {
                 : Collections.emptyList();
 
         BriefingMetadata metadata = new BriefingMetadata(
-                articles.size(),
-                articles.size(),
+                totalArticleCount,
+                totalArticleCount,
                 news.size(),
                 modelName,
                 promptVersion
@@ -80,22 +80,17 @@ public final class BriefingBuilder {
 
     private static AnalyzedNews mapToAnalyzedNews(
             AiResponse.AiAnalyzedNews aiNews,
-            Map<String, Article> articleMap) {
+            Article article) {
 
-        List<SourceReference> sources = aiNews.sources().stream()
-                .map(src -> {
-                    Article article = articleMap.get(src.articleId());
-                    return new SourceReference(
-                            src.articleId(),
-                            article != null ? article.sourceName() : "Unknown",
-                            article != null ? article.title() : "Unknown",
-                            article != null ? article.url() : "https://unknown",
-                            article != null ? article.publishedAt()
-                                    : OffsetDateTime.parse("1970-01-01T00:00:00+09:00"),
-                            src.isPrimary()
-                    );
-                })
-                .toList();
+        SourceReference source = new SourceReference(
+                article.id(),
+                article.sourceName(),
+                article.title(),
+                article.url(),
+                article.publishedAt(),
+                true
+        );
+        List<SourceReference> sources = List.of(source);
 
         List<EconomicTerm> terms = aiNews.terms() != null
                 ? aiNews.terms().stream()

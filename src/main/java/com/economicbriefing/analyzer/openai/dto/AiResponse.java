@@ -23,8 +23,7 @@ public record AiResponse(
         @JsonProperty("beginnerExplanation") String beginnerExplanation,
         @JsonProperty("economicImpact") String economicImpact,
         @JsonProperty("terms") List<AiEconomicTerm> terms,
-        @JsonProperty("evidenceStatus") String evidenceStatus,
-        @JsonProperty("sources") List<AiSourceReference> sources
+        @JsonProperty("evidenceStatus") String evidenceStatus
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -32,11 +31,5 @@ public record AiResponse(
         @JsonProperty("term") String term,
         @JsonProperty("explanation") String explanation,
         @JsonProperty("example") String example
-    ) {}
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record AiSourceReference(
-        @JsonProperty("articleId") String articleId,
-        @JsonProperty("isPrimary") boolean isPrimary
     ) {}
 }

@@ -6,7 +6,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 import com.economicbriefing.analyzer.openai.dto.AiResponse;
-import com.economicbriefing.domain.analysis.NewsEvidenceStatus;
 import com.economicbriefing.domain.article.Article;
 import com.economicbriefing.domain.article.ArticleSourceType;
 import com.economicbriefing.domain.article.NewsCategory;
@@ -26,8 +25,9 @@ class BriefingBuilderTest {
                 aiResponse,
                 LocalDate.of(2025, 1, 15),
                 articles,
+                10,
                 "gpt-4o",
-                "v2",
+                "v3",
                 null,
                 null
         );
@@ -36,63 +36,14 @@ class BriefingBuilderTest {
         assertEquals(LocalDate.of(2025, 1, 15), briefing.targetDate());
         assertEquals("2025-01-15 경제 브리핑", briefing.title());
         assertNotNull(briefing.generatedAt());
-    }
-
-    @Test
-    void shouldMapNewsWithNewFields() {
-        AiResponse aiResponse = createAiResponse();
-        List<Article> articles = createArticles();
-
-        Briefing briefing = BriefingBuilder.build(
-                aiResponse, LocalDate.of(2025, 1, 15),
-                articles, "gpt-4o", "v2", null, null);
-
         assertEquals(1, briefing.news().size());
+
+        // sources는 자동 매핑됨
         var news = briefing.news().get(0);
-        assertEquals("news-1", news.id());
-        assertEquals("기준금리가 내려갔어요", news.easyTitle());
-        assertEquals(NewsCategory.INTEREST_RATE, news.category());
-        assertEquals(5, news.importance());
-        assertEquals(3, news.threeLineSummary().size());
-        assertNotNull(news.whatHappened());
-        assertNotNull(news.whyItHappened());
-        assertEquals(NewsEvidenceStatus.CONFIRMED, news.evidenceStatus());
-
         assertEquals(1, news.sources().size());
+        assertEquals("article-1", news.sources().get(0).articleId());
         assertEquals("한국은행", news.sources().get(0).sourceName());
-        assertEquals("기준금리 인하", news.sources().get(0).title());
-    }
-
-    @Test
-    void shouldHandleMissingArticleInMap() {
-        AiResponse aiResponse = new AiResponse(
-                List.of("요약"),
-                List.of(new AiResponse.AiAnalyzedNews(
-                        "news-1", "제목", "interest_rate", 5,
-                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향",
-                        List.of(), "confirmed",
-                        List.of(new AiResponse.AiSourceReference("non-existent-id", true))
-                )),
-                List.of()
-        );
-
-        Briefing briefing = BriefingBuilder.build(
-                aiResponse, LocalDate.of(2025, 1, 15),
-                List.of(), "gpt-4o", "v2", null, null);
-
-        assertEquals("Unknown", briefing.news().get(0).sources().get(0).sourceName());
-    }
-
-    @Test
-    void shouldUseCustomBriefingTitle() {
-        AiResponse aiResponse = createAiResponse();
-        List<Article> articles = createArticles();
-
-        Briefing briefing = BriefingBuilder.build(
-                aiResponse, LocalDate.of(2025, 1, 15),
-                articles, "gpt-4o", "v2", "커스텀 제목", null);
-
-        assertEquals("커스텀 제목", briefing.title());
+        assertTrue(news.sources().get(0).isPrimary());
     }
 
     @Test
@@ -102,15 +53,14 @@ class BriefingBuilderTest {
                 List.of(new AiResponse.AiAnalyzedNews(
                         "news-1", "제목", "interest_rate", 5,
                         List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향",
-                        List.of(), "confirmed",
-                        List.of(new AiResponse.AiSourceReference("article-1", true))
+                        List.of(), "confirmed"
                 )),
                 List.of(new AiResponse.AiEconomicTerm("기준금리", "설명", "예시"))
         );
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                createArticles(), "gpt-4o", "v2", null, null);
+                createArticles(), 10, "gpt-4o", "v3", null, null);
 
         assertEquals(1, briefing.glossary().size());
         assertEquals("기준금리", briefing.glossary().get(0).term());
@@ -124,12 +74,12 @@ class BriefingBuilderTest {
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                articles, "gpt-4o", "v2", null, null);
+                articles, 100, "gpt-4o", "v3", null, null);
 
-        assertEquals(1, briefing.metadata().collectedArticleCount());
+        assertEquals(100, briefing.metadata().collectedArticleCount());
         assertEquals(1, briefing.metadata().selectedNewsCount());
         assertEquals("gpt-4o", briefing.metadata().modelName());
-        assertEquals("v2", briefing.metadata().promptVersion());
+        assertEquals("v3", briefing.metadata().promptVersion());
     }
 
     @Test
@@ -139,17 +89,68 @@ class BriefingBuilderTest {
                 List.of(new AiResponse.AiAnalyzedNews(
                         "news-1", "제목", "unknown_category", 3,
                         List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향",
-                        List.of(), "confirmed",
-                        List.of(new AiResponse.AiSourceReference("article-1", true))
+                        List.of(), "confirmed"
                 )),
                 List.of()
         );
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse, LocalDate.of(2025, 1, 15),
-                createArticles(), "gpt-4o", "v2", null, null);
+                createArticles(), 10, "gpt-4o", "v3", null, null);
 
         assertEquals(NewsCategory.OTHER, briefing.news().get(0).category());
+    }
+
+    @Test
+    void shouldHandleEmptyOverallSummary() {
+        AiResponse aiResponse = new AiResponse(
+                List.of(),
+                List.of(new AiResponse.AiAnalyzedNews(
+                        "news-1", "제목", "interest_rate", 3,
+                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향",
+                        List.of(), "confirmed"
+                )),
+                List.of()
+        );
+
+        Briefing briefing = BriefingBuilder.build(
+                aiResponse, LocalDate.of(2025, 1, 15),
+                createArticles(), 10, "gpt-4o", "v3", null, null);
+
+        assertNotNull(briefing.overallSummary());
+        assertTrue(briefing.overallSummary().isEmpty());
+    }
+
+    @Test
+    void shouldHandleNullOverallSummary() {
+        AiResponse aiResponse = new AiResponse(
+                null,
+                List.of(new AiResponse.AiAnalyzedNews(
+                        "news-1", "제목", "interest_rate", 3,
+                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향",
+                        List.of(), "confirmed"
+                )),
+                List.of()
+        );
+
+        Briefing briefing = BriefingBuilder.build(
+                aiResponse, LocalDate.of(2025, 1, 15),
+                createArticles(), 10, "gpt-4o", "v3", null, null);
+
+        assertNotNull(briefing.overallSummary());
+        assertTrue(briefing.overallSummary().isEmpty());
+    }
+
+    @Test
+    void shouldUseCustomBriefingTitle() {
+        AiResponse aiResponse = createAiResponse();
+        List<Article> articles = createArticles();
+
+        Briefing briefing = BriefingBuilder.build(
+                aiResponse, LocalDate.of(2025, 1, 15),
+                articles, 10, "gpt-4o", "v3", "커스텀 제목", null);
+
+        assertEquals("커스텀 제목", briefing.title());
     }
 
     private AiResponse createAiResponse() {
@@ -166,53 +167,10 @@ class BriefingBuilderTest {
                         "경기가 나빠질 것 같아서 금리를 낮췄어요",
                         "시중금리 하락",
                         List.of(new AiResponse.AiEconomicTerm("기준금리", "설명", null)),
-                        "confirmed",
-                        List.of(new AiResponse.AiSourceReference("article-1", true))
+                        "confirmed"
                 )),
                 List.of()
         );
-    }
-
-    @Test
-    void shouldHandleEmptyOverallSummary() {
-        AiResponse aiResponse = new AiResponse(
-                List.of(),
-                List.of(new AiResponse.AiAnalyzedNews(
-                        "news-1", "제목", "interest_rate", 3,
-                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향",
-                        List.of(), "confirmed",
-                        List.of(new AiResponse.AiSourceReference("article-1", true))
-                )),
-                List.of()
-        );
-
-        Briefing briefing = BriefingBuilder.build(
-                aiResponse, LocalDate.of(2025, 1, 15),
-                createArticles(), "gpt-4o", "v2", null, null);
-
-        assertNotNull(briefing.overallSummary());
-        assertTrue(briefing.overallSummary().isEmpty());
-    }
-
-    @Test
-    void shouldHandleNullOverallSummary() {
-        AiResponse aiResponse = new AiResponse(
-                null,
-                List.of(new AiResponse.AiAnalyzedNews(
-                        "news-1", "제목", "interest_rate", 3,
-                        List.of("핵심"), "사건", "원인", "초보자 설명", "경제영향",
-                        List.of(), "confirmed",
-                        List.of(new AiResponse.AiSourceReference("article-1", true))
-                )),
-                List.of()
-        );
-
-        Briefing briefing = BriefingBuilder.build(
-                aiResponse, LocalDate.of(2025, 1, 15),
-                createArticles(), "gpt-4o", "v2", null, null);
-
-        assertNotNull(briefing.overallSummary());
-        assertTrue(briefing.overallSummary().isEmpty());
     }
 
     private List<Article> createArticles() {
