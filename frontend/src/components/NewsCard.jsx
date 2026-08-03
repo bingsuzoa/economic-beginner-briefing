@@ -70,6 +70,12 @@ export default function NewsCard({ news, onMarkRead }) {
   const [readAt, setReadAt] = useState(news.readAt)
   const visibilityTimerRef = useRef(null)
 
+  // Update state when news.readAt changes (e.g., when navigating back)
+  useEffect(() => {
+    setIsRead(!!news.readAt)
+    setReadAt(news.readAt)
+  }, [news.readAt])
+
   useEffect(() => {
     // Skip if already read
     if (isRead) return

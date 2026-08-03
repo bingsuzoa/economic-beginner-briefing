@@ -28,8 +28,7 @@ class AnalysisPromptBuilderTest {
                 articles, LocalDate.of(2025, 1, 15), 5, audience);
 
         assertTrue(prompt.contains("대상 날짜: 2025-01-15"));
-        assertTrue(prompt.contains("최대 선별 뉴스 수: 5"));
-        assertTrue(prompt.contains("전체 기사 수: 2"));
+        assertTrue(prompt.contains("분석할 기사 수: 2"));
     }
 
     @Test
@@ -80,7 +79,7 @@ class AnalysisPromptBuilderTest {
                 articles, LocalDate.of(2025, 1, 15), 5, audience);
 
         assertTrue(prompt.contains("## 요청사항"));
-        assertTrue(prompt.contains("같은 사건에 대한 기사는 반드시 하나로 그룹화"));
+        assertTrue(prompt.contains("위 각 기사에 대해 순서대로 분석하세요"));
         assertTrue(prompt.contains("JSON 형식으로 응답"));
     }
 

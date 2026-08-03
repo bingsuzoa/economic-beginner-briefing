@@ -1,6 +1,8 @@
 package com.economicbriefing.analyzer.openai;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -52,41 +54,67 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
             throw new AnalyzeException(ErrorCode.ANALYZE_EMPTY_INPUT);
         }
 
-        log.info("Starting AI analysis: articles={}, targetDate={}, maxNews={}",
+        log.info("Starting AI analysis (2-stage): articles={}, targetDate={}, maxNews={}",
                 request.articles().size(), request.targetDate(), request.maxSelectedNews());
 
-        String userPrompt = AnalysisPromptBuilder.build(
+        // Stage 1: Selection
+        log.info("Stage 1: Selecting important articles...");
+        String selectionPrompt = com.economicbriefing.analyzer.openai.prompt.SelectionPromptBuilder.build(
                 request.articles(),
                 request.targetDate(),
                 request.maxSelectedNews(),
                 request.audience()
         );
 
-        AiResponse aiResponse = RetryExecutor.execute(
-                () -> callAndParse(userPrompt),
+        com.economicbriefing.analyzer.openai.dto.SelectionResponse selectionResponse = RetryExecutor.execute(
+                () -> callAndParseSelection(selectionPrompt),
                 appProperties.retry()
         );
 
-        // Validate article IDs from AI response
-        validateArticleIds(aiResponse, request.articles());
+        List<String> selectedIds = selectionResponse.selectedArticleIds();
+        log.info("Stage 1 completed: selected {} articles", selectedIds.size());
+
+        // Filter selected articles in order
+        Map<String, com.economicbriefing.domain.article.Article> articleMap = request.articles().stream()
+                .collect(Collectors.toMap(
+                        com.economicbriefing.domain.article.Article::id,
+                        a -> a
+                ));
+
+        List<com.economicbriefing.domain.article.Article> selectedArticles = selectedIds.stream()
+                .map(articleMap::get)
+                .filter(a -> a != null)
+                .toList();
+
+        // Stage 2: Analysis
+        log.info("Stage 2: Analyzing selected articles...");
+        String analysisPrompt = AnalysisPromptBuilder.build(
+                selectedArticles,
+                request.targetDate(),
+                request.maxSelectedNews(),
+                request.audience()
+        );
+
+        AiResponse aiResponse = RetryExecutor.execute(
+                () -> callAndParseAnalysis(analysisPrompt),
+                appProperties.retry()
+        );
+
+        log.info("Stage 2 completed: analyzed {} news items", aiResponse.news().size());
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse,
                 request.targetDate(),
-                request.articles(),
+                selectedArticles,
+                request.articles().size(),
                 openAiProperties.model(),
-                "v2",
+                "v3-2stage",
                 request.briefingTitle(),
                 request.targetHour()
         );
 
-        Set<String> selectedIds = aiResponse.news().stream()
-                .flatMap(n -> n.sources().stream())
-                .map(AiResponse.AiSourceReference::articleId)
-                .collect(Collectors.toSet());
-
         List<String> rejectedArticleIds = request.articles().stream()
-                .map(a -> a.id())
+                .map(com.economicbriefing.domain.article.Article::id)
                 .filter(id -> !selectedIds.contains(id))
                 .toList();
 
@@ -96,16 +124,38 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         return new AnalyzeNewsResult(briefing, rejectedArticleIds, List.of());
     }
 
-    private AiResponse callAndParse(String userPrompt) {
-        String content = aiClient.complete(SystemPromptBuilder.SYSTEM_PROMPT, userPrompt);
-        return parseAndValidate(content);
+    private com.economicbriefing.analyzer.openai.dto.SelectionResponse callAndParseSelection(String userPrompt) {
+        String content = aiClient.complete(
+                com.economicbriefing.analyzer.openai.prompt.SelectionPromptBuilder.SYSTEM_PROMPT,
+                userPrompt
+        );
+        return parseSelection(content);
     }
 
-    private AiResponse parseAndValidate(String content) {
-        log.info("=== PARSING JSON START ===");
+    private AiResponse callAndParseAnalysis(String userPrompt) {
+        String content = aiClient.complete(SystemPromptBuilder.SYSTEM_PROMPT, userPrompt);
+        return parseAndValidateAnalysis(content);
+    }
+
+    private com.economicbriefing.analyzer.openai.dto.SelectionResponse parseSelection(String content) {
+        log.info("Parsing selection response...");
+        try {
+            com.economicbriefing.analyzer.openai.dto.SelectionResponse response =
+                    objectMapper.readValue(content, com.economicbriefing.analyzer.openai.dto.SelectionResponse.class);
+            log.info("Selection parsed successfully: {} articles selected", response.selectedArticleIds().size());
+            return response;
+        } catch (JsonProcessingException e) {
+            log.error("Failed to parse selection response", e);
+            log.error("Full content for debugging: {}", content);
+            throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR, e);
+        }
+    }
+
+    private AiResponse parseAndValidateAnalysis(String content) {
+        log.info("=== PARSING ANALYSIS JSON START ===");
         log.info("Content length: {} characters", content.length());
         log.info("First 500 chars: {}", content.substring(0, Math.min(500, content.length())));
-        log.info("=== PARSING JSON END ===");
+        log.info("=== PARSING ANALYSIS JSON END ===");
 
         AiResponse response;
         try {
@@ -150,34 +200,9 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                 log.error("{}whatHappened is null or blank", newsPrefix);
                 throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR);
             }
-            if (news.sources() == null || news.sources().isEmpty()) {
-                log.error("{}sources is null or empty", newsPrefix);
-                throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR);
-            }
         }
 
         return response;
     }
 
-    private void validateArticleIds(AiResponse response, List<com.economicbriefing.domain.article.Article> inputArticles) {
-        Set<String> validArticleIds = inputArticles.stream()
-                .map(a -> a.id())
-                .collect(Collectors.toSet());
-
-        for (int i = 0; i < response.news().size(); i++) {
-            AiResponse.AiAnalyzedNews news = response.news().get(i);
-            for (AiResponse.AiSourceReference source : news.sources()) {
-                if (!validArticleIds.contains(source.articleId())) {
-                    log.error("AI returned invalid article ID: newsIndex={}, invalidId={}, validIds={}",
-                            i, source.articleId(), validArticleIds);
-                    log.error("News easyTitle: {}", news.easyTitle());
-                    log.error("This indicates AI hallucinated or mixed up article IDs");
-                    throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR,
-                            new IllegalStateException("AI returned article ID that doesn't exist in input: " + source.articleId()));
-                }
-            }
-        }
-        log.info("Article ID validation passed: all {} article IDs are valid",
-                response.news().stream().flatMap(n -> n.sources().stream()).count());
-    }
 }
