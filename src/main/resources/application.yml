@@ -29,11 +29,12 @@ spring:
 
 server:
   port: ${ADMIN_PORT:3000}
+  forward-headers-strategy: framework
   servlet:
     session:
       cookie:
         same-site: ${SESSION_COOKIE_SAME_SITE:lax}
-        secure: ${SESSION_COOKIE_SECURE:false}
+        secure: ${AUTH_SECURE_COOKIE:true}
         http-only: true
       timeout: 7d
 
@@ -106,11 +107,10 @@ openai:
   timeout: 60s
   max-selected-news: 15
 
-sms:
-  provider: ${SMS_PROVIDER:dev}
-  api-key: ${SMS_API_KEY:}
-  api-secret: ${SMS_API_SECRET:}
-  sender-number: ${SMS_SENDER_NUMBER:}
+auth:
+  require-https: ${AUTH_REQUIRE_HTTPS:true}
+  email-encryption-key: ${AUTH_EMAIL_ENCRYPTION_KEY}
+  email-hash-key: ${AUTH_EMAIL_HASH_KEY}
 
 admin:
   # No default: a blank token is rejected at startup and by the admin filter.

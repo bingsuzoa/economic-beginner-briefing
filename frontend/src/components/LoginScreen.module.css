@@ -57,6 +57,64 @@
   overflow: hidden;
 }
 
+.authCard { max-width: 440px; }
+
+.formFields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field > span {
+  display: block;
+  margin-bottom: 6px;
+  color: #666;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.inputWrap { position: relative; }
+
+.stepCount {
+  margin: 8px 0 0;
+  color: #AAA;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.description {
+  margin: -14px 0 24px;
+  color: #888;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.backButton {
+  display: block;
+  margin: 16px auto 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #AAA;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.complete { text-align: center; }
+
+.completeIcon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  margin: 32px auto 8px;
+  place-items: center;
+  border-radius: 50%;
+  background: #FFD43B;
+  color: #1A1A1A;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
 /* ── Progress bar ── */
 .progressBar {
   height: 3px;

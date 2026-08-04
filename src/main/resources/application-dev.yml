@@ -7,6 +7,15 @@ spring:
   jpa:
     show-sql: true
 
+auth:
+  require-https: false
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
+
 logging:
   level:
     com.economicbriefing: DEBUG
