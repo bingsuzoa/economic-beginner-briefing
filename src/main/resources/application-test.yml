@@ -15,8 +15,16 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
   flyway:
     enabled: false
-sms:
-  provider: dev
+auth:
+  require-https: false
+  email-encryption-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+  email-hash-key: AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
 
 admin:
   token: test-admin-token

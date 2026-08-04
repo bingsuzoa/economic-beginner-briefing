@@ -84,11 +84,15 @@ src/
 | `OPENAI_API_KEY` | 필수 | OpenAI API 키 |
 | `ADMIN_TOKEN` | 필수 (DRY_RUN=false) | 관리자 API 인증 토큰. 비어 있으면 기동 실패 |
 | `SPRING_DATASOURCE_USERNAME` / `_PASSWORD` | 필수 | PostgreSQL 접속 정보 |
+| `AUTH_EMAIL_ENCRYPTION_KEY` | 필수 | 이메일 AES-256-GCM 암호화 키(Base64 32바이트) |
+| `AUTH_EMAIL_HASH_KEY` | 필수 | 이메일 조회용 HMAC-SHA-256 키(Base64 32바이트, 암호화 키와 별도) |
+| `AUTH_REQUIRE_HTTPS` / `AUTH_SECURE_COOKIE` | 기본값: true | 인증 API HTTPS 및 Secure 세션 쿠키 강제 |
 | `TEACHER_MODEL` | 기본값: gpt-4o-mini | 기사 분류 모델 |
 | `TEACHER_CONCURRENCY` | 기본값: 6 | 분류 동시 실행 수 |
 | `EMBEDDING_ENABLED` | 기본값: true | 임베딩 생성 여부 |
 
 `.env.example`을 `.env`로 복사해 사용합니다.
+두 이메일 키는 각각 `openssl rand -base64 32`로 생성하고 소스코드나 DB에 저장하지 않습니다.
 
 ## 수동 실행
 

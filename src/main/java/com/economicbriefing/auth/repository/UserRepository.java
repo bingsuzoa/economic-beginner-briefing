@@ -6,7 +6,8 @@ import com.economicbriefing.auth.entity.UserEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserRepository extends JpaRepository<UserEntity, String> {
-    Optional<UserEntity> findByPhone(String phone);
-    boolean existsByPhone(String phone);
+    Optional<UserEntity> findByUsername(String username);
+    boolean existsByUsername(String username);
+    boolean existsByEmailHash(String emailHash);
     boolean existsByNickname(String nickname);
 }

@@ -30,6 +30,8 @@ import static org.junit.jupiter.api.Assertions.*;
     "spring.flyway.enabled=false",
     "openai.api-key=test-key",
     "admin.token=test-admin-token",
+    "auth.email-encryption-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    "auth.email-hash-key=AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
     // stops the real pipeline from firing if a tick lands mid-test
     "briefing.dry-run=true",
     "spring.mail.host=localhost",

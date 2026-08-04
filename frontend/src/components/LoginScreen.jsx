@@ -1,308 +1,188 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import s from './LoginScreen.module.css'
 
-const useTitle = (t) => useEffect(() => { document.title = t }, [])
+const useTitle = (title) => useEffect(() => { document.title = title }, [title])
+const fields = [
+  ['username', '사용할 아이디를 알려주세요', '영문, 숫자, 밑줄을 사용해 4~30자로 입력해주세요.', 'text', '아이디'],
+  ['email', '이메일을 입력해주세요', '비밀번호를 잊었을 때 재설정에 사용해요.', 'email', 'name@example.com'],
+  ['password', '비밀번호를 만들어주세요', '안전하게 사용할 수 있도록 8자 이상 입력해주세요.', 'password', '8자 이상'],
+  ['passwordConfirm', '비밀번호를 한 번 더 입력해주세요', '방금 입력한 비밀번호와 같은지 확인할게요.', 'password', '비밀번호 확인'],
+  ['nickname', '어떻게 불러드릴까요?', '서비스에서 사용할 닉네임을 2~20자로 입력해주세요.', 'text', '닉네임'],
+]
 
-const SIGNUP_STEPS = ['phone', 'sms', 'name', 'birth', 'nickname']
-const LOGIN_STEPS = ['phone', 'sms']
+const validate = (name, value, form) => {
+  if (name === 'username' && !/^[A-Za-z0-9_]{4,30}$/.test(value)) return '영문, 숫자, 밑줄 4~30자로 입력해주세요.'
+  if (name === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return '올바른 이메일 형식을 입력해주세요.'
+  if (name === 'password' && value.length < 8) return '비밀번호는 8자 이상 입력해주세요.'
+  if (name === 'passwordConfirm' && value !== form.password) return '비밀번호가 일치하지 않습니다.'
+  if (name === 'nickname' && (value.trim().length < 2 || value.trim().length > 20)) return '닉네임은 2~20자로 입력해주세요.'
+  return ''
+}
 
 export default function LoginScreen({ onLoginSuccess }) {
-  const [step, setStep] = useState('initial')
-  const [intent, setIntent] = useState('signup')
-  const [phone, setPhone] = useState('')
-  const [code, setCode] = useState('')
-  const [name, setName] = useState('')
-  const [birthDigits, setBirthDigits] = useState('')
-  const [genderCode, setGenderCode] = useState('')
-  const [nickname, setNickname] = useState('')
+  const [mode, setMode] = useState('initial')
+  const [form, setForm] = useState({ username: '', email: '', password: '', passwordConfirm: '', nickname: '' })
+  const [signupStep, setSignupStep] = useState(0)
+  const [createdUser, setCreatedUser] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [timer, setTimer] = useState(0)
-  const [canResend, setCanResend] = useState(false)
-  const [nicknameOk, setNicknameOk] = useState(null)
-  const [toast, setToast] = useState('')
-  const genderRef = useRef(null)
-  const timerRef = useRef(null)
   useTitle('Thoth - 시작하기')
 
-  // Timer
-  useEffect(() => {
-    if (timer <= 0) { clearInterval(timerRef.current); return }
-    timerRef.current = setInterval(() => setTimer(t => t - 1), 1000)
-    return () => clearInterval(timerRef.current)
-  }, [timer > 0])
-
-  const steps = intent === 'signup' ? SIGNUP_STEPS : LOGIN_STEPS
-  const stepIdx = steps.indexOf(step)
-  const progress = step === 'initial' ? 0
-    : step === 'checking' ? 85
-    : stepIdx >= 0 ? Math.round(((stepIdx + 1) / steps.length) * 100) : 0
-
-  const fmtTimer = () => `${Math.floor(timer / 60)}:${String(timer % 60).padStart(2, '0')}`
-  const fmtPhone = p => p.length === 11 ? `${p.slice(0,3)}-${p.slice(3,7)}-${p.slice(7)}` : p
-
-  const deriveBirthInfo = () => {
-    const gc = parseInt(genderCode)
-    const century = gc <= 2 ? 1900 : 2000
-    const y = century + parseInt(birthDigits.substring(0, 2))
-    const m = birthDigits.substring(2, 4)
-    const d = birthDigits.substring(4, 6)
-    return { birthDate: `${y}-${m}-${d}`, gender: gc % 2 === 1 ? '남성' : '여성' }
+  const update = (name, value) => {
+    setForm(current => ({ ...current, [name]: value }))
+    setError(validate(name, value, { ...form, [name]: value }))
   }
 
-  const resetAll = () => {
-    setStep('initial'); setPhone(''); setCode(''); setName('')
-    setBirthDigits(''); setGenderCode(''); setNickname('')
-    setError(''); setNicknameOk(null); setTimer(0); setCanResend(false)
-  }
-
-  const startTimer = () => { setTimer(180); setCanResend(false); setTimeout(() => setCanResend(true), 60000) }
-
-  // ── Handlers ──
-
-  const handleSendCode = async () => {
-    setError(''); setLoading(true)
+  const check = async (name) => {
+    const value = form[name].trim()
     try {
-      const res = await fetch('/api/auth/sms/send', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
-      })
+      const res = await fetch(`/api/auth/check-${name}?${name}=${encodeURIComponent(value)}`)
       const data = await res.json()
-      if (res.ok && data.success) {
-        setStep('sms'); startTimer(); setCode('')
-        if (data.devCode) {
-          // Dev mode: auto-verify
-          setCode(data.devCode)
-          setTimeout(() => handleVerify(data.devCode), 300)
-        }
-      } else setError(data.message || '발송에 실패했습니다.')
-    } catch { setError('서버에 연결할 수 없습니다.') }
-    finally { setLoading(false) }
+      return data.taken ? 'taken' : 'available'
+    } catch { /* 다음 버튼에서 재시도 안내 */ }
+    return false
   }
 
-  const handleVerify = async (codeOverride) => {
-    setError(''); setLoading(true)
-    try {
-      const res = await fetch('/api/auth/sms/verify', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, code: codeOverride || code }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.success) { setError(data.message || '인증에 실패했습니다.'); return }
+  const nextSignupStep = async (event) => {
+    event.preventDefault()
+    const [name] = fields[signupStep]
+    const validationError = validate(name, form[name], form)
+    if (validationError) { setError(validationError); return }
 
-      if (intent === 'login') {
-        // Auto-login
-        const loginRes = await fetch('/api/auth/login', { method: 'POST' })
-        const loginData = await loginRes.json()
-        if (loginData.success) onLoginSuccess(loginData.user)
-        else setError(loginData.message || '로그인에 실패했습니다.')
-      } else {
-        setStep('name')
-      }
-    } catch { setError('서버에 연결할 수 없습니다.') }
-    finally { setLoading(false) }
+    setError('')
+    setLoading(true)
+    const availabilityResult = ['username', 'email', 'nickname'].includes(name) ? await check(name) : 'available'
+    if (availabilityResult !== 'available') {
+      setError(availabilityResult === 'taken' ? `이미 사용 중인 ${name === 'username' ? '아이디' : name === 'email' ? '이메일' : '닉네임'}입니다.` : '중복 확인에 실패했습니다. 다시 시도해주세요.')
+      setLoading(false)
+      return
+    }
+    setLoading(false)
+    if (signupStep < fields.length - 1) setSignupStep(step => step + 1)
+    else submitSignup()
   }
 
-  const handleNameNext = () => {
-    if (!name.trim()) { setError('이름을 입력해주세요.'); return }
-    setError(''); setStep('birth')
-  }
-
-  const handleBirthNext = async () => {
-    if (birthDigits.length !== 6 || !genderCode) { setError('생년월일과 성별을 입력해주세요.'); return }
-    setError(''); setStep('checking'); setLoading(true)
-    try {
-      const res = await fetch('/api/auth/check-member', { method: 'POST' })
-      const data = await res.json()
-      if (data.exists) {
-        setToast('이미 가입된 계정입니다. 로그인 화면으로 이동합니다.')
-        setTimeout(() => { setToast(''); resetAll() }, 2500)
-      } else {
-        setStep('nickname')
-      }
-    } catch { setError('서버에 연결할 수 없습니다.'); setStep('birth') }
-    finally { setLoading(false) }
-  }
-
-  const checkNickname = async (nick) => {
-    if (!nick || nick.length < 2) { setNicknameOk(null); return }
-    try {
-      const res = await fetch(`/api/auth/check-nickname?nickname=${encodeURIComponent(nick)}`)
-      const data = await res.json()
-      setNicknameOk(!data.taken)
-    } catch { setNicknameOk(null) }
-  }
-
-  const handleSignup = async () => {
-    if (!nickname.trim()) { setError('닉네임을 입력해주세요.'); return }
-    if (nicknameOk === false) { setError('이미 사용 중인 닉네임입니다.'); return }
-    setError(''); setLoading(true)
-    const { birthDate, gender } = deriveBirthInfo()
+  const submitSignup = async () => {
+    setLoading(true)
     try {
       const res = await fetch('/api/auth/signup', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, nickname, birthDate, gender }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
       })
       const data = await res.json()
-      if (data.success) onLoginSuccess(data.user)
+      if (res.ok && data.success) setCreatedUser(data.user)
       else setError(data.message || '가입에 실패했습니다.')
     } catch { setError('서버에 연결할 수 없습니다.') }
     finally { setLoading(false) }
   }
 
-  const onKey = (handler) => (e) => { if (e.key === 'Enter') handler() }
-
-  // ── Step checks for completed display ──
-  const past = (target) => {
-    const all = [...SIGNUP_STEPS, 'checking']
-    return all.indexOf(step) > all.indexOf(target)
+  const submit = async (event) => {
+    event.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: form.username, password: form.password }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) onLoginSuccess(data.user)
+      else setError(data.message || '로그인에 실패했습니다.')
+    } catch { setError('서버에 연결할 수 없습니다.') }
+    finally { setLoading(false) }
   }
 
-  // ── Initial ──
-  if (step === 'initial') {
-    return (
+  const reset = () => {
+    setMode('initial')
+    setForm({ username: '', email: '', password: '', passwordConfirm: '', nickname: '' })
+    setSignupStep(0)
+    setCreatedUser(null)
+    setError('')
+  }
+
+  if (mode === 'initial') return (
+    <div className={s.page}>
+      <div className={s.card}>
+        <img src="/images/main-logo.png" alt="토트" className={s.logo} />
+        <h1 className={s.heroTitle}>Thoth</h1>
+        <p className={s.heroSub}>경제 초보자를 위한 맞춤 뉴스 브리핑</p>
+        <div className={s.heroButtons}>
+          <button className={`${s.btn} ${s.primary}`} onClick={() => setMode('signup')}>시작하기</button>
+          <button className={`${s.btn} ${s.outline}`} onClick={() => setMode('login')}>로그인</button>
+        </div>
+      </div>
+    </div>
+  )
+
+  if (mode === 'signup') {
+    if (createdUser) return (
       <div className={s.page}>
-        <div className={s.card}>
-          <img src="/images/main-logo.png" alt="토트" className={s.logo} />
-          <h1 className={s.heroTitle}>Thoth</h1>
-          <p className={s.heroSub}>경제 초보자를 위한 맞춤 뉴스 브리핑</p>
-          <div className={s.heroButtons}>
-            <button className={`${s.btn} ${s.primary}`}
-              onClick={() => { setIntent('signup'); setStep('phone'); setError('') }}>시작하기</button>
-            <button className={`${s.btn} ${s.outline}`}
-              onClick={() => { setIntent('login'); setStep('phone'); setError('') }}>로그인</button>
+        <div className={`${s.stepCard} ${s.authCard}`}>
+          <div className={s.progressBar}><div className={s.progressFill} style={{ width: '100%' }} /></div>
+          <div className={`${s.stepArea} ${s.complete}`}>
+            <div className={s.completeIcon}>✓</div>
+            <h2 className={s.question}>가입이 완료됐어요!</h2>
+            <p className={s.description}>{createdUser.nickname}님, 병아리 경제 뉴스와 함께 시작해요.</p>
+            <button className={`${s.btn} ${s.primary} ${s.fixedBtn}`} onClick={() => onLoginSuccess(createdUser)}>시작하기</button>
           </div>
         </div>
-        {toast && <div className={s.toast}>{toast}</div>}
+      </div>
+    )
+
+    const [name, question, description, type, placeholder] = fields[signupStep]
+    const valid = !validate(name, form[name], form)
+    return (
+      <div className={s.page}>
+        <div className={`${s.stepCard} ${s.authCard}`}>
+          <div className={s.progressBar}><div className={s.progressFill} style={{ width: `${((signupStep + 1) / 6) * 100}%` }} /></div>
+          <form className={s.stepArea} key={name} onSubmit={nextSignupStep}>
+            <p className={s.stepCount}>{signupStep + 1} / 5</p>
+            <h2 className={s.question}>{question}</h2>
+            <p className={s.description}>{description}</p>
+            <div className={s.inputWrap}>
+              <input className={s.input} name={name} type={type} placeholder={placeholder} autoFocus
+                autoComplete={name === 'passwordConfirm' ? 'new-password' : name === 'password' ? 'new-password' : name}
+                value={form[name]} onChange={e => update(name, e.target.value)} />
+            </div>
+            {error && <p className={s.error}>{error}</p>}
+            <button className={`${s.btn} ${s.primary} ${s.fixedBtn}`} disabled={loading || !valid}>
+              {loading ? '확인 중...' : signupStep === fields.length - 1 ? '가입 완료' : '다음'}
+            </button>
+            <button type="button" className={s.backButton}
+              onClick={() => { setError(''); signupStep ? setSignupStep(step => step - 1) : reset() }}>이전으로</button>
+          </form>
+        </div>
       </div>
     )
   }
 
-  // ── Step screens ──
+  const visibleFields = fields.filter(([name]) => ['username', 'password'].includes(name))
   return (
     <div className={s.page}>
-      <div className={s.stepCard}>
-        {/* Progress */}
-        <div className={s.progressBar}><div className={s.progressFill} style={{ width: `${progress}%` }} /></div>
-
-        {/* Completed steps */}
-        <div className={s.completed}>
-          {past('phone') && (
-            <div className={s.done}><span className={s.doneIcon}>✓</span><span className={s.doneLabel}>휴대폰</span><span className={s.doneValue}>{fmtPhone(phone)}</span></div>
-          )}
-          {past('sms') && (
-            <div className={s.done}><span className={s.doneIcon}>✓</span><span className={s.doneLabel}>인증</span><span className={s.doneValue}>완료</span></div>
-          )}
-          {past('name') && (
-            <div className={s.done}><span className={s.doneIcon}>✓</span><span className={s.doneLabel}>이름</span><span className={s.doneValue}>{name}</span></div>
-          )}
-          {past('birth') && (
-            <div className={s.done}><span className={s.doneIcon}>✓</span><span className={s.doneLabel}>생년월일</span><span className={s.doneValue}>{birthDigits.slice(0,2)}.{birthDigits.slice(2,4)}.{birthDigits.slice(4)} / {deriveBirthInfo().gender}</span></div>
-          )}
-        </div>
-
-        {/* Current step */}
-        <div className={s.stepArea} key={step}>
-
-          {step === 'phone' && (
-            <>
-              <h2 className={s.question}>휴대폰 번호를<br/>입력해주세요</h2>
-              <input type="tel" inputMode="numeric" placeholder="01012345678" autoFocus
-                value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                onKeyDown={onKey(handleSendCode)} className={s.input} maxLength={11} />
-              {error && <p className={s.error}>{error}</p>}
-              <button className={`${s.btn} ${s.primary} ${s.fixedBtn}`}
-                disabled={loading || phone.length < 10} onClick={handleSendCode}>
-                {loading ? '발송 중...' : '인증번호 받기'}
-              </button>
-              <p className={s.back} onClick={resetAll}>이전으로</p>
-            </>
-          )}
-
-          {step === 'sms' && (
-            <>
-              <h2 className={s.question}>인증번호 6자리를<br/>입력해주세요</h2>
-              {timer > 0
-                ? <p className={s.timer}>{fmtTimer()}</p>
-                : <p className={s.timerExpired}>인증번호가 만료되었습니다</p>}
-              <input type="text" inputMode="numeric" maxLength={6} placeholder="000000" autoFocus
-                value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
-                onKeyDown={onKey(handleVerify)} className={`${s.input} ${s.codeInput}`} />
-              {error && <p className={s.error}>{error}</p>}
-              <button className={`${s.btn} ${s.primary} ${s.fixedBtn}`}
-                disabled={loading || code.length !== 6 || timer <= 0} onClick={handleVerify}>
-                {loading ? '확인 중...' : '다음'}
-              </button>
-              {canResend && (
-                <button className={`${s.btn} ${s.outline} ${s.resendBtn}`}
-                  onClick={handleSendCode} disabled={loading}>재전송</button>
-              )}
-              <p className={s.back} onClick={() => { setStep('phone'); setError(''); setCode('') }}>번호 변경</p>
-            </>
-          )}
-
-          {step === 'name' && (
-            <>
-              <h2 className={s.question}>이름을<br/>입력해주세요</h2>
-              <input type="text" placeholder="홍길동" autoFocus
-                value={name} onChange={e => setName(e.target.value)}
-                onKeyDown={onKey(handleNameNext)} className={s.input} />
-              {error && <p className={s.error}>{error}</p>}
-              <button className={`${s.btn} ${s.primary} ${s.fixedBtn}`}
-                disabled={!name.trim()} onClick={handleNameNext}>다음</button>
-            </>
-          )}
-
-          {step === 'birth' && (
-            <>
-              <h2 className={s.question}>주민등록번호 앞 7자리를<br/>입력해주세요</h2>
-              <div className={s.rrnRow}>
-                <input type="text" inputMode="numeric" maxLength={6} placeholder="생년월일" autoFocus
-                  value={birthDigits} onChange={e => {
-                    const v = e.target.value.replace(/\D/g, '')
-                    setBirthDigits(v)
-                    if (v.length === 6) genderRef.current?.focus()
-                  }} className={`${s.input} ${s.rrnBirth}`} />
-                <span className={s.rrnDash}>—</span>
-                <input type="text" inputMode="numeric" maxLength={1} placeholder="●" ref={genderRef}
-                  value={genderCode} onChange={e => setGenderCode(e.target.value.replace(/[^1-4]/g, ''))}
-                  onKeyDown={onKey(handleBirthNext)} className={`${s.input} ${s.rrnGender}`} />
-                <span className={s.rrnDots}>●●●●●●</span>
-              </div>
-              {error && <p className={s.error}>{error}</p>}
-              <button className={`${s.btn} ${s.primary} ${s.fixedBtn}`}
-                disabled={birthDigits.length !== 6 || !genderCode} onClick={handleBirthNext}>다음</button>
-            </>
-          )}
-
-          {step === 'checking' && (
-            <div className={s.checkingArea}>
-              <div className={s.spinner} />
-              <p className={s.checkingText}>확인 중...</p>
-            </div>
-          )}
-
-          {step === 'nickname' && (
-            <>
-              <h2 className={s.question}>사용할 닉네임을<br/>입력해주세요</h2>
-              <div className={s.nicknameWrap}>
-                <input type="text" placeholder="닉네임" autoFocus
-                  value={nickname} onChange={e => { setNickname(e.target.value); setNicknameOk(null) }}
-                  onBlur={e => checkNickname(e.target.value)}
-                  onKeyDown={onKey(handleSignup)} className={s.input} />
-                {nicknameOk === true && <span className={s.nickOk}>사용 가능</span>}
-                {nicknameOk === false && <span className={s.nickBad}>이미 사용 중</span>}
-              </div>
-              {error && <p className={s.error}>{error}</p>}
-              <button className={`${s.btn} ${s.primary} ${s.fixedBtn}`}
-                disabled={loading || !nickname.trim() || nicknameOk === false} onClick={handleSignup}>
-                {loading ? '가입 중...' : '가입 완료'}
-              </button>
-            </>
-          )}
-        </div>
+      <div className={`${s.stepCard} ${s.authCard}`}>
+        <div className={s.progressBar}><div className={s.progressFill} style={{ width: '100%' }} /></div>
+        <form className={s.stepArea} onSubmit={submit}>
+          <h2 className={s.question}>{mode === 'login' ? '아이디로 로그인해요' : '간단히 회원가입해요'}</h2>
+          <div className={s.formFields}>
+            {visibleFields.map(([name, , , type, placeholder], index) => (
+              <label className={s.field} key={name}>
+                <span>{name === 'username' ? '아이디' : '비밀번호'}</span>
+                <div className={s.inputWrap}>
+                  <input className={s.input} name={name} type={type} placeholder={placeholder}
+                    autoComplete={name === 'passwordConfirm' ? 'new-password' : name === 'password' ? (mode === 'login' ? 'current-password' : 'new-password') : name}
+                    autoFocus={index === 0} value={form[name]} required
+                    minLength={name === 'password' ? 8 : undefined}
+                    onChange={e => update(name, e.target.value)} />
+                </div>
+              </label>
+            ))}
+          </div>
+          {error && <p className={s.error}>{error}</p>}
+          <button className={`${s.btn} ${s.primary} ${s.fixedBtn}`} disabled={loading}>
+            {loading ? '처리 중...' : mode === 'login' ? '로그인' : '가입 완료'}
+          </button>
+          <p className={s.back} onClick={reset}>이전으로</p>
+        </form>
       </div>
-      {toast && <div className={s.toast}>{toast}</div>}
     </div>
   )
 }

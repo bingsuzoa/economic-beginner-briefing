@@ -4,6 +4,7 @@ import com.economicbriefing.config.AdminProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -18,10 +19,13 @@ public class SecurityConfig {
 
     private final AdminProperties adminProperties;
     private final ObjectMapper objectMapper;
+    private final boolean requireHttps;
 
-    public SecurityConfig(AdminProperties adminProperties, ObjectMapper objectMapper) {
+    public SecurityConfig(AdminProperties adminProperties, ObjectMapper objectMapper,
+                          @Value("${auth.require-https:true}") boolean requireHttps) {
         this.adminProperties = adminProperties;
         this.objectMapper = objectMapper;
+        this.requireHttps = requireHttps;
     }
 
     @Bean
@@ -43,6 +47,11 @@ public class SecurityConfig {
                 new AdminTokenFilter(adminProperties.token(), objectMapper),
                 UsernamePasswordAuthenticationFilter.class
             );
+
+        if (requireHttps) {
+            http.requiresChannel(channel -> channel
+                    .requestMatchers("/api/auth/**").requiresSecure());
+        }
 
         return http.build();
     }
