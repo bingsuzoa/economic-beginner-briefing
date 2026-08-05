@@ -8,7 +8,9 @@
   font-size: 0.85rem;
   border-top: 1px solid #eee;
   margin-top: 40px;
+  flex-wrap: wrap;
 }
+.footer a { color: inherit; text-decoration: underline; }
 .logo {
   width: 24px;
   height: 24px;

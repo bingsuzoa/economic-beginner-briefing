@@ -35,7 +35,12 @@
 .userName {
   font-size: 0.9rem;
   color: var(--color-text);
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-weight: 600;
 }
+.userName:hover { text-decoration: underline; }
 .logoutBtn {
   padding: 6px 14px;
   border: 1px solid var(--color-border, #ddd);
