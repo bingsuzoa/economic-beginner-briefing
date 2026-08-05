@@ -51,7 +51,7 @@ export default function PrivacyPolicy() {
           <span className={s.eyebrow}>PRIVACY POLICY</span>
           <h1>개인정보처리방침</h1>
           <p>병아리 경제 뉴스는 이용자의 개인정보를 소중히 여기며 안전하게 보호하기 위해 노력합니다.</p>
-          <p className={s.updated}>시행일 및 최종 수정일: 2026년 8월 4일</p>
+          <p className={s.updated}>시행일 및 최종 수정일: 2026년 8월 6일</p>
         </section>
 
         <div className={s.contentGrid}>
@@ -107,6 +107,7 @@ export default function PrivacyPolicy() {
                   </tbody>
                 </table>
               </div>
+              <p>회원 탈퇴 시 아이디, 암호화된 이메일, 이메일 조회용 해시, 비밀번호 해시, 닉네임, 프로필 정보, 가입·로그인 정보, 뉴스 열람 기록 및 인증 토큰은 즉시 삭제합니다. 접속 기록은 최대 3개월, 문의·분쟁 처리 이메일은 관계 법령이 적용되는 경우 최대 3년간 계정 정보와 분리하여 보관한 뒤 파기합니다.</p>
             </section>
 
             <section id="sharing">
@@ -132,11 +133,12 @@ export default function PrivacyPolicy() {
             <section id="destruction">
               <h2>7. 개인정보의 파기</h2>
               <p>보유 기간이 지나거나 처리 목적이 달성된 개인정보는 복구 또는 재생되지 않도록 지체 없이 파기합니다. 전자 파일은 복구하기 어려운 방식으로 삭제하고, 종이 문서가 있는 경우에는 분쇄하거나 소각합니다. 법령에 따라 계속 보관해야 하는 정보는 다른 개인정보와 분리하여 보관합니다.</p>
+              <p>회원은 앱 내부의 계정 관리 메뉴 또는 공개 <a href="/delete-account">계정 삭제 페이지</a>에서 본인 확인 후 탈퇴할 수 있습니다. 계정과 연결된 개인정보 및 뉴스 열람 기록은 확인 즉시 삭제되며, 삭제된 계정은 복구할 수 없습니다.</p>
             </section>
 
             <section id="rights">
               <h2>8. 이용자의 권리</h2>
-              <p>이용자는 자신의 개인정보에 대해 열람, 정정, 삭제, 처리정지 및 동의 철회를 요구할 수 있으며 언제든지 회원 탈퇴를 요청할 수 있습니다. 본인 확인 후 직접 서비스 내 기능을 이용하거나 아래 이메일로 요청해 주세요. 운영자는 관계 법령에서 정한 기간 내에 처리하고 결과를 안내합니다.</p>
+              <p>이용자는 자신의 개인정보에 대해 열람, 정정, 삭제, 처리정지 및 동의 철회를 요구할 수 있으며 언제든지 회원 탈퇴를 요청할 수 있습니다. 앱 내부 계정 관리 또는 공개 계정 삭제 페이지에서 아이디와 비밀번호로 본인을 확인하면 즉시 처리됩니다. 비밀번호를 잊은 경우 등록한 이메일 주소에서 아래 이메일로 요청해 주세요.</p>
               <p>법정대리인이나 위임받은 사람도 적법한 위임 관계를 확인한 뒤 권리를 행사할 수 있습니다. 법령에 따라 요청이 제한되는 경우에는 그 사유를 안내합니다.</p>
             </section>
 
@@ -165,8 +167,8 @@ export default function PrivacyPolicy() {
               <p>개인정보 처리와 관련한 문의, 불만 처리, 권리 행사 및 회원 탈퇴 요청은 아래 연락처로 보내 주세요.</p>
               <div className={s.contactBox}>
                 <strong>개인정보 보호 담당자</strong>
-                <span>병아리 경제 뉴스 운영자</span>
-                <a href="mailto:support@economic-beginner.com">support@economic-beginner.com</a>
+                <span>Thoth(토트) 운영자 권미경</span>
+                <a href="mailto:zxc_777@naver.com">zxc_777@naver.com</a>
               </div>
               <p>개인정보 침해에 대한 상담이 필요한 경우 개인정보침해신고센터(국번 없이 118), 개인정보분쟁조정위원회(1833-6972) 등 관계 기관에 도움을 요청할 수 있습니다.</p>
             </section>

@@ -9,6 +9,7 @@ import java.util.regex.Pattern;
 
 import com.economicbriefing.auth.entity.UserEntity;
 import com.economicbriefing.auth.repository.UserRepository;
+import com.economicbriefing.auth.service.AccountDeletionService;
 import com.economicbriefing.auth.service.EmailCryptoService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -16,6 +17,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,12 +35,14 @@ public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailCryptoService emailCrypto;
+    private final AccountDeletionService accountDeletionService;
 
     public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                          EmailCryptoService emailCrypto) {
+                          EmailCryptoService emailCrypto, AccountDeletionService accountDeletionService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.emailCrypto = emailCrypto;
+        this.accountDeletionService = accountDeletionService;
     }
 
     @PostMapping("/login")
@@ -100,6 +104,31 @@ public class AuthController {
                 .orElse(ResponseEntity.status(401).build());
     }
 
+    @DeleteMapping("/me")
+    public ResponseEntity<Map<String, Object>> deleteMe(@RequestBody DeleteRequest body,
+                                                         HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        String userId = session == null ? null : (String) session.getAttribute(SESSION_USER_ID);
+        if (userId == null) return ResponseEntity.status(401).build();
+        if (!accountDeletionService.deleteAuthenticated(userId, value(body.password()))) {
+            return bad("비밀번호가 올바르지 않습니다.");
+        }
+        session.invalidate();
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    @PostMapping("/delete-account")
+    public ResponseEntity<Map<String, Object>> deleteAccount(@RequestBody ExternalDeleteRequest body,
+                                                              HttpServletRequest request) {
+        String username = normalizeUsername(body.username());
+        if (username == null || !accountDeletionService.deleteWithCredentials(username, value(body.password()))) {
+            return bad("아이디 또는 비밀번호가 올바르지 않습니다.");
+        }
+        HttpSession session = request.getSession(false);
+        if (session != null) session.invalidate();
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
     @GetMapping("/check-username")
     public Map<String, Boolean> checkUsername(@RequestParam String username) {
         String normalized = normalizeUsername(username);
@@ -126,6 +155,7 @@ public class AuthController {
         body.put("id", user.getId());
         body.put("username", user.getUsername());
         body.put("nickname", user.getNickname());
+        body.put("email", maskEmail(user.getEmailEncrypted()));
         body.put("profileImageUrl", user.getProfileImageUrl());
         return body;
     }
@@ -137,6 +167,15 @@ public class AuthController {
 
     private static String value(String value) { return value == null ? "" : value; }
 
+    private String maskEmail(String encryptedEmail) {
+        if (encryptedEmail == null) return null;
+        String email = emailCrypto.decrypt(encryptedEmail);
+        int at = email.indexOf('@');
+        return at < 1 ? "***" : email.charAt(0) + "***" + email.substring(at);
+    }
+
     record LoginRequest(String username, String password) {}
     record SignupRequest(String username, String email, String password, String passwordConfirm, String nickname) {}
+    record DeleteRequest(String password) {}
+    record ExternalDeleteRequest(String username, String password) {}
 }

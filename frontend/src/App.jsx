@@ -7,6 +7,7 @@ import NewsCard from './components/NewsCard'
 import Footer from './components/Footer'
 import BottomNav from './components/BottomNav'
 import LoginScreen from './components/LoginScreen'
+import AccountManagement from './components/AccountManagement'
 
 const API_BASE = '/api/briefing'
 
@@ -57,10 +58,11 @@ export default function App() {
 
   return (
     <>
-      <Navbar user={user} onLogout={() => setUser(null)} />
+      <Navbar user={user} onLogout={() => setUser(null)} onAccountClick={() => setActiveMenu('account')} />
       <div className={s.layout}>
-        <Sidebar activeMenu={activeMenu} onMenuChange={setActiveMenu} />
+        <Sidebar activeMenu={activeMenu} onMenuChange={setActiveMenu} onAccountClick={() => setActiveMenu('account')} />
         <main className={s.main}>
+          {activeMenu === 'account' && <AccountManagement user={user} onDeleted={() => setUser(null)} />}
           {activeMenu === 'news' && <HeroSection />}
           {activeMenu === 'stock' && (
             <section className={s.loanHero}>
@@ -78,7 +80,7 @@ export default function App() {
               <p className={s.loanMessage}>대출계산기는 업데이트중이예요.</p>
             </div>
           )}
-          {activeMenu !== 'loan' && (
+          {activeMenu !== 'loan' && activeMenu !== 'account' && (
             <>
               {loading && (
                 <div className={s.status}>

@@ -1,6 +1,6 @@
 import s from './Navbar.module.css'
 
-export default function Navbar({ user, onLogout }) {
+export default function Navbar({ user, onLogout, onAccountClick }) {
   const logout = () =>
     fetch('/api/auth/logout', { method: 'POST' })
       .then(() => { onLogout(); window.location.href = '/' })
@@ -12,7 +12,7 @@ export default function Navbar({ user, onLogout }) {
         Thoth
       </div>
       <div className={s.auth}>
-        <span className={s.userName}>{user.nickname || user.name || user.phone}</span>
+        <button className={s.userName} onClick={onAccountClick}>{user.nickname || user.username}</button>
         <button className={s.logoutBtn} onClick={logout}>로그아웃</button>
       </div>
     </nav>
