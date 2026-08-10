@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class FrontendRouteController {
 
-    @GetMapping({"/privacy", "/privacy/", "/delete-account", "/delete-account/"})
+    @GetMapping({"/privacy", "/privacy/", "/delete-account", "/delete-account/", "/contact", "/contact/"})
     public String privacy() {
         return "forward:/index.html";
     }
