@@ -1,0 +1,9 @@
+{
+  "appId": "com.torth.app",
+  "appName": "Thoth",
+  "webDir": "dist",
+  "server": {
+    "url": "https://economic-beginner.com",
+    "cleartext": false
+  }
+}

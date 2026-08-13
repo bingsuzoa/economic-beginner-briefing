@@ -21,6 +21,8 @@ build/
 # Frontend
 node_modules/
 frontend/dist/
+/dist/
+/local.properties
 
 # Server logs (NSSM AppStdout/AppStderr)
 logs/
