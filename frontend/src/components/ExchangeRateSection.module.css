@@ -7,6 +7,10 @@
   animation: fadeInUp 0.45s ease both;
 }
 .message { text-align: center; padding: 32px 12px; color: var(--color-text-secondary); }
+.currencies { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 24px; }
+.currencies button { border: 1px solid #e5e5e5; border-radius: 12px; padding: 11px; background: #fff; color: var(--color-text); font: inherit; font-weight: 700; cursor: pointer; }
+.currencies button[aria-pressed='true'] { background: var(--color-primary-light); border-color: var(--color-primary-dark); }
+.currencies button:focus-visible { outline: 3px solid #228be6; outline-offset: 2px; }
 .header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
 .eyebrow { font-weight: 700; margin-bottom: 4px; }
 .header h2 { font-size: clamp(2rem, 5vw, 2.8rem); line-height: 1.2; margin-bottom: 8px; }

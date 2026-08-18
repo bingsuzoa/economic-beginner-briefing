@@ -17,26 +17,30 @@ class KoreaEximExchangeRateClientTest {
             new ObjectMapper());
 
     @Test
-    void extractsUsdDealBaseRateRegardlessOfArrayOrderAndComma() throws Exception {
+    void extractsSupportedRatesInOneResponseAndKeepsJpyHundredUnit() throws Exception {
         String body = """
                 [
                   {"result":1,"cur_unit":"EUR","deal_bas_r":"1,620.10"},
+                  {"result":1,"cur_unit":"JPY(100)","deal_bas_r":"920.50"},
                   {"result":1,"cur_unit":"USD","deal_bas_r":"1,380.20"}
                 ]
                 """;
 
-        assertEquals("1380.20", client.parseUsdRate(body).orElseThrow().toPlainString());
+        var rates = client.parseRates(body);
+        assertEquals("1380.20", rates.get(SupportedCurrency.USD).toPlainString());
+        assertEquals("920.50", rates.get(SupportedCurrency.JPY).toPlainString());
+        assertEquals(100, SupportedCurrency.JPY.unit());
     }
 
     @Test
     void emptyResponseIsAValidNonBusinessDay() throws Exception {
-        assertEquals(true, client.parseUsdRate("null").isEmpty());
-        assertEquals(true, client.parseUsdRate("[]").isEmpty());
+        assertEquals(true, client.parseRates("null").isEmpty());
+        assertEquals(true, client.parseRates("[]").isEmpty());
     }
 
     @Test
     void apiErrorCodeFailsFast() {
         assertThrows(KoreaEximExchangeRateClient.ExchangeRateFetchException.class,
-                () -> client.parseUsdRate("[{\"result\":4}]"));
+                () -> client.parseRates("[{\"result\":4}]"));
     }
 }

@@ -10,7 +10,8 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Optional;
+import java.util.EnumMap;
+import java.util.Map;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,7 +44,7 @@ public class KoreaEximExchangeRateClient {
         this.httpClient = httpClient;
     }
 
-    public Optional<BigDecimal> fetchUsdRate(LocalDate date) {
+    public Map<SupportedCurrency, BigDecimal> fetchRates(LocalDate date) {
         if (properties.apiKey() == null || properties.apiKey().isBlank()) {
             throw new ExchangeRateFetchException("KOREA_EXIM_API_KEY is not configured");
         }
@@ -60,10 +61,9 @@ public class KoreaEximExchangeRateClient {
                 throw new ExchangeRateFetchException("Korea Exim API returned HTTP " + response.statusCode());
             }
 
-            Optional<BigDecimal> rate = parseUsdRate(response.body());
-            log.info("[ExchangeRate] API call succeeded date={} usdFound={} usdRate={}",
-                    date, rate.isPresent(), rate.map(BigDecimal::toPlainString).orElse("none"));
-            return rate;
+            Map<SupportedCurrency, BigDecimal> rates = parseRates(response.body());
+            log.info("[ExchangeRate] API call succeeded date={} currencies={}", date, rates.keySet());
+            return rates;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ExchangeRateFetchException("Korea Exim API call interrupted", e);
@@ -72,30 +72,33 @@ public class KoreaEximExchangeRateClient {
         }
     }
 
-    Optional<BigDecimal> parseUsdRate(String body) throws IOException {
+    Map<SupportedCurrency, BigDecimal> parseRates(String body) throws IOException {
         JsonNode root = objectMapper.readTree(body);
         if (root == null || root.isNull() || (root.isArray() && root.isEmpty())) {
-            return Optional.empty();
+            return Map.of();
         }
         if (!root.isArray()) {
             throw new ExchangeRateFetchException("Unexpected Korea Exim API response");
         }
 
         log.info("[ExchangeRate] API response count={}", root.size());
+        Map<SupportedCurrency, BigDecimal> rates = new EnumMap<>(SupportedCurrency.class);
         for (JsonNode item : root) {
             int result = item.path("result").asInt(1);
             if (result != 1) {
                 throw new ExchangeRateFetchException("Korea Exim API result code=" + result);
             }
-            if ("USD".equals(item.path("cur_unit").asText())) {
-                String rawRate = item.path("deal_bas_r").asText();
-                if (rawRate.isBlank()) {
-                    throw new ExchangeRateFetchException("USD deal_bas_r is empty");
+            for (SupportedCurrency currency : SupportedCurrency.values()) {
+                if (currency.apiCode().equals(item.path("cur_unit").asText())) {
+                    String rawRate = item.path("deal_bas_r").asText();
+                    if (rawRate.isBlank()) {
+                        throw new ExchangeRateFetchException(currency.name() + " deal_bas_r is empty");
+                    }
+                    rates.put(currency, new BigDecimal(rawRate.replace(",", "")));
                 }
-                return Optional.of(new BigDecimal(rawRate.replace(",", "")));
             }
         }
-        return Optional.empty();
+        return rates;
     }
 
     private URI requestUri(LocalDate date) {

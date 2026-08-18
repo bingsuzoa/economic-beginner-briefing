@@ -40,12 +40,13 @@ class ExchangeRateServiceTest {
                 "USD", "KRW", LocalDate.of(2026, 7, 17), LocalDate.of(2026, 8, 17)))
                 .thenReturn(List.of(friday, monday));
 
-        var response = service.getUsdKrw(ExchangeRatePeriod.M1);
+        var response = service.getRate(SupportedCurrency.USD, ExchangeRatePeriod.M1);
 
         assertEquals(new BigDecimal("1370.00"), response.previousRate());
         assertEquals(new BigDecimal("10.00"), response.changeAmount());
         assertEquals(new BigDecimal("1375.00"), response.averageRate());
-        assertEquals("KRW_WEAK", response.trend());
+        assertEquals("WEAK", response.krwTrend());
+        assertEquals("STRONG", response.foreignCurrencyTrend());
     }
 
     @Test
@@ -58,31 +59,36 @@ class ExchangeRateServiceTest {
                 "USD", "KRW", LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 17)))
                 .thenReturn(List.of(start, current));
 
-        assertEquals("KRW_STRONG", service.getUsdKrw(ExchangeRatePeriod.W1).trend());
+        assertEquals("STRONG", service.getRate(SupportedCurrency.USD, ExchangeRatePeriod.W1).krwTrend());
     }
 
     @Test
     void savesParsedRateAndSkipsMissingOrDuplicateData() {
         LocalDate date = LocalDate.of(2026, 8, 18);
-        when(client.fetchUsdRate(date)).thenReturn(Optional.of(new BigDecimal("1380.20")));
-        assertTrue(service.collect(date));
+        when(client.fetchRates(date)).thenReturn(java.util.Map.of(
+                SupportedCurrency.USD, new BigDecimal("1380.20"),
+                SupportedCurrency.JPY, new BigDecimal("920.50")));
+        assertEquals(2, service.collect(date));
 
         var saved = ArgumentCaptor.forClass(ExchangeRateEntity.class);
-        verify(repository).save(saved.capture());
-        assertEquals(new BigDecimal("1380.20"), saved.getValue().getRate());
+        verify(repository, org.mockito.Mockito.times(2)).save(saved.capture());
+        assertEquals(List.of("USD", "JPY"), saved.getAllValues().stream()
+                .map(ExchangeRateEntity::getBaseCurrency).toList());
 
         LocalDate holiday = date.minusDays(3);
-        when(client.fetchUsdRate(holiday)).thenReturn(Optional.empty());
-        assertFalse(service.collect(holiday));
+        when(client.fetchRates(holiday)).thenReturn(java.util.Map.of());
+        assertEquals(0, service.collect(holiday));
 
         LocalDate duplicate = date.minusDays(1);
         when(repository.existsByRateDateAndBaseCurrencyAndQuoteCurrency(duplicate, "USD", "KRW"))
                 .thenReturn(true);
-        assertFalse(service.collect(duplicate));
-        verify(client, never()).fetchUsdRate(duplicate);
+        when(repository.existsByRateDateAndBaseCurrencyAndQuoteCurrency(duplicate, "JPY", "KRW"))
+                .thenReturn(true);
+        assertEquals(0, service.collect(duplicate));
+        verify(client, never()).fetchRates(duplicate);
     }
 
     private static ExchangeRateEntity rate(String date, String value) {
-        return new ExchangeRateEntity(LocalDate.parse(date), new BigDecimal(value));
+        return new ExchangeRateEntity(LocalDate.parse(date), SupportedCurrency.USD, new BigDecimal(value));
     }
 }

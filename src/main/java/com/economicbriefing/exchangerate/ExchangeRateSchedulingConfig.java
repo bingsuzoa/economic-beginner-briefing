@@ -35,7 +35,7 @@ public class ExchangeRateSchedulingConfig implements SchedulingConfigurer {
         registrar.addCronTask(new CronTask(() -> {
             LocalDate date = LocalDate.now(ExchangeRateService.KST);
             try {
-                boolean inserted = service.collect(date);
+                int inserted = service.collect(date);
                 log.info("[ExchangeRate] Scheduler finished date={} inserted={}", date, inserted);
             } catch (Exception e) {
                 log.error("[ExchangeRate] Scheduler failed date={}", date, e);

@@ -36,6 +36,9 @@ public class ExchangeRateEntity {
     @Column(nullable = false, precision = 18, scale = 6)
     private BigDecimal rate;
 
+    @Column(nullable = false)
+    private int unit;
+
     @Column(nullable = false, length = 32)
     private String source;
 
@@ -47,11 +50,12 @@ public class ExchangeRateEntity {
 
     protected ExchangeRateEntity() {}
 
-    public ExchangeRateEntity(LocalDate rateDate, BigDecimal rate) {
+    public ExchangeRateEntity(LocalDate rateDate, SupportedCurrency currency, BigDecimal rate) {
         this.rateDate = rateDate;
         this.rate = rate;
-        this.baseCurrency = "USD";
+        this.baseCurrency = currency.name();
         this.quoteCurrency = "KRW";
+        this.unit = currency.unit();
         this.source = "KOREA_EXIM";
     }
 
@@ -72,6 +76,7 @@ public class ExchangeRateEntity {
     public String getBaseCurrency() { return baseCurrency; }
     public String getQuoteCurrency() { return quoteCurrency; }
     public BigDecimal getRate() { return rate; }
+    public int getUnit() { return unit; }
     public String getSource() { return source; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }

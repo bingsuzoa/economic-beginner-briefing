@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -22,13 +23,15 @@ public class ExchangeRateController {
         this.service = service;
     }
 
-    @GetMapping("/api/exchange-rate/usd-krw")
-    public ResponseEntity<ApiResponse<?>> getUsdKrw(
+    @GetMapping("/api/exchange-rate/{currency}")
+    public ResponseEntity<ApiResponse<?>> getRate(
+            @PathVariable String currency,
             @RequestParam(defaultValue = "1M") String period) {
         try {
-            return ResponseEntity.ok(ApiResponse.ok(service.getUsdKrw(ExchangeRatePeriod.from(period))));
+            return ResponseEntity.ok(ApiResponse.ok(service.getRate(
+                    SupportedCurrency.from(currency), ExchangeRatePeriod.from(period))));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error("INVALID_PERIOD", e.getMessage()));
+            return ResponseEntity.badRequest().body(ApiResponse.error("INVALID_EXCHANGE_RATE_REQUEST", e.getMessage()));
         }
     }
 

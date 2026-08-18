@@ -5,7 +5,9 @@ import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -18,7 +20,6 @@ public class ExchangeRateService {
 
     static final ZoneId KST = ZoneId.of("Asia/Seoul");
     static final BigDecimal NEUTRAL_PERCENT = new BigDecimal("0.1");
-    private static final String BASE = "USD";
     private static final String QUOTE = "KRW";
     private static final Logger log = LoggerFactory.getLogger(ExchangeRateService.class);
 
@@ -31,25 +32,40 @@ public class ExchangeRateService {
         this.client = client;
     }
 
-    public boolean collect(LocalDate date) {
-        if (repository.existsByRateDateAndBaseCurrencyAndQuoteCurrency(date, BASE, QUOTE)) {
-            log.info("[ExchangeRate] DB SKIP date={} reason=already-exists", date);
-            return false;
+    public int collect(LocalDate date) {
+        List<SupportedCurrency> missing = Arrays.stream(SupportedCurrency.values())
+                .filter(currency -> !repository.existsByRateDateAndBaseCurrencyAndQuoteCurrency(
+                        date, currency.name(), QUOTE))
+                .toList();
+        if (missing.isEmpty()) {
+            log.info("[ExchangeRate] DB SKIP date={} reason=all-currencies-exist", date);
+            return 0;
         }
 
-        return client.fetchUsdRate(date).map(rate -> {
-            try {
-                repository.save(new ExchangeRateEntity(date, rate));
-                log.info("[ExchangeRate] DB INSERT date={} rate={}", date, rate);
-                return true;
-            } catch (DataIntegrityViolationException e) {
-                log.info("[ExchangeRate] DB SKIP date={} reason=concurrent-duplicate", date);
-                return false;
-            }
-        }).orElseGet(() -> {
+        Map<SupportedCurrency, BigDecimal> rates = client.fetchRates(date);
+        if (rates.isEmpty()) {
             log.info("[ExchangeRate] Non-business-day SKIP date={}", date);
-            return false;
-        });
+            return 0;
+        }
+
+        int inserted = 0;
+        for (SupportedCurrency currency : missing) {
+            BigDecimal rate = rates.get(currency);
+            if (rate == null) {
+                log.info("[ExchangeRate] Currency SKIP date={} currency={} reason=no-data", date, currency);
+                continue;
+            }
+            try {
+                repository.save(new ExchangeRateEntity(date, currency, rate));
+                inserted++;
+                log.info("[ExchangeRate] DB INSERT date={} currency={} unit={} rate={}",
+                        date, currency, currency.unit(), rate);
+            } catch (DataIntegrityViolationException e) {
+                log.info("[ExchangeRate] DB SKIP date={} currency={} reason=concurrent-duplicate",
+                        date, currency);
+            }
+        }
+        return inserted;
     }
 
     public boolean startOneYearBackfill() {
@@ -75,21 +91,24 @@ public class ExchangeRateService {
                 skipped++;
                 continue;
             }
-            if (collect(date)) inserted++; else skipped++;
+            int saved = collect(date);
+            inserted += saved;
+            if (saved == 0) skipped++;
         }
         log.info("[ExchangeRate] Initial backfill finished inserted={} skipped={}", inserted, skipped);
     }
 
-    public ExchangeRateResponse getUsdKrw(ExchangeRatePeriod period) {
+    public ExchangeRateResponse getRate(SupportedCurrency currency, ExchangeRatePeriod period) {
+        String base = currency.name();
         List<ExchangeRateEntity> latest = repository
-                .findTop2ByBaseCurrencyAndQuoteCurrencyOrderByRateDateDesc(BASE, QUOTE);
+                .findTop2ByBaseCurrencyAndQuoteCurrencyOrderByRateDateDesc(base, QUOTE);
         if (latest.isEmpty()) throw new ExchangeRateNotReadyException();
 
         ExchangeRateEntity current = latest.get(0);
         BigDecimal previous = latest.size() > 1 ? latest.get(1).getRate() : current.getRate();
         List<ExchangeRateEntity> entities = repository
                 .findByBaseCurrencyAndQuoteCurrencyAndRateDateBetweenOrderByRateDateAsc(
-                        BASE, QUOTE, period.startFrom(current.getRateDate()), current.getRateDate());
+                        base, QUOTE, period.startFrom(current.getRateDate()), current.getRateDate());
         if (entities.isEmpty()) entities = List.of(current);
 
         BigDecimal rate = current.getRate();
@@ -99,14 +118,17 @@ public class ExchangeRateService {
                 .divide(BigDecimal.valueOf(entities.size()), 2, RoundingMode.HALF_UP);
         BigDecimal periodChange = percent(rate.subtract(start), start);
         BigDecimal averageDifference = rate.subtract(average).setScale(2, RoundingMode.HALF_UP);
-        String trend = periodChange.abs().compareTo(NEUTRAL_PERCENT) < 0
-                ? "KRW_NEUTRAL" : periodChange.signum() > 0 ? "KRW_WEAK" : "KRW_STRONG";
+        String krwTrend = periodChange.abs().compareTo(NEUTRAL_PERCENT) < 0
+                ? "NEUTRAL" : periodChange.signum() > 0 ? "WEAK" : "STRONG";
+        String foreignTrend = "NEUTRAL".equals(krwTrend)
+                ? "NEUTRAL" : "WEAK".equals(krwTrend) ? "STRONG" : "WEAK";
 
         return new ExchangeRateResponse(
-                "USD/KRW", current.getRateDate(), rate, previous,
+                currency.name(), currency.displayName(), currency.name() + "/KRW",
+                currency.unit(), currency.unitLabel(), currency.flag(), current.getRateDate(), rate, previous,
                 rate.subtract(previous).setScale(2, RoundingMode.HALF_UP), percent(rate.subtract(previous), previous),
                 period.apiValue(), start, periodChange, average, averageDifference,
-                percent(averageDifference, average), trend,
+                percent(averageDifference, average), krwTrend, foreignTrend,
                 entities.stream().map(e -> new ExchangeRateResponse.HistoryPoint(e.getRateDate(), e.getRate())).toList());
     }
 

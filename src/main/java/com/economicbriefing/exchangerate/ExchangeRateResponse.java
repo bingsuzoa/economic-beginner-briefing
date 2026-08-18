@@ -5,7 +5,12 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record ExchangeRateResponse(
+        String currency,
+        String currencyName,
         String pair,
+        int unit,
+        String unitLabel,
+        String flag,
         LocalDate rateDate,
         BigDecimal currentRate,
         BigDecimal previousRate,
@@ -17,7 +22,8 @@ public record ExchangeRateResponse(
         BigDecimal averageRate,
         BigDecimal differenceFromAverage,
         BigDecimal differenceFromAveragePercent,
-        String trend,
+        String krwTrend,
+        String foreignCurrencyTrend,
         List<HistoryPoint> history
 ) {
     public record HistoryPoint(LocalDate date, BigDecimal rate) {}
