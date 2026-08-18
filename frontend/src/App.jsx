@@ -8,6 +8,7 @@ import Footer from './components/Footer'
 import BottomNav from './components/BottomNav'
 import LoginScreen from './components/LoginScreen'
 import AccountManagement from './components/AccountManagement'
+import ExchangeRateSection from './components/ExchangeRateSection'
 
 const API_BASE = '/api/briefing'
 
@@ -19,7 +20,7 @@ export default function App() {
   const [news, setNews] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [activeMenu, setActiveMenu] = useState('news')
+  const [activeMenu, setActiveMenu] = useState('home')
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -29,7 +30,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const titles = { news: 'Thoth - 오늘의 토트', stock: 'Thoth - 주식', realestate: 'Thoth - 부동산', loan: 'Thoth - 대출계산기' }
+    const titles = { home: 'Thoth - 홈', news: 'Thoth - 오늘의 토트', stock: 'Thoth - 주식', realestate: 'Thoth - 부동산' }
     document.title = titles[activeMenu] || 'Thoth'
   }, [activeMenu])
 
@@ -63,6 +64,7 @@ export default function App() {
         <Sidebar activeMenu={activeMenu} onMenuChange={setActiveMenu} onAccountClick={() => setActiveMenu('account')} />
         <main className={s.main}>
           {activeMenu === 'account' && <AccountManagement user={user} onDeleted={() => setUser(null)} />}
+          {activeMenu === 'home' && <ExchangeRateSection />}
           {activeMenu === 'news' && <HeroSection />}
           {activeMenu === 'stock' && (
             <section className={s.loanHero}>
@@ -74,13 +76,7 @@ export default function App() {
               <img src="/images/realestate-hero.png" alt="부동산" className={s.loanImage} />
             </section>
           )}
-          {activeMenu === 'loan' && (
-            <div className={s.loanHero}>
-              <img src="/images/loan-hero.png" alt="대출계산기" className={s.loanImage} />
-              <p className={s.loanMessage}>대출계산기는 업데이트중이예요.</p>
-            </div>
-          )}
-          {activeMenu !== 'loan' && activeMenu !== 'account' && (
+          {['news', 'stock', 'realestate'].includes(activeMenu) && (
             <>
               {loading && (
                 <div className={s.status}>

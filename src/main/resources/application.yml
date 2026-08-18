@@ -117,6 +117,15 @@ admin:
   token: ${ADMIN_TOKEN:}
   default-page-size: 20
 
+exchange-rate:
+  korea-exim:
+    api-key: ${KOREA_EXIM_API_KEY:}
+    api-url: https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON
+    timeout: 15s
+    scheduler-enabled: ${EXCHANGE_RATE_SCHEDULER_ENABLED:true}
+    # Official data is unavailable before 11:00 KST; collect at noon on weekdays.
+    scheduler-cron: ${EXCHANGE_RATE_SCHEDULER_CRON:0 0 12 * * MON-FRI}
+
 logging:
   level:
     root: INFO

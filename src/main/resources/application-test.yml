@@ -29,3 +29,7 @@ server:
 admin:
   token: test-admin-token
   default-page-size: 20
+
+exchange-rate:
+  korea-exim:
+    scheduler-enabled: false
