@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import s from './ExchangeRateSection.module.css'
-import { exchangeRateData, EXCHANGE_RATE_PERIODS, getExchangeRateSummary } from '../data/exchangeRate'
+import { EXCHANGE_RATE_PERIODS, fetchExchangeRate } from '../data/exchangeRate'
 
 const formatRate = (value) => value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const formatPercent = (value) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
@@ -36,7 +36,9 @@ function RateChart({ points, average }) {
   const min = Math.min(...rates, average)
   const max = Math.max(...rates, average)
   const range = max - min || 1
-  const x = (index) => padding + (index / (points.length - 1)) * (width - padding * 2)
+  const x = (index) => points.length === 1
+    ? width / 2
+    : padding + (index / (points.length - 1)) * (width - padding * 2)
   const y = (rate) => height - padding - ((rate - min) / range) * (height - padding * 2)
   const line = points.map((point, index) => `${x(index)},${y(point.rate)}`).join(' ')
   const averageY = y(average)
@@ -58,28 +60,41 @@ function RateChart({ points, average }) {
 
 export default function ExchangeRateSection() {
   const [periodKey, setPeriodKey] = useState('month')
-  const summary = useMemo(() => getExchangeRateSummary(exchangeRateData, periodKey), [periodKey])
-  const dailyDifference = exchangeRateData.currentRate - exchangeRateData.previousRate
-  const dailyPercent = (dailyDifference / exchangeRateData.previousRate) * 100
-  const rising = dailyDifference >= 0
-  const averagePosition = summary.averageDifference >= 0 ? '높아요' : '낮아요'
-  const trend = summary.direction === 'weak' ? '원화 약세' : summary.direction === 'strong' ? '원화 강세' : '중립'
-  const isNeutral = summary.direction === 'neutral'
-  const exampleStart = Math.round(summary.current / 100) * 100
-  const exampleEnd = summary.direction === 'strong' ? exampleStart - 80 : exampleStart + 80
-  const currentImpacts = impacts[summary.direction] || impacts.weak
+  const [data, setData] = useState(null)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let active = true
+    setError(null)
+    fetchExchangeRate(periodKey)
+      .then((result) => active && setData(result))
+      .catch((err) => active && setError(err.message))
+    return () => { active = false }
+  }, [periodKey])
+
+  if (!data && !error) return <section className={s.section}><p className={s.message}>🐥 환율 정보를 불러오고 있어요...</p></section>
+  if (error) return <section className={s.section}><p className={s.message}>환율 정보를 불러오지 못했어요.<br />잠시 후 다시 확인해주세요.</p></section>
+
+  const direction = data.trend === 'KRW_WEAK' ? 'weak' : data.trend === 'KRW_STRONG' ? 'strong' : 'neutral'
+  const rising = data.changeAmount >= 0
+  const averagePosition = data.differenceFromAverage >= 0 ? '높아요' : '낮아요'
+  const trend = direction === 'weak' ? '원화 약세' : direction === 'strong' ? '원화 강세' : '중립'
+  const isNeutral = direction === 'neutral'
+  const exampleStart = Math.round(data.currentRate / 100) * 100
+  const exampleEnd = direction === 'strong' ? exampleStart - 80 : exampleStart + 80
+  const currentImpacts = impacts[direction] || impacts.weak
 
   return (
     <section className={s.section} aria-labelledby="exchange-rate-title">
       <header className={s.header}>
         <div>
           <p className={s.eyebrow}>🇺🇸 원/달러 환율</p>
-          <h2 id="exchange-rate-title">{formatRate(exchangeRateData.currentRate)}원</h2>
+          <h2 id="exchange-rate-title">{formatRate(data.currentRate)}원</h2>
           <p className={rising ? s.up : s.down}>
-            {rising ? '▲ 상승' : '▼ 하락'} {formatRate(Math.abs(dailyDifference))}원 ({formatPercent(dailyPercent)}) <span>전일 대비</span>
+            {rising ? '▲ 상승' : '▼ 하락'} {formatRate(Math.abs(data.changeAmount))}원 ({formatPercent(data.changePercent)}) <span>전 영업일 대비</span>
           </p>
         </div>
-        <p className={s.updated}>2026. 8. 18. 기준 · 예시 데이터</p>
+        <p className={s.updated}>{data.rateDate.replaceAll('-', '. ')}. 기준 · 한국수출입은행</p>
       </header>
 
       <div className={s.periods} aria-label="환율 조회 기간">
@@ -88,18 +103,18 @@ export default function ExchangeRateSection() {
         ))}
       </div>
 
-      <RateChart points={summary.points} average={summary.average} />
+      <RateChart points={data.history} average={data.averageRate} />
 
       <div className={s.stats} aria-live="polite">
-        <div><span>최근 {summary.period.label} 변화</span><strong className={summary.periodChangePercent >= 0 ? s.up : s.down}>{formatPercent(summary.periodChangePercent)}</strong></div>
-        <div><span>최근 {summary.period.label} 평균</span><strong>{formatRate(summary.average)}원</strong></div>
-        <div><span>평균 대비 현재</span><strong>{formatRate(Math.abs(summary.averageDifference))}원 {averagePosition} ({formatPercent(summary.averageDifferencePercent)})</strong></div>
+        <div><span>최근 {EXCHANGE_RATE_PERIODS[periodKey].label} 변화</span><strong className={data.periodChangePercent >= 0 ? s.up : s.down}>{formatPercent(data.periodChangePercent)}</strong></div>
+        <div><span>최근 {EXCHANGE_RATE_PERIODS[periodKey].label} 평균</span><strong>{formatRate(data.averageRate)}원</strong></div>
+        <div><span>평균 대비 현재</span><strong>{formatRate(Math.abs(data.differenceFromAverage))}원 {averagePosition} ({formatPercent(data.differenceFromAveragePercent)})</strong></div>
       </div>
 
       <div className={s.explainGrid}>
         <article className={s.explanation}>
           <h3>🐥 {isNeutral ? '최근에는 큰 방향성 없이 움직이고 있어요' : `지금은 ${trend} 흐름이에요`}</h3>
-          <p>{summary.direction === 'strong'
+          <p>{direction === 'strong'
             ? '1달러를 사는 데 필요한 원화가 줄고 있어요. 달러의 가치는 낮아지고, 원화의 가치는 상대적으로 올라가고 있다는 뜻이에요.'
             : isNeutral
               ? '선택한 기간의 시작과 지금을 비교했을 때 환율 변화가 0.1% 미만이에요.'
