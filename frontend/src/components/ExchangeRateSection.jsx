@@ -113,7 +113,9 @@ export default function ExchangeRateSection() {
 
       <div className={s.explainGrid}>
         <article className={s.explanation}>
-          <h3>🐥 {isNeutral ? '최근에는 큰 방향성 없이 움직이고 있어요' : `지금은 ${trend} 흐름이에요`}</h3>
+          <h3>🐥 {isNeutral
+            ? `최근 ${EXCHANGE_RATE_PERIODS[periodKey].label} 기준 큰 방향성 없이 움직이고 있어요`
+            : `최근 ${EXCHANGE_RATE_PERIODS[periodKey].label} 기준 ${trend} 흐름이에요`}</h3>
           <p>{direction === 'strong'
             ? '1달러를 사는 데 필요한 원화가 줄고 있어요. 달러의 가치는 낮아지고, 원화의 가치는 상대적으로 올라가고 있다는 뜻이에요.'
             : isNeutral
