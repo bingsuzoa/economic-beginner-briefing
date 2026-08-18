@@ -8,6 +8,7 @@ import Footer from './components/Footer'
 import BottomNav from './components/BottomNav'
 import LoginScreen from './components/LoginScreen'
 import AccountManagement from './components/AccountManagement'
+import ExchangeRateSection from './components/ExchangeRateSection'
 
 const API_BASE = '/api/briefing'
 
@@ -63,7 +64,12 @@ export default function App() {
         <Sidebar activeMenu={activeMenu} onMenuChange={setActiveMenu} onAccountClick={() => setActiveMenu('account')} />
         <main className={s.main}>
           {activeMenu === 'account' && <AccountManagement user={user} onDeleted={() => setUser(null)} />}
-          {activeMenu === 'news' && <HeroSection />}
+          {activeMenu === 'news' && (
+            <>
+              <ExchangeRateSection />
+              <HeroSection />
+            </>
+          )}
           {activeMenu === 'stock' && (
             <section className={s.loanHero}>
               <img src="/images/stock-hero.png" alt="주식" className={s.loanImage} />
