@@ -9,8 +9,12 @@ import java.util.stream.Collectors;
 import com.economicbriefing.analyzer.NewsAnalyzer;
 import com.economicbriefing.analyzer.dto.AnalyzeNewsRequest;
 import com.economicbriefing.analyzer.dto.AnalyzeNewsResult;
+import com.economicbriefing.analyzer.dto.ArticleValidationResult;
 import com.economicbriefing.analyzer.openai.dto.AiResponse;
+import com.economicbriefing.analyzer.openai.dto.ArticleAnalysisResponse;
 import com.economicbriefing.analyzer.openai.prompt.AnalysisPromptBuilder;
+import com.economicbriefing.analyzer.openai.prompt.ArticleAnalyzerPromptBuilder;
+import com.economicbriefing.analyzer.openai.prompt.ArticleValidatorPromptBuilder;
 import com.economicbriefing.analyzer.openai.prompt.SystemPromptBuilder;
 import com.economicbriefing.analyzer.openai.util.BriefingBuilder;
 import com.economicbriefing.analyzer.openai.util.RetryExecutor;
@@ -36,16 +40,19 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
     private final ObjectMapper objectMapper;
     private final OpenAiProperties openAiProperties;
     private final AppProperties appProperties;
+    private final ArticleBodyFetcher articleBodyFetcher;
 
     public OpenAiNewsAnalyzer(
             OpenAiClient aiClient,
             ObjectMapper objectMapper,
             OpenAiProperties openAiProperties,
-            AppProperties appProperties) {
+            AppProperties appProperties,
+            ArticleBodyFetcher articleBodyFetcher) {
         this.aiClient = aiClient;
         this.objectMapper = objectMapper;
         this.openAiProperties = openAiProperties;
         this.appProperties = appProperties;
+        this.articleBodyFetcher = articleBodyFetcher;
     }
 
     @Override
@@ -54,7 +61,7 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
             throw new AnalyzeException(ErrorCode.ANALYZE_EMPTY_INPUT);
         }
 
-        log.info("Starting AI analysis (2-stage): articles={}, targetDate={}, maxNews={}",
+        log.info("Starting AI analysis (3-stage): articles={}, targetDate={}, maxNews={}",
                 request.articles().size(), request.targetDate(), request.maxSelectedNews());
 
         // Stage 1: Selection
@@ -81,18 +88,51 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                         a -> a
                 ));
 
-        List<com.economicbriefing.domain.article.Article> selectedArticles = selectedIds.stream()
+        List<com.economicbriefing.domain.article.Article> selectedArticles = articleBodyFetcher.enrich(selectedIds.stream()
                 .map(articleMap::get)
                 .filter(a -> a != null)
-                .toList();
+                .toList());
 
-        // Stage 2: Analysis
-        log.info("Stage 2: Analyzing selected articles...");
+        // Stage 2: Article analysis
+        log.info("Stage 2: Structuring selected article evidence...");
+        String articleAnalyzerPrompt = ArticleAnalyzerPromptBuilder.build(selectedArticles);
+        ArticleAnalysisResponse articleAnalysis = RetryExecutor.execute(
+                () -> callAndParseArticleAnalysis(articleAnalyzerPrompt, selectedArticles),
+                appProperties.retry()
+        );
+        String articleAnalysisJson = toJson(articleAnalysis);
+        String validationPrompt = ArticleValidatorPromptBuilder.build(selectedArticles, articleAnalysisJson);
+        ArticleValidationResult itemValidation = RetryExecutor.execute(
+                () -> callAndParseValidation(
+                        ArticleValidatorPromptBuilder.ITEM_VALIDATION_SYSTEM_PROMPT,
+                        validationPrompt, selectedArticles, articleAnalysis,
+                        Set.of(ArticleValidationResult.FindingType.WRONG_TYPE,
+                                ArticleValidationResult.FindingType.WRONG_SPEAKER,
+                                ArticleValidationResult.FindingType.UNSUPPORTED,
+                                ArticleValidationResult.FindingType.INACCURATE)),
+                appProperties.retry()
+        );
+        ArticleValidationResult missingReview = RetryExecutor.execute(
+                () -> callAndParseValidation(
+                        ArticleValidatorPromptBuilder.MISSING_REVIEW_SYSTEM_PROMPT,
+                        validationPrompt, selectedArticles, articleAnalysis,
+                        Set.of(ArticleValidationResult.FindingType.MISSING)),
+                appProperties.retry()
+        );
+        ArticleValidationResult validation = ArticleValidationMerger.merge(
+                selectedArticles, articleAnalysis, itemValidation, missingReview);
+        log.info("Stage 2 completed: structured {} articles, validator findings={}",
+                articleAnalysis.articles().size(),
+                validation.articles().stream().mapToInt(a -> a.findings().size()).sum());
+
+        // Stage 3: Final analysis
+        log.info("Stage 3: Analyzing selected articles...");
         String analysisPrompt = AnalysisPromptBuilder.build(
                 selectedArticles,
                 request.targetDate(),
                 request.maxSelectedNews(),
-                request.audience()
+                request.audience(),
+                articleAnalysisJson
         );
 
         AiResponse aiResponse = RetryExecutor.execute(
@@ -100,7 +140,7 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                 appProperties.retry()
         );
 
-        log.info("Stage 2 completed: analyzed {} news items", aiResponse.news().size());
+        log.info("Stage 3 completed: analyzed {} news items", aiResponse.news().size());
 
         Briefing briefing = BriefingBuilder.build(
                 aiResponse,
@@ -108,7 +148,7 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                 selectedArticles,
                 request.articles().size(),
                 openAiProperties.model(),
-                "v3-2stage",
+                "v4-article-analyzer",
                 request.briefingTitle(),
                 request.targetHour()
         );
@@ -121,7 +161,7 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         log.info("AI analysis completed: selected={}, rejected={}",
                 briefing.news().size(), rejectedArticleIds.size());
 
-        return new AnalyzeNewsResult(briefing, rejectedArticleIds, List.of());
+        return new AnalyzeNewsResult(briefing, rejectedArticleIds, List.of(), validation);
     }
 
     private com.economicbriefing.analyzer.openai.dto.SelectionResponse callAndParseSelection(String userPrompt) {
@@ -135,6 +175,64 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
     private AiResponse callAndParseAnalysis(String userPrompt) {
         String content = aiClient.complete(SystemPromptBuilder.SYSTEM_PROMPT, userPrompt);
         return parseAndValidateAnalysis(content);
+    }
+
+    private ArticleAnalysisResponse callAndParseArticleAnalysis(
+            String userPrompt,
+            List<com.economicbriefing.domain.article.Article> selectedArticles) {
+        String content = aiClient.complete(ArticleAnalyzerPromptBuilder.SYSTEM_PROMPT, userPrompt, 0);
+        try {
+            ArticleAnalysisResponse response = objectMapper.readValue(content, ArticleAnalysisResponse.class);
+            validateArticleAnalysis(response, selectedArticles);
+            return response;
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            log.error("Failed to parse or validate Article Analyzer response", e);
+            throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR, e);
+        }
+    }
+
+    private void validateArticleAnalysis(
+            ArticleAnalysisResponse response,
+            List<com.economicbriefing.domain.article.Article> selectedArticles) {
+        if (response.articles() == null || response.articles().size() != selectedArticles.size()) {
+            throw new IllegalArgumentException("Article Analyzer result count does not match selection");
+        }
+        for (int i = 0; i < selectedArticles.size(); i++) {
+            ArticleAnalysisResponse.ArticleAnalysis analysis = response.articles().get(i);
+            if (analysis == null || !selectedArticles.get(i).id().equals(analysis.articleId())
+                    || analysis.issues() == null || analysis.issues().isEmpty()
+                    || analysis.issues().stream().anyMatch(issue -> issue == null
+                            || issue.name() == null || issue.name().isBlank()
+                            || issue.mainFacts() == null || issue.changes() == null
+                            || issue.relations() == null || issue.statements() == null
+                            || issue.keyTerms() == null)) {
+                throw new IllegalArgumentException("Invalid Article Analyzer result at index " + i);
+            }
+        }
+    }
+
+    private String toJson(ArticleAnalysisResponse response) {
+        try {
+            return objectMapper.writeValueAsString(response);
+        } catch (JsonProcessingException e) {
+            throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR, e);
+        }
+    }
+
+    private ArticleValidationResult callAndParseValidation(
+            String systemPrompt,
+            String userPrompt,
+            List<com.economicbriefing.domain.article.Article> selectedArticles,
+            ArticleAnalysisResponse baseline,
+            Set<ArticleValidationResult.FindingType> allowedTypes) {
+        String content = aiClient.complete(systemPrompt, userPrompt, 0);
+        try {
+            return ArticleValidationIntegrity.parseAndValidate(
+                    objectMapper, content, selectedArticles, baseline, allowedTypes);
+        } catch (Exception e) {
+            log.error("Failed to parse or validate Article Validator response", e);
+            throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR, e);
+        }
     }
 
     private com.economicbriefing.analyzer.openai.dto.SelectionResponse parseSelection(String content) {

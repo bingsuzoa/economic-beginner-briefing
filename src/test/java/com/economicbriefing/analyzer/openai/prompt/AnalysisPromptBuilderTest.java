@@ -25,7 +25,7 @@ class AnalysisPromptBuilderTest {
         );
 
         String prompt = AnalysisPromptBuilder.build(
-                articles, LocalDate.of(2025, 1, 15), 5, audience);
+                articles, LocalDate.of(2025, 1, 15), 5, audience, "{\"articles\":[]}");
 
         assertTrue(prompt.contains("대상 날짜: 2025-01-15"));
         assertTrue(prompt.contains("분석할 기사 수: 2"));
@@ -41,7 +41,7 @@ class AnalysisPromptBuilderTest {
         );
 
         String prompt = AnalysisPromptBuilder.build(
-                articles, LocalDate.of(2025, 1, 15), 5, audience);
+                articles, LocalDate.of(2025, 1, 15), 5, audience, "{\"articles\":[]}");
 
         assertTrue(prompt.contains("경제 지식 수준: 초보자"));
         assertTrue(prompt.contains("interest_rate"));
@@ -59,7 +59,7 @@ class AnalysisPromptBuilderTest {
         );
 
         String prompt = AnalysisPromptBuilder.build(
-                articles, LocalDate.of(2025, 1, 15), 5, audience);
+                articles, LocalDate.of(2025, 1, 15), 5, audience, "{\"articles\":[]}");
 
         // New lightweight one-line format
         assertTrue(prompt.contains("[1] article-1 | 한국은행 | 기준금리 인하 — 기준금리가 인하되었습니다."));
@@ -76,7 +76,7 @@ class AnalysisPromptBuilderTest {
                 "beginner", List.of(NewsCategory.INTEREST_RATE), List.of("테스트"));
 
         String prompt = AnalysisPromptBuilder.build(
-                articles, LocalDate.of(2025, 1, 15), 5, audience);
+                articles, LocalDate.of(2025, 1, 15), 5, audience, "{\"articles\":[]}");
 
         assertTrue(prompt.contains("## 요청사항"));
         assertTrue(prompt.contains("위 각 기사에 대해 순서대로 분석하세요"));

@@ -1,0 +1,36 @@
+{
+  "articles": [{
+    "articleId": "AKR20260816026000002",
+    "issues": [{
+      "name": "ISA 제도 변경",
+      "mainFacts": ["정부는 ISA 납입 한도 이월과 계약기간 변경을 검토하고 있다."],
+      "changes": [
+        {"target":"ISA 납입 한도 이월","before":"이월 불가","after":"이월 가능","status":"PROPOSED"},
+        {"target":"ISA 계약기간","before":"기존 ISA 5년, 생산적 금융 ISA 10년","after":"사실상 무기한 연장 가능","status":"PROPOSED"}
+      ],
+      "relations": [
+        {"from":"ISA 제도 변경","to":"자영업자·프리랜서 불리함 완화","relationType":"PURPOSE","articleExplanation":"불리하고 장기투자와 복리 효과를 떨어뜨릴 수 있다는 지적이 나왔다.","evidenceType":"FACT","speaker":null},
+        {"from":"납입 한도 이월 폐지와 계약기간 제한","to":"장기투자와 복리 효과 저하","relationType":"CLAIMED_EFFECT","articleExplanation":"불리하고 장기투자와 복리 효과를 떨어뜨릴 수 있다는 지적이 나왔다.","evidenceType":"CLAIM","speaker":null}
+      ],
+      "statements": [],
+      "keyTerms": ["ISA", "생산적 금융 ISA"]
+    }, {
+      "name": "부동산 세제 개편",
+      "mainFacts": ["정부안은 종부세 부담 상한을 150%에서 200%로 올리기로 했다."],
+      "changes": [{"target":"종부세 부담 상한","before":"150%","after":"200%","status":"PROPOSED"}],
+      "relations": [],
+      "statements": [],
+      "keyTerms": ["종합부동산세", "세 부담 상한"]
+    }, {
+      "name": "주가 누르기 방지책",
+      "mainFacts": ["정부안은 주가 누르기 추정 요건을 규정했다."],
+      "changes": [],
+      "relations": [
+        {"from":"주가 누르기 방지책","to":"상법·자본시장법 개정안 논의","relationType":"EXPECTED_PROCESS","articleExplanation":"유기적으로 논의할 필요성도 제기된다.","evidenceType":"FACT","speaker":null},
+        {"from":"자본시장법 개정안","to":"기업가치 제고와 주주 보호","relationType":"PURPOSE","articleExplanation":"자본시장 측면의 보완책으로 볼 수 있다.","evidenceType":"FACT","speaker":null}
+      ],
+      "statements": [],
+      "keyTerms": ["주가 누르기 방지책", "PBR", "자본시장법"]
+    }]
+  }]
+}
