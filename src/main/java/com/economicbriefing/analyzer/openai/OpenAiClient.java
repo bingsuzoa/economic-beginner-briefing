@@ -44,13 +44,21 @@ public class OpenAiClient {
         return complete(systemPrompt, userPrompt, properties.model());
     }
 
+    public String complete(String systemPrompt, String userPrompt, double temperature) {
+        return complete(systemPrompt, userPrompt, properties.model(), temperature);
+    }
+
     /**
      * Model override: the teacher stage runs on a cheaper model so it does not eat the
      * main model's token-per-minute budget before the analysis call needs it.
      */
     public String complete(String systemPrompt, String userPrompt, String model) {
+        return complete(systemPrompt, userPrompt, model, properties.temperature());
+    }
+
+    private String complete(String systemPrompt, String userPrompt, String model, double temperature) {
         try {
-            String requestBody = buildRequestBody(systemPrompt, userPrompt, model);
+            String requestBody = buildRequestBody(systemPrompt, userPrompt, model, temperature);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(API_URL))
@@ -138,11 +146,11 @@ public class OpenAiClient {
         }
     }
 
-    private String buildRequestBody(String systemPrompt, String userPrompt, String model) {
+    private String buildRequestBody(String systemPrompt, String userPrompt, String model, double temperature) {
         try {
             ObjectNode root = objectMapper.createObjectNode();
             root.put("model", model);
-            root.put("temperature", properties.temperature());
+            root.put("temperature", temperature);
 
             ObjectNode responseFormat = objectMapper.createObjectNode();
             responseFormat.put("type", "json_object");

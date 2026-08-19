@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Thoth</string>
+    <string name="title_activity_main">Thoth</string>
+    <string name="package_name">com.torth.app</string>
+    <string name="custom_url_scheme">com.torth.app</string>
+</resources>

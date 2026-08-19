@@ -15,7 +15,8 @@ public final class AnalysisPromptBuilder {
             List<Article> articles,
             LocalDate targetDate,
             int maxSelectedNews,
-            AudienceProfile audience) {
+            AudienceProfile audience,
+            String articleAnalysisJson) {
 
         String audienceSection = String.join("\n",
                 "- 경제 지식 수준: " + formatKnowledgeLevel(audience.economicKnowledgeLevel()),
@@ -42,6 +43,12 @@ public final class AnalysisPromptBuilder {
 
                 %s
 
+                ## Article Analyzer 결과
+
+                아래 JSON은 기사 내부 정보만 구조화한 결과입니다. 최종 분석의 사실·관계 근거로 우선 사용하세요.
+
+                %s
+
                 ## 요청사항
                 1. 위 각 기사에 대해 순서대로 분석하세요.
                 2. 각 뉴스에 대해 "오늘 내 돈과 무슨 관련이 있는지"를 경제 초보자가 이해할 수 있도록 해설하세요. 특히 beginnerExplanation에서는 기사 내용을 반복하지 말고, 기사를 이해하기 위해 필요한 경제 원리와 배경지식을 설명하세요.
@@ -53,7 +60,8 @@ public final class AnalysisPromptBuilder {
                         targetDate.toString(),
                         articles.size(),
                         audienceSection,
-                        articlesSection
+                        articlesSection,
+                        articleAnalysisJson
                 );
     }
 

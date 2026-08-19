@@ -7,5 +7,10 @@ import com.economicbriefing.domain.briefing.Briefing;
 public record AnalyzeNewsResult(
     Briefing briefing,
     List<String> rejectedArticleIds,
-    List<String> warnings
-) {}
+    List<String> warnings,
+    ArticleValidationResult validation
+) {
+    public AnalyzeNewsResult(Briefing briefing, List<String> rejectedArticleIds, List<String> warnings) {
+        this(briefing, rejectedArticleIds, warnings, null);
+    }
+}
