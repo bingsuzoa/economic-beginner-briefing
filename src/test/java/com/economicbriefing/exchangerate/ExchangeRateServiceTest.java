@@ -40,10 +40,12 @@ class ExchangeRateServiceTest {
                 "USD", "KRW", LocalDate.of(2026, 7, 17), LocalDate.of(2026, 8, 17)))
                 .thenReturn(List.of(friday, monday));
 
-        var response = service.getRate(SupportedCurrency.USD, ExchangeRatePeriod.M1);
+        var response = service.getHistory(SupportedCurrency.USD, ExchangeRatePeriod.M1);
 
-        assertEquals(new BigDecimal("1370.00"), response.previousRate());
-        assertEquals(new BigDecimal("10.00"), response.changeAmount());
+        assertEquals(new BigDecimal("1380.00"), response.latestDailyRate());
+        assertEquals(new BigDecimal("1370.00"), response.previousDailyRate());
+        assertEquals(new BigDecimal("10.00"), response.dailyChangeAmount());
+        assertEquals(new BigDecimal("1370.00"), response.periodStartRate());
         assertEquals(new BigDecimal("1375.00"), response.averageRate());
         assertEquals("WEAK", response.krwTrend());
         assertEquals("STRONG", response.foreignCurrencyTrend());
@@ -59,7 +61,7 @@ class ExchangeRateServiceTest {
                 "USD", "KRW", LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 17)))
                 .thenReturn(List.of(start, current));
 
-        assertEquals("STRONG", service.getRate(SupportedCurrency.USD, ExchangeRatePeriod.W1).krwTrend());
+        assertEquals("STRONG", service.getHistory(SupportedCurrency.USD, ExchangeRatePeriod.W1).krwTrend());
     }
 
     @Test

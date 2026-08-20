@@ -98,7 +98,7 @@ public class ExchangeRateService {
         log.info("[ExchangeRate] Initial backfill finished inserted={} skipped={}", inserted, skipped);
     }
 
-    public ExchangeRateResponse getRate(SupportedCurrency currency, ExchangeRatePeriod period) {
+    public ExchangeRateResponse getHistory(SupportedCurrency currency, ExchangeRatePeriod period) {
         String base = currency.name();
         List<ExchangeRateEntity> latest = repository
                 .findTop2ByBaseCurrencyAndQuoteCurrencyOrderByRateDateDesc(base, QUOTE);

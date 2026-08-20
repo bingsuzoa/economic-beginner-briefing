@@ -5,8 +5,8 @@ export const EXCHANGE_RATE_PERIODS = {
   year: { label: '1년', apiValue: '1Y' },
 }
 
-export async function fetchExchangeRate(currency, periodKey) {
-  const response = await fetch(`/api/exchange-rate/${currency}?period=${EXCHANGE_RATE_PERIODS[periodKey].apiValue}`)
+export async function fetchExchangeRateHistory(currency, periodKey) {
+  const response = await fetch(`/api/exchange-rate/history/${currency}?period=${EXCHANGE_RATE_PERIODS[periodKey].apiValue}`)
   const body = await response.json()
   if (!response.ok || !body.success) throw new Error(body.message || '환율 정보를 불러오지 못했어요.')
   return body.data
