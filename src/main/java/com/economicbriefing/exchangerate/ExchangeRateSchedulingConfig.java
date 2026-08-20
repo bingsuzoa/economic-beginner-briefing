@@ -7,39 +7,37 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.annotation.SchedulingConfigurer;
-import org.springframework.scheduling.config.CronTask;
-import org.springframework.scheduling.config.ScheduledTaskRegistrar;
-import org.springframework.scheduling.support.CronTrigger;
+import org.springframework.scheduling.annotation.Scheduled;
 
 @Configuration
 @EnableScheduling
-@ConditionalOnProperty(name = "exchange-rate.korea-exim.scheduler-enabled", havingValue = "true")
-public class ExchangeRateSchedulingConfig implements SchedulingConfigurer {
+@ConditionalOnProperty(name = "exchange-rate.fixer.scheduler-enabled", havingValue = "true")
+public class ExchangeRateSchedulingConfig {
 
     private static final Logger log = LoggerFactory.getLogger(ExchangeRateSchedulingConfig.class);
     private final ExchangeRateProperties properties;
-    private final ExchangeRateService service;
+    private final CurrentExchangeRateService currentService;
+    private final ExchangeRateService historyService;
 
-    public ExchangeRateSchedulingConfig(ExchangeRateProperties properties, ExchangeRateService service) {
+    public ExchangeRateSchedulingConfig(ExchangeRateProperties properties,
+            CurrentExchangeRateService currentService, ExchangeRateService historyService) {
         this.properties = properties;
-        this.service = service;
+        this.currentService = currentService;
+        this.historyService = historyService;
     }
 
-    @Override
-    public void configureTasks(ScheduledTaskRegistrar registrar) {
-        if (!properties.schedulerCronValid()) {
-            log.error("[ExchangeRate] Scheduler disabled: invalid cron='{}'", properties.schedulerCron());
-            return;
-        }
-        registrar.addCronTask(new CronTask(() -> {
-            LocalDate date = LocalDate.now(ExchangeRateService.KST);
-            try {
-                int inserted = service.collect(date);
-                log.info("[ExchangeRate] Scheduler finished date={} inserted={}", date, inserted);
-            } catch (Exception e) {
-                log.error("[ExchangeRate] Scheduler failed date={}", date, e);
-            }
-        }, new CronTrigger(properties.schedulerCron(), ExchangeRateService.KST)));
+    @Scheduled(cron = "${exchange-rate.fixer.scheduler-cron}", zone = "Asia/Seoul")
+    void refreshCurrent() {
+        if (!properties.fixer().schedulerEnabled()) return;
+        try { log.info("[ExchangeRate] Fixer saved={}", currentService.refresh()); }
+        catch (Exception e) { log.error("[ExchangeRate] Fixer failed; keeping last value", e); }
+    }
+
+    @Scheduled(cron = "${exchange-rate.ecos.scheduler-cron}", zone = "Asia/Seoul")
+    void refreshHistory() {
+        if (!properties.ecos().schedulerEnabled()) return;
+        LocalDate today = LocalDate.now(ExchangeRateService.KST);
+        try { log.info("[ExchangeRate] ECOS saved={}", historyService.collect(today.minusDays(7), today)); }
+        catch (Exception e) { log.error("[ExchangeRate] ECOS failed; keeping history", e); }
     }
 }

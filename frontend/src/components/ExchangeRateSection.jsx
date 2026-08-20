@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import s from './ExchangeRateSection.module.css'
-import { EXCHANGE_RATE_PERIODS, fetchExchangeRateHistory } from '../data/exchangeRate'
+import { EXCHANGE_RATE_PERIODS, fetchCurrentExchangeRate, fetchExchangeRateHistory } from '../data/exchangeRate'
 
 const formatRate = (value) => value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const formatPercent = (value) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
@@ -9,6 +9,9 @@ const formatDate = (date) => {
   const [, month, day] = date.split('-').map(Number)
   return `${month}. ${day}.`
 }
+const formatTime = (date) => new Intl.DateTimeFormat('ko-KR', {
+  timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false,
+}).format(new Date(date))
 
 const impacts = {
   USD: { weak: [
@@ -74,6 +77,18 @@ export default function ExchangeRateSection() {
   const [periodKey, setPeriodKey] = useState('month')
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
+  const [current, setCurrent] = useState(null)
+  const [currentError, setCurrentError] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    setCurrent(null)
+    setCurrentError(false)
+    fetchCurrentExchangeRate(currency)
+      .then((result) => active && setCurrent(result))
+      .catch(() => active && setCurrentError(true))
+    return () => { active = false }
+  }, [currency])
 
   useEffect(() => {
     let active = true
@@ -96,7 +111,6 @@ export default function ExchangeRateSection() {
   if (error) return <section className={s.section}>{currencySelector}<p className={s.message}>{currency === 'JPY' ? '엔화' : '달러'} 환율 정보를 준비하고 있어요.<br />잠시 후 다시 확인해주세요.</p></section>
 
   const direction = data.krwTrend === 'WEAK' ? 'weak' : data.krwTrend === 'STRONG' ? 'strong' : 'neutral'
-  const rising = data.dailyChangeAmount >= 0
   const averagePosition = data.differenceFromAverage >= 0 ? '높아요' : '낮아요'
   const krwTrend = direction === 'weak' ? '원화 약세' : direction === 'strong' ? '원화 강세' : '중립'
   const foreignTrend = data.foreignCurrencyTrend === 'STRONG' ? `${data.currencyName}화 강세` : data.foreignCurrencyTrend === 'WEAK' ? `${data.currencyName}화 약세` : '중립'
@@ -113,13 +127,11 @@ export default function ExchangeRateSection() {
       {currencySelector}
       <header className={s.header}>
         <div>
-          <p className={s.eyebrow}>{data.flag} 원/{data.currencyName} 일별 기준환율</p>
-          <h2 id="exchange-rate-title">{data.unitLabel} = {formatRate(data.latestDailyRate)}원</h2>
-          <p className={rising ? s.up : s.down}>
-            {rising ? '▲ 상승' : '▼ 하락'} {formatRate(Math.abs(data.dailyChangeAmount))}원 ({formatPercent(data.dailyChangePercent)}) <span>직전 고시일 대비</span>
-          </p>
+          <p className={s.eyebrow}>{data.flag} 원/{data.currencyName} 환율</p>
+          <h2 id="exchange-rate-title">{current ? `${current.unitLabel} = ${formatRate(current.rate)}원` : '현재 환율 준비 중'}</h2>
+          <p className={s.currentMeta}>{current ? `현재 환율 · 최근 업데이트 ${formatTime(current.sourceTimestamp)} · 출처 Fixer` : currentError ? 'Fixer 최신값을 아직 저장하지 못했어요.' : '현재 환율을 불러오고 있어요.'}</p>
         </div>
-        <p className={s.updated}>{data.latestDailyRateDate.replaceAll('-', '. ')}. 일별 매매기준율 · 한국수출입은행</p>
+        <p className={s.updated}>최근 일별 환율 {formatRate(data.latestDailyRate)}원<br />기준일 {data.latestDailyRateDate.replaceAll('-', '. ')}. · 한국은행 ECOS</p>
       </header>
 
       <div className={s.periods} aria-label="환율 조회 기간">

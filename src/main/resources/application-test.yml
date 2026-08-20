@@ -31,5 +31,7 @@ admin:
   default-page-size: 20
 
 exchange-rate:
-  korea-exim:
+  fixer:
+    scheduler-enabled: false
+  ecos:
     scheduler-enabled: false

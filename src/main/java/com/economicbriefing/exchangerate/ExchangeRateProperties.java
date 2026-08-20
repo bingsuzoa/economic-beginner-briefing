@@ -4,17 +4,8 @@ import java.net.URI;
 import java.time.Duration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.scheduling.support.CronExpression;
-
-@ConfigurationProperties(prefix = "exchange-rate.korea-exim")
-public record ExchangeRateProperties(
-        String apiKey,
-        URI apiUrl,
-        Duration timeout,
-        boolean schedulerEnabled,
-        String schedulerCron
-) {
-    public boolean schedulerCronValid() {
-        return schedulerCron != null && CronExpression.isValidExpression(schedulerCron);
-    }
+@ConfigurationProperties(prefix = "exchange-rate")
+public record ExchangeRateProperties(Fixer fixer, Ecos ecos) {
+    public record Fixer(String apiKey, URI apiUrl, Duration timeout, boolean schedulerEnabled, String schedulerCron) {}
+    public record Ecos(String apiKey, URI apiUrl, Duration timeout, boolean schedulerEnabled, String schedulerCron) {}
 }

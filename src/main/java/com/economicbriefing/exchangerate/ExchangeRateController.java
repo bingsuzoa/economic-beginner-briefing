@@ -17,9 +17,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class ExchangeRateController {
 
     private final ExchangeRateService service;
+    private final CurrentExchangeRateService currentService;
 
-    public ExchangeRateController(ExchangeRateService service) {
+    public ExchangeRateController(ExchangeRateService service, CurrentExchangeRateService currentService) {
         this.service = service;
+        this.currentService = currentService;
+    }
+
+    @GetMapping("/api/exchange-rate/current/{currency}")
+    public ResponseEntity<ApiResponse<?>> getCurrent(@PathVariable String currency) {
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(currentService.get(SupportedCurrency.from(currency))));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("INVALID_EXCHANGE_RATE_REQUEST", e.getMessage()));
+        }
     }
 
     @GetMapping("/api/exchange-rate/history/{currency}")
@@ -41,6 +52,11 @@ public class ExchangeRateController {
                     .body(ApiResponse.error("BACKFILL_ALREADY_RUNNING", "환율 초기 적재가 이미 실행 중입니다."));
         }
         return ResponseEntity.accepted().body(ApiResponse.ok(Map.of("message", "최근 1년 환율 적재를 시작했습니다.")));
+    }
+
+    @PostMapping("/api/admin/exchange-rates/refresh-current")
+    public ResponseEntity<ApiResponse<?>> refreshCurrent() {
+        return ResponseEntity.ok(ApiResponse.ok(Map.of("saved", currentService.refresh())));
     }
 
     @ExceptionHandler(ExchangeRateNotReadyException.class)
