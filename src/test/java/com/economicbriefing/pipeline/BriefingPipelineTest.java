@@ -6,6 +6,8 @@ import com.economicbriefing.admin.entity.PipelineRunEntity;
 import com.economicbriefing.admin.repository.PipelineItemRepository;
 import com.economicbriefing.admin.repository.PipelineLogRepository;
 import com.economicbriefing.admin.repository.PipelineRunRepository;
+import com.economicbriefing.classifier.repository.ArticleAnalysisRepository;
+import com.economicbriefing.classifier.repository.ArticleAnalyzerResultRepository;
 import com.economicbriefing.domain.execution.ExecutionLog;
 import com.economicbriefing.domain.execution.ExecutionStatus;
 import com.economicbriefing.domain.execution.PublicationDecision;
@@ -27,9 +29,13 @@ class BriefingPipelineTest {
     @Autowired private PipelineRunRepository runRepository;
     @Autowired private PipelineLogRepository logRepository;
     @Autowired private PipelineItemRepository itemRepository;
+    @Autowired private ArticleAnalysisRepository analysisRepository;
+    @Autowired private ArticleAnalyzerResultRepository analyzerResultRepository;
 
     @BeforeEach
     void setUp() {
+        analyzerResultRepository.deleteAll();
+        analysisRepository.deleteAll();
         logRepository.deleteAll();
         itemRepository.deleteAll();
         runRepository.deleteAll();
@@ -47,6 +53,50 @@ class BriefingPipelineTest {
         assertTrue(log.getCollectedArticleCount() > 0);
         assertTrue(log.getSelectedNewsCount() > 0);
         assertNotNull(log.getCompletedAt());
+    }
+
+    @Test
+    void shouldSaveArticleAnalyzerResultsWithFinalAnalyses() {
+        PipelineOptions options = PipelineOptions.manual(LocalDate.of(2025, 1, 20));
+
+        ExecutionLog log = pipeline.run(options);
+
+        assertEquals(ExecutionStatus.SUCCESS, log.getStatus());
+        var analyzerResults = analyzerResultRepository.findAll();
+        var finalResults = analysisRepository.findAll();
+        assertFalse(analyzerResults.isEmpty());
+        assertFalse(finalResults.isEmpty());
+
+        var analyzerResult = analyzerResults.get(0);
+        assertNotNull(analyzerResult.getArticleId());
+        assertNotNull(analyzerResult.getBriefingId());
+        assertEquals("mock", analyzerResult.getModelName());
+        assertEquals("mock-article-analyzer-v1", analyzerResult.getAnalyzerPromptVersion());
+        assertTrue(analyzerResult.getAnalysisJson().contains("\"issues\""));
+        assertTrue(analyzerResult.getAnalysisJson().contains("\"mainFacts\""));
+        assertTrue(analyzerResult.getAnalysisJson().contains("\"changes\""));
+        assertTrue(analyzerResult.getAnalysisJson().contains("\"relations\""));
+        assertTrue(analyzerResult.getAnalysisJson().contains("\"statements\""));
+        assertTrue(analyzerResult.getAnalysisJson().contains("\"keyTerms\""));
+        assertTrue(finalResults.stream().anyMatch(finalResult ->
+                finalResult.getArticleId().equals(analyzerResult.getArticleId())
+                        && finalResult.getBriefingId().equals(analyzerResult.getBriefingId())));
+    }
+
+    @Test
+    void shouldKeepAnalyzerResultHistoryForRepeatedAnalysisAfterFailure() {
+        LocalDate date = LocalDate.of(2025, 1, 21);
+        pipeline.run(PipelineOptions.manual(date));
+        long firstCount = analyzerResultRepository.count();
+
+        ExecutionLog failed = new ExecutionLog("exec-analyzer-history", date, KstDateTimeUtil.now());
+        failed.markFailed(KstDateTimeUtil.now());
+        executionTracker.startRun("exec-analyzer-history", "2025-01-21", "MANUAL", failed.getStartedAt());
+        executionTracker.finishRun("exec-analyzer-history", "2025-01-21", failed);
+
+        pipeline.run(PipelineOptions.manual(date));
+
+        assertTrue(analyzerResultRepository.count() > firstCount);
     }
 
     @Test

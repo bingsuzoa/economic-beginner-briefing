@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 import com.economicbriefing.analyzer.NewsAnalyzer;
 import com.economicbriefing.analyzer.dto.AnalyzeNewsRequest;
 import com.economicbriefing.analyzer.dto.AnalyzeNewsResult;
+import com.economicbriefing.analyzer.openai.dto.ArticleAnalysisResponse;
 import com.economicbriefing.domain.analysis.AnalyzedNews;
 import com.economicbriefing.domain.analysis.EconomicTerm;
 import com.economicbriefing.domain.analysis.NewsEvidenceStatus;
@@ -183,7 +184,30 @@ public class MockNewsAnalyzer implements NewsAnalyzer {
         log.info("[MOCK] Analysis complete: selected={}, rejected={}",
                 news.size(), rejectedArticleIds.size());
 
-        return new AnalyzeNewsResult(briefing, rejectedArticleIds, List.of());
+        ArticleAnalysisResponse articleAnalysis = new ArticleAnalysisResponse(selectedArticles.stream()
+                .map(this::articleToAnalyzerResult)
+                .toList());
+
+        return new AnalyzeNewsResult(
+                briefing, rejectedArticleIds, List.of(), null,
+                articleAnalysis, "mock", "mock-article-analyzer-v1");
+    }
+
+    private ArticleAnalysisResponse.ArticleAnalysis articleToAnalyzerResult(Article article) {
+        String fact = article.summary() != null && !article.summary().isBlank()
+                ? article.summary()
+                : article.title();
+        return new ArticleAnalysisResponse.ArticleAnalysis(article.id(), List.of(
+                new ArticleAnalysisResponse.Issue(
+                        article.title(),
+                        List.of(fact),
+                        List.of(),
+                        List.of(),
+                        List.of(new ArticleAnalysisResponse.Statement(
+                                ArticleAnalysisResponse.StatementType.FACT,
+                                article.sourceName(),
+                                fact)),
+                        List.of(article.categories().isEmpty() ? "OTHER" : article.categories().get(0).name()))));
     }
 
     private AnalyzedNews articleToAnalyzedNews(Article article, int index) {

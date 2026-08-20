@@ -21,8 +21,10 @@ import com.economicbriefing.classifier.EmbeddingService;
 import com.economicbriefing.classifier.TeacherClassifier;
 import com.economicbriefing.classifier.TeacherLabelResponse;
 import com.economicbriefing.classifier.entity.ArticleAnalysisEntity;
+import com.economicbriefing.classifier.entity.ArticleAnalyzerResultEntity;
 import com.economicbriefing.classifier.entity.TeacherLabelEntity;
 import com.economicbriefing.classifier.repository.ArticleAnalysisRepository;
+import com.economicbriefing.classifier.repository.ArticleAnalyzerResultRepository;
 import com.economicbriefing.classifier.repository.TeacherLabelRepository;
 import com.economicbriefing.collector.NewsCollector;
 import com.economicbriefing.collector.dto.CollectNewsRequest;
@@ -63,6 +65,7 @@ public class BriefingPipeline {
     private final ArticlePersistenceService articlePersistenceService;
     private final TeacherLabelRepository teacherLabelRepository;
     private final ArticleAnalysisRepository articleAnalysisRepository;
+    private final ArticleAnalyzerResultRepository articleAnalyzerResultRepository;
     private final EmbeddingService embeddingService; // null when embedding disabled
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
@@ -79,6 +82,7 @@ public class BriefingPipeline {
             ArticlePersistenceService articlePersistenceService,
             TeacherLabelRepository teacherLabelRepository,
             ArticleAnalysisRepository articleAnalysisRepository,
+            ArticleAnalyzerResultRepository articleAnalyzerResultRepository,
             com.fasterxml.jackson.databind.ObjectMapper objectMapper,
             @org.springframework.lang.Nullable EmbeddingService embeddingService) {
         this.collector = collector;
@@ -93,6 +97,7 @@ public class BriefingPipeline {
         this.articlePersistenceService = articlePersistenceService;
         this.teacherLabelRepository = teacherLabelRepository;
         this.articleAnalysisRepository = articleAnalysisRepository;
+        this.articleAnalyzerResultRepository = articleAnalyzerResultRepository;
         this.objectMapper = objectMapper;
         this.embeddingService = embeddingService;
     }
@@ -252,6 +257,7 @@ public class BriefingPipeline {
         executionLog.setSelectedNewsCount(filteredBriefing.news().size());
 
         // 2.7 Save article analyses to DB — this is what the public API serves
+        saveArticleAnalyzerResults(analyzeResult);
         saveArticleAnalyses(filteredBriefing);
         executionTracker.markAnalyzed(runId, analyzedUrls(analyzeResult.briefing()));
         executionTracker.log(runId, "INFO", "ANALYZE", "ANALYZE_DONE",
@@ -323,6 +329,25 @@ public class BriefingPipeline {
                 articleAnalysisRepository.save(entity);
             } catch (Exception e) {
                 log.warn("Failed to save article analysis for news {}: {}", news.id(), e.getMessage());
+            }
+        }
+    }
+
+    private void saveArticleAnalyzerResults(AnalyzeNewsResult result) {
+        if (result.articleAnalysis() == null || result.articleAnalysis().articles() == null) return;
+        String briefingId = result.briefing().id();
+        for (var analysis : result.articleAnalysis().articles()) {
+            try {
+                ArticleAnalyzerResultEntity entity = new ArticleAnalyzerResultEntity();
+                entity.setArticleId(analysis.articleId());
+                entity.setBriefingId(briefingId);
+                entity.setAnalysisJson(objectMapper.writeValueAsString(analysis));
+                entity.setModelName(result.analyzerModelName());
+                entity.setAnalyzerPromptVersion(result.analyzerPromptVersion());
+                articleAnalyzerResultRepository.save(entity);
+            } catch (Exception e) {
+                log.warn("Failed to save article analyzer result: articleId={}, briefingId={}, reason={}",
+                        analysis != null ? analysis.articleId() : null, briefingId, e.getMessage());
             }
         }
     }

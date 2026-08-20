@@ -35,6 +35,7 @@ import org.springframework.stereotype.Service;
 public class OpenAiNewsAnalyzer implements NewsAnalyzer {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAiNewsAnalyzer.class);
+    private static final String ARTICLE_ANALYZER_PROMPT_VERSION = "v4-article-analyzer";
 
     private final OpenAiClient aiClient;
     private final ObjectMapper objectMapper;
@@ -148,7 +149,7 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                 selectedArticles,
                 request.articles().size(),
                 openAiProperties.model(),
-                "v4-article-analyzer",
+                ARTICLE_ANALYZER_PROMPT_VERSION,
                 request.briefingTitle(),
                 request.targetHour()
         );
@@ -161,7 +162,9 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         log.info("AI analysis completed: selected={}, rejected={}",
                 briefing.news().size(), rejectedArticleIds.size());
 
-        return new AnalyzeNewsResult(briefing, rejectedArticleIds, List.of(), validation);
+        return new AnalyzeNewsResult(
+                briefing, rejectedArticleIds, List.of(), validation,
+                articleAnalysis, openAiProperties.model(), ARTICLE_ANALYZER_PROMPT_VERSION);
     }
 
     private com.economicbriefing.analyzer.openai.dto.SelectionResponse callAndParseSelection(String userPrompt) {
