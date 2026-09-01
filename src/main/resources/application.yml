@@ -106,6 +106,8 @@ openai:
   temperature: 0.3
   timeout: 60s
   max-selected-news: 15
+  economic-flow-comparison-model: ${ECONOMIC_FLOW_COMPARISON_MODEL:gpt-4o-mini}
+  economic-flow-traversal-model: ${ECONOMIC_FLOW_TRAVERSAL_MODEL:gpt-4o-mini}
 
 auth:
   require-https: ${AUTH_REQUIRE_HTTPS:true}

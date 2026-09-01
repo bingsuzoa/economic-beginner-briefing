@@ -6,6 +6,9 @@ import com.economicbriefing.admin.repository.PipelineItemRepository;
 import com.economicbriefing.admin.repository.PipelineLogRepository;
 import com.economicbriefing.admin.repository.PipelineRunRepository;
 import com.economicbriefing.classifier.repository.ArticleAnalysisRepository;
+import com.economicbriefing.classifier.repository.ArticleAnalyzerResultRepository;
+import com.economicbriefing.classifier.repository.ArticleRouterResultRepository;
+import com.economicbriefing.analyzer.openai.prompt.RetrievalRouterPromptBuilder;
 import com.economicbriefing.domain.execution.ExecutionLog;
 import com.economicbriefing.domain.execution.ExecutionStatus;
 import com.economicbriefing.pipeline.BriefingPipeline;
@@ -31,9 +34,13 @@ class DryRunE2ETest {
     @Autowired private PipelineLogRepository logRepository;
     @Autowired private PipelineItemRepository itemRepository;
     @Autowired private ArticleAnalysisRepository analysisRepository;
+    @Autowired private ArticleAnalyzerResultRepository analyzerResultRepository;
+    @Autowired private ArticleRouterResultRepository routerResultRepository;
 
     @BeforeEach
     void setUp() {
+        routerResultRepository.deleteAll();
+        analyzerResultRepository.deleteAll();
         logRepository.deleteAll();
         itemRepository.deleteAll();
         runRepository.deleteAll();
@@ -68,6 +75,38 @@ class DryRunE2ETest {
         assertNotNull(first.getBriefingId());
         assertNotNull(first.getAnalysisJson());
         assertTrue(first.getAnalysisJson().contains("easyTitle"));
+
+        var analyzerResults = analyzerResultRepository.findAll();
+        assertFalse(analyzerResults.isEmpty(), "pipeline should persist article analyzer results");
+        var analyzerResult = analyzerResults.get(0);
+        assertNotNull(analyzerResult.getArticleId());
+        assertEquals(first.getBriefingId(), analyzerResult.getBriefingId());
+        assertEquals("mock", analyzerResult.getModelName());
+        assertEquals(com.economicbriefing.analyzer.openai.prompt.ArticleAnalyzerPromptBuilder.PROMPT_VERSION,
+                analyzerResult.getPromptVersion());
+        assertTrue(analyzerResult.getAnalysisJson().contains("\"issues\""));
+        assertTrue(analyzerResult.getAnalysisJson().contains("\"mainFacts\""));
+        assertTrue(analyzerResult.getAnalysisJson().contains("\"changes\""));
+        assertTrue(analyzerResult.getAnalysisJson().contains("\"relations\""));
+        assertTrue(analyzerResult.getAnalysisJson().contains("\"statements\""));
+        assertTrue(analyzerResult.getAnalysisJson().contains("\"keyTerms\""));
+
+        var routerResults = routerResultRepository.findAll();
+        assertFalse(routerResults.isEmpty(), "pipeline should persist retrieval router results");
+        var routerResult = routerResults.get(0);
+        assertEquals(analyzerResult.getArticleId(), routerResult.getArticleId());
+        assertEquals(first.getBriefingId(), routerResult.getBriefingId());
+        assertEquals("mock", routerResult.getModelName());
+        assertEquals(RetrievalRouterPromptBuilder.PROMPT_VERSION, routerResult.getPromptVersion());
+        assertTrue(routerResult.getRouterJson().contains("\"needsRetrieval\""));
+
+        long firstRunCount = analyzerResultRepository.count();
+        long firstRouterRunCount = routerResultRepository.count();
+        pipeline.run(PipelineOptions.manual(LocalDate.of(2025, 3, 21)));
+        assertTrue(analyzerResultRepository.count() > firstRunCount,
+                "reanalyzing the same articles should preserve history");
+        assertTrue(routerResultRepository.count() > firstRouterRunCount,
+                "rerouting the same articles should preserve history");
     }
 
     @Test

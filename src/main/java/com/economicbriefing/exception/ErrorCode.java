@@ -10,6 +10,9 @@ public enum ErrorCode {
 
     // Analyze
     ANALYZE_API_ERROR("OpenAI API error", true),
+    ANALYZE_ATOMICITY_ERROR("Atomic relation contract invalid", true),
+    ANALYZE_DRAFT_INTEGRITY_ERROR("Analyzer draft integrity invalid", true),
+    ANALYZE_VALIDATOR_ERROR("Validator response invalid", true),
     ANALYZE_VALIDATION_ERROR("Response schema invalid", false),
     ANALYZE_TIMEOUT("OpenAI API timeout", true),
     ANALYZE_EMPTY_INPUT("No articles to analyze", false),

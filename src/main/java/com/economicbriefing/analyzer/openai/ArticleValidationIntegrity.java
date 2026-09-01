@@ -89,12 +89,18 @@ final class ArticleValidationIntegrity {
             throw new IllegalArgumentException("Invalid Article Validator finding");
         }
         if (finding.type() == ArticleValidationResult.FindingType.MISSING) {
-            if (finding.targetReference() != null || !isNullish(finding.currentValue())
+            if (blank(finding.targetReference()) || !isNullish(finding.currentValue())
                     || isNullish(finding.suggestedValue()) || blank(finding.evidence())) {
                 throw new IllegalArgumentException("Invalid MISSING finding shape");
             }
-            if (baseline.issues().stream().noneMatch(issue -> issue.name().equals(finding.issue()))) {
-                throw new IllegalArgumentException("MISSING finding references unknown issue");
+            var match = Pattern.compile("issues\\[(\\d+)]").matcher(finding.targetReference());
+            if (!match.matches()) {
+                throw invalidReference(finding, baseline);
+            }
+            int issueIndex = Integer.parseInt(match.group(1));
+            if (issueIndex >= baseline.issues().size()
+                    || !baseline.issues().get(issueIndex).name().equals(finding.issue())) {
+                throw invalidReference(finding, baseline);
             }
             return true;
         }
@@ -110,9 +116,14 @@ final class ArticleValidationIntegrity {
             throw new IllegalArgumentException("Item finding requires suggestedValue");
         }
 
-        ResolvedReference resolved = resolve(baseline, finding.targetReference(), mapper);
+        ResolvedReference resolved;
+        try {
+            resolved = resolve(baseline, finding.targetReference(), mapper);
+        } catch (IllegalArgumentException e) {
+            throw invalidReference(finding, baseline);
+        }
         if (resolved.targetType() != finding.targetType() || !resolved.issue().equals(finding.issue())) {
-            throw new IllegalArgumentException("Finding target does not match targetReference");
+            throw invalidReference(finding, baseline);
         }
         JsonNode current = !isNullish(finding.currentValue()) ? finding.currentValue() : mapper.nullNode();
         if (!resolved.value().equals(current)) {
@@ -120,6 +131,21 @@ final class ArticleValidationIntegrity {
         }
         validateSuggestedAxis(finding, resolved.field());
         return isSelfConsistent(finding, resolved.field());
+    }
+
+    private static ValidatorReferenceViolationException invalidReference(
+            ArticleValidationResult.Finding finding,
+            ArticleAnalysisResponse.ArticleAnalysis baseline) {
+        String allowed = java.util.stream.IntStream.range(0, baseline.issues().size())
+                .mapToObj(i -> "issues[" + i + "]=" + baseline.issues().get(i).name())
+                .collect(java.util.stream.Collectors.joining(", "));
+        return new ValidatorReferenceViolationException("""
+                INVALID_VALIDATOR_REFERENCE
+                Returned issue: %s
+                Returned targetReference: %s
+                Allowed: %s
+                Use one exact issue name and its matching issues[index] reference.
+                """.formatted(finding.issue(), finding.targetReference(), allowed).trim());
     }
 
     private static boolean isSelfConsistent(ArticleValidationResult.Finding finding, String field) {
@@ -256,7 +282,14 @@ final class ArticleValidationIntegrity {
             }
             if ("status".equals(field)) ArticleAnalysisResponse.ChangeStatus.valueOf(value);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("suggestedValue is outside target field enum", e);
+            String allowed = switch (field) {
+                case "relationType" -> java.util.Arrays.toString(ArticleAnalysisResponse.RelationType.values());
+                case "evidenceType", "type" -> java.util.Arrays.toString(ArticleAnalysisResponse.StatementType.values());
+                case "status" -> java.util.Arrays.toString(ArticleAnalysisResponse.ChangeStatus.values());
+                default -> "[]";
+            };
+            throw new IllegalArgumentException("suggestedValue '" + value
+                    + "' is invalid for " + field + "; allowed=" + allowed, e);
         }
     }
 
@@ -281,4 +314,8 @@ final class ArticleValidationIntegrity {
 
     private record ResolvedReference(
             String issue, ArticleValidationResult.TargetType targetType, JsonNode value, String field) {}
+
+    static final class ValidatorReferenceViolationException extends IllegalArgumentException {
+        ValidatorReferenceViolationException(String message) { super(message); }
+    }
 }

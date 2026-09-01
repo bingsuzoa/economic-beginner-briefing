@@ -61,8 +61,9 @@ class ArticleValidationIntegrityTest {
     void rejectsWrongTargetAndSuggestedEnumAxis() {
         assertThrows(Exception.class, () -> parse(validFinding().replace(
                 "\"targetType\":\"RELATION\"", "\"targetType\":\"STATEMENT\"")));
-        assertThrows(Exception.class, () -> parse(validFinding().replace(
+        var invalidEnum = assertThrows(Exception.class, () -> parse(validFinding().replace(
                 "\"suggestedValue\":\"INTERPRETATION\"", "\"suggestedValue\":\"PURPOSE\"")));
+        assertTrue(invalidEnum.getMessage().contains("allowed="));
         assertThrows(Exception.class, () -> parse(validFinding().replace(
                 "\"suggestedValue\":\"INTERPRETATION\"", "\"suggestedValue\":{}")));
     }
@@ -104,6 +105,21 @@ class ArticleValidationIntegrityTest {
         assertEquals(1, parse(json).articles().get(0).findings().size());
     }
 
+    @Test
+    void acceptsMissingWithExactIssueReferenceAndRejectsUnknownIssue() throws Exception {
+        String valid = missingFinding("금리", "issues[0]");
+        assertEquals(1, ArticleValidationIntegrity.parseAndValidate(mapper, valid,
+                List.of(article), baseline, Set.of(ArticleValidationResult.FindingType.MISSING))
+                .articles().getFirst().findings().size());
+
+        var error = assertThrows(ArticleValidationIntegrity.ValidatorReferenceViolationException.class,
+                () -> ArticleValidationIntegrity.parseAndValidate(mapper,
+                        missingFinding("존재하지 않는 쟁점", "issues[1]"), List.of(article), baseline,
+                        Set.of(ArticleValidationResult.FindingType.MISSING)));
+        assertTrue(error.getMessage().contains("issues[0]=금리"));
+        assertTrue(error.getMessage().contains("존재하지 않는 쟁점"));
+    }
+
     private ArticleValidationResult parse(String json) throws Exception {
         return ArticleValidationIntegrity.parseAndValidate(
                 mapper, json, List.of(article), baseline, allowed);
@@ -119,5 +135,13 @@ class ArticleValidationIntegrityTest {
                 + "\"targetReference\":\"issues[0].relations[0].evidenceType\","
                 + "\"description\":\"분류 오류\",\"currentValue\":\"FACT\","
                 + "\"suggestedValue\":\"INTERPRETATION\",\"evidence\":\"원문\"}";
+    }
+
+    private String missingFinding(String issue, String reference) {
+        return "{\"articles\":[{\"articleId\":\"article-1\",\"findings\":[{"
+                + "\"type\":\"MISSING\",\"issue\":\"" + issue + "\",\"targetType\":\"MAIN_FACT\","
+                + "\"targetReference\":\"" + reference + "\",\"description\":\"핵심 사실 누락\","
+                + "\"currentValue\":null,\"suggestedValue\":\"금리가 오른다.\","
+                + "\"evidence\":\"금리가 오른다.\"}]}]}";
     }
 }

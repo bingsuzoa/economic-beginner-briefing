@@ -64,6 +64,30 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+tasks.register<Test>("manualEconomicFlowDebug") {
+    group = "verification"
+    description = "Runs only the articles listed in a manual Economic Flow debug manifest"
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.economicbriefing.analyzer.openai.ManualEconomicFlowDebugTest") }
+
+    val input = providers.gradleProperty("input").orNull
+    systemProperty("manual.flow.input", input?.let { rootProject.file(it).absolutePath } ?: "")
+    systemProperty("manual.flow.analysisRepeat", providers.gradleProperty("analysis-repeat").orNull ?: "1")
+    doFirst {
+        require(input != null) { "-Pinput=<manifest.json> is required" }
+    }
+
+    val envFile = rootProject.file(".env")
+    if (envFile.exists()) {
+        envFile.readLines()
+            .filter { it.isNotBlank() && !it.startsWith("#") && '=' in it }
+            .forEach { line ->
+                val (key, value) = line.split("=", limit = 2)
+                if (System.getenv(key.trim()) == null) environment(key.trim(), value.trim())
+            }
+    }
+}
+
 // 운영(Windows)은 NSSM 서비스가 bootJar 산출물을 java -jar로 띄웁니다.
 // 개발(Mac/Linux)에서는 bootRun을 허용하며, .env 파일에서 환경변수를 로드합니다.
 tasks.bootRun {

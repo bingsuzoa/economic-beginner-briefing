@@ -21,8 +21,12 @@ import com.economicbriefing.classifier.EmbeddingService;
 import com.economicbriefing.classifier.TeacherClassifier;
 import com.economicbriefing.classifier.TeacherLabelResponse;
 import com.economicbriefing.classifier.entity.ArticleAnalysisEntity;
+import com.economicbriefing.classifier.entity.ArticleAnalyzerResultEntity;
+import com.economicbriefing.classifier.entity.ArticleRouterResultEntity;
 import com.economicbriefing.classifier.entity.TeacherLabelEntity;
 import com.economicbriefing.classifier.repository.ArticleAnalysisRepository;
+import com.economicbriefing.classifier.repository.ArticleAnalyzerResultRepository;
+import com.economicbriefing.classifier.repository.ArticleRouterResultRepository;
 import com.economicbriefing.classifier.repository.TeacherLabelRepository;
 import com.economicbriefing.collector.NewsCollector;
 import com.economicbriefing.collector.dto.CollectNewsRequest;
@@ -40,6 +44,7 @@ import com.economicbriefing.domain.execution.ExecutionLog;
 import com.economicbriefing.domain.execution.PublicationDecision;
 import com.economicbriefing.domain.briefing.Briefing;
 import com.economicbriefing.exception.BriefingException;
+import com.economicbriefing.economicflow.EconomicFlowIngestor;
 import com.economicbriefing.util.IdGenerator;
 import com.economicbriefing.util.KstDateTimeUtil;
 import org.slf4j.Logger;
@@ -63,8 +68,11 @@ public class BriefingPipeline {
     private final ArticlePersistenceService articlePersistenceService;
     private final TeacherLabelRepository teacherLabelRepository;
     private final ArticleAnalysisRepository articleAnalysisRepository;
+    private final ArticleAnalyzerResultRepository articleAnalyzerResultRepository;
+    private final ArticleRouterResultRepository articleRouterResultRepository;
     private final EmbeddingService embeddingService; // null when embedding disabled
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final EconomicFlowIngestor economicFlowIngestor;
 
     public BriefingPipeline(
             NewsCollector collector,
@@ -79,7 +87,10 @@ public class BriefingPipeline {
             ArticlePersistenceService articlePersistenceService,
             TeacherLabelRepository teacherLabelRepository,
             ArticleAnalysisRepository articleAnalysisRepository,
+            ArticleAnalyzerResultRepository articleAnalyzerResultRepository,
+            ArticleRouterResultRepository articleRouterResultRepository,
             com.fasterxml.jackson.databind.ObjectMapper objectMapper,
+            EconomicFlowIngestor economicFlowIngestor,
             @org.springframework.lang.Nullable EmbeddingService embeddingService) {
         this.collector = collector;
         this.analyzer = analyzer;
@@ -93,7 +104,10 @@ public class BriefingPipeline {
         this.articlePersistenceService = articlePersistenceService;
         this.teacherLabelRepository = teacherLabelRepository;
         this.articleAnalysisRepository = articleAnalysisRepository;
+        this.articleAnalyzerResultRepository = articleAnalyzerResultRepository;
+        this.articleRouterResultRepository = articleRouterResultRepository;
         this.objectMapper = objectMapper;
+        this.economicFlowIngestor = economicFlowIngestor;
         this.embeddingService = embeddingService;
     }
 
@@ -253,6 +267,8 @@ public class BriefingPipeline {
 
         // 2.7 Save article analyses to DB — this is what the public API serves
         saveArticleAnalyses(filteredBriefing);
+        saveArticleAnalyzerResults(analyzeResult, analyzeResult.briefing().id());
+        saveArticleRouterResults(analyzeResult, analyzeResult.briefing().id());
         executionTracker.markAnalyzed(runId, analyzedUrls(analyzeResult.briefing()));
         executionTracker.log(runId, "INFO", "ANALYZE", "ANALYZE_DONE",
                 analyzeResult.briefing().news().size() + "건의 분석 결과를 저장했습니다.");
@@ -323,6 +339,44 @@ public class BriefingPipeline {
                 articleAnalysisRepository.save(entity);
             } catch (Exception e) {
                 log.warn("Failed to save article analysis for news {}: {}", news.id(), e.getMessage());
+            }
+        }
+    }
+
+    private void saveArticleAnalyzerResults(AnalyzeNewsResult result, String briefingId) {
+        if (result.articleAnalysis() == null) return;
+        for (var analysis : result.articleAnalysis().articles()) {
+            try {
+                ArticleAnalyzerResultEntity entity = new ArticleAnalyzerResultEntity();
+                entity.setArticleId(analysis.articleId());
+                entity.setBriefingId(briefingId);
+                entity.setAnalysisJson(objectMapper.writeValueAsString(analysis));
+                entity.setModelName(result.briefing().metadata().modelName());
+                entity.setPromptVersion(
+                        com.economicbriefing.analyzer.openai.prompt.ArticleAnalyzerPromptBuilder.PROMPT_VERSION);
+                articleAnalyzerResultRepository.save(entity);
+            } catch (Exception e) {
+                log.warn("Failed to save article analyzer result: articleId={}, briefingId={}, cause={}",
+                        analysis.articleId(), briefingId, e.getMessage());
+            }
+        }
+    }
+
+    private void saveArticleRouterResults(AnalyzeNewsResult result, String briefingId) {
+        if (result.routerResult() == null) return;
+        for (var route : result.routerResult().articles()) {
+            try {
+                ArticleRouterResultEntity entity = new ArticleRouterResultEntity();
+                entity.setArticleId(route.articleId());
+                entity.setBriefingId(briefingId);
+                entity.setRouterJson(objectMapper.writeValueAsString(route));
+                entity.setModelName(result.briefing().metadata().modelName());
+                entity.setPromptVersion(
+                        com.economicbriefing.analyzer.openai.prompt.RetrievalRouterPromptBuilder.PROMPT_VERSION);
+                articleRouterResultRepository.save(entity);
+            } catch (Exception e) {
+                log.warn("Failed to save article router result: articleId={}, briefingId={}, cause={}",
+                        route.articleId(), briefingId, e.getMessage());
             }
         }
     }

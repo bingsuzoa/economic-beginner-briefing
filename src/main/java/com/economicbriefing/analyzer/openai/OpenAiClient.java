@@ -48,6 +48,20 @@ public class OpenAiClient {
         return complete(systemPrompt, userPrompt, properties.model(), temperature);
     }
 
+    String completeWithSchema(
+            String systemPrompt,
+            String userPrompt,
+            double temperature,
+            String schemaName,
+            String schema) {
+        return complete(systemPrompt, userPrompt, properties.model(), temperature, schemaName, schema);
+    }
+
+    public String completeWithSchema(String systemPrompt, String userPrompt, String model,
+            double temperature, String schemaName, String schema) {
+        return complete(systemPrompt, userPrompt, model, temperature, schemaName, schema);
+    }
+
     /**
      * Model override: the teacher stage runs on a cheaper model so it does not eat the
      * main model's token-per-minute budget before the analysis call needs it.
@@ -57,8 +71,19 @@ public class OpenAiClient {
     }
 
     private String complete(String systemPrompt, String userPrompt, String model, double temperature) {
+        return complete(systemPrompt, userPrompt, model, temperature, null, null);
+    }
+
+    private String complete(
+            String systemPrompt,
+            String userPrompt,
+            String model,
+            double temperature,
+            String schemaName,
+            String schema) {
         try {
-            String requestBody = buildRequestBody(systemPrompt, userPrompt, model, temperature);
+            String requestBody = buildRequestBody(
+                    systemPrompt, userPrompt, model, temperature, schemaName, schema);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(API_URL))
@@ -146,14 +171,29 @@ public class OpenAiClient {
         }
     }
 
-    private String buildRequestBody(String systemPrompt, String userPrompt, String model, double temperature) {
+    private String buildRequestBody(
+            String systemPrompt,
+            String userPrompt,
+            String model,
+            double temperature,
+            String schemaName,
+            String schema) {
         try {
             ObjectNode root = objectMapper.createObjectNode();
             root.put("model", model);
             root.put("temperature", temperature);
 
             ObjectNode responseFormat = objectMapper.createObjectNode();
-            responseFormat.put("type", "json_object");
+            if (schema == null) {
+                responseFormat.put("type", "json_object");
+            } else {
+                responseFormat.put("type", "json_schema");
+                ObjectNode jsonSchema = objectMapper.createObjectNode();
+                jsonSchema.put("name", schemaName);
+                jsonSchema.put("strict", true);
+                jsonSchema.set("schema", objectMapper.readTree(schema));
+                responseFormat.set("json_schema", jsonSchema);
+            }
             root.set("response_format", responseFormat);
 
             ArrayNode messages = objectMapper.createArrayNode();

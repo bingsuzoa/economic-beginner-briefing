@@ -12,9 +12,12 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import com.economicbriefing.analyzer.openai.dto.ArticleAnalysisResponse;
+import com.economicbriefing.analyzer.openai.dto.RetrievalRouterResponse;
 import com.economicbriefing.analyzer.openai.prompt.ArticleAnalyzerPromptBuilder;
 import com.economicbriefing.analyzer.openai.prompt.ArticleValidatorPromptBuilder;
+import com.economicbriefing.analyzer.openai.prompt.RetrievalRouterPromptBuilder;
 import com.economicbriefing.analyzer.dto.ArticleValidationResult;
+import com.economicbriefing.config.AppProperties;
 import com.economicbriefing.config.OpenAiProperties;
 import com.economicbriefing.domain.article.Article;
 import com.economicbriefing.domain.article.ArticleSourceType;
@@ -68,10 +71,28 @@ class ArticleAnalyzerLiveTest {
         OpenAiClient client = new OpenAiClient(properties, json);
         String baselinePath = System.getenv("ARTICLE_ANALYZER_BASELINE_PATH");
         ArticleAnalysisResponse response = baselinePath == null
-                ? json.readValue(client.complete(
-                        ArticleAnalyzerPromptBuilder.SYSTEM_PROMPT,
-                        ArticleAnalyzerPromptBuilder.build(List.of(article)), 0), ArticleAnalysisResponse.class)
+                ? new OpenAiNewsAnalyzer(client, json, properties, null, null)
+                        .analyzeArticleDraftWithRetry(
+                                ArticleAnalyzerPromptBuilder.build(List.of(article)),
+                                List.of(article),
+                                new AppProperties.RetryProperties(
+                                        3, Duration.ofSeconds(1), Duration.ofSeconds(2)))
                 : json.readValue(Path.of(baselinePath).toFile(), ArticleAnalysisResponse.class);
+        RetrievalRouterResponse routerResponse = json.readValue(client.complete(
+                RetrievalRouterPromptBuilder.SYSTEM_PROMPT,
+                RetrievalRouterPromptBuilder.build(json.writeValueAsString(response)), 0),
+                RetrievalRouterResponse.class);
+        OpenAiNewsAnalyzer.validateRouterResult(routerResponse, response);
+        if ("true".equalsIgnoreCase(System.getenv("RETRIEVAL_ROUTER_ONLY"))) {
+            Path analyzerOutput = Path.of("pipeline-debug/article-analyzer-" + articleId + ".json");
+            Path routerOutput = Path.of("pipeline-debug/retrieval-router-" + articleId + ".json");
+            Files.createDirectories(analyzerOutput.getParent());
+            json.writerWithDefaultPrettyPrinter().writeValue(analyzerOutput.toFile(), response);
+            json.writerWithDefaultPrettyPrinter().writeValue(routerOutput.toFile(), routerResponse);
+            System.out.printf("[RETRIEVAL ROUTER LIVE TEST] bodyChars=%d analyzer=%s router=%s%n",
+                    content.length(), analyzerOutput.toAbsolutePath(), routerOutput.toAbsolutePath());
+            return;
+        }
         String itemValidationJson = client.complete(
                 ArticleValidatorPromptBuilder.ITEM_VALIDATION_SYSTEM_PROMPT,
                 ArticleValidatorPromptBuilder.build(
@@ -92,14 +113,17 @@ class ArticleAnalyzerLiveTest {
                 .allMatch(issue -> !issue.mainFacts().isEmpty()));
 
         Path analyzerOutput = Path.of("pipeline-debug/article-analyzer-" + articleId + ".json");
+        Path routerOutput = Path.of("pipeline-debug/retrieval-router-" + articleId + ".json");
         Path validatorOutput = Path.of("pipeline-debug/article-validator-" + articleId + ".json");
         Files.createDirectories(analyzerOutput.getParent());
         json.writerWithDefaultPrettyPrinter().writeValue(analyzerOutput.toFile(), response);
+        json.writerWithDefaultPrettyPrinter().writeValue(routerOutput.toFile(), routerResponse);
         json.writerWithDefaultPrettyPrinter().writeValue(validatorOutput.toFile(), validation);
 
         if (!GOLD_ARTICLE_ID.equals(articleId)) {
-            System.out.printf("[ARTICLE ANALYZER LIVE TEST] bodyChars=%d analyzer=%s validator=%s%n",
-                    content.length(), analyzerOutput.toAbsolutePath(), validatorOutput.toAbsolutePath());
+            System.out.printf("[ARTICLE ANALYZER LIVE TEST] bodyChars=%d analyzer=%s router=%s validator=%s%n",
+                    content.length(), analyzerOutput.toAbsolutePath(), routerOutput.toAbsolutePath(),
+                    validatorOutput.toAbsolutePath());
             return;
         }
 
@@ -133,8 +157,9 @@ class ArticleAnalyzerLiveTest {
                 .anyMatch(f -> f.currentValue() != null && f.currentValue().isTextual()
                         && "CLAIMED_EFFECT".equals(f.currentValue().asText())
                         && f.suggestedValue() != null && "CLAIM".equals(f.suggestedValue().asText())));
-        System.out.printf("[ARTICLE ANALYZER LIVE TEST] bodyChars=%d analyzer=%s validator=%s%n",
-                content.length(), analyzerOutput.toAbsolutePath(), validatorOutput.toAbsolutePath());
+        System.out.printf("[ARTICLE ANALYZER LIVE TEST] bodyChars=%d analyzer=%s router=%s validator=%s%n",
+                content.length(), analyzerOutput.toAbsolutePath(), routerOutput.toAbsolutePath(),
+                validatorOutput.toAbsolutePath());
     }
 
     private static boolean hasFinding(ArticleValidationResult validation, String evidence) {

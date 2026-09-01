@@ -83,6 +83,37 @@ class AnalysisPromptBuilderTest {
         assertTrue(prompt.contains("JSON 형식으로 응답"));
     }
 
+    @Test
+    void shouldHandleMissingAndDisconnectedFlowWithoutInventingRelations() {
+        var articles = createArticles();
+        var audience = new AudienceProfile(
+                "beginner", List.of(NewsCategory.INTEREST_RATE), List.of());
+
+        String withoutFlow = AnalysisPromptBuilder.build(
+                articles, LocalDate.of(2025, 1, 15), 5, audience, "{\"articles\":[]}", null);
+        String withDisconnectedNodes = AnalysisPromptBuilder.build(
+                articles, LocalDate.of(2025, 1, 15), 5, audience, "{\"articles\":[]}",
+                "{\"nodes\":[{\"nodeId\":1},{\"nodeId\":2}],\"edges\":[],\"graphExhausted\":true}");
+
+        assertTrue(withoutFlow.contains("(검증된 Economic Flow 없음)"));
+        assertTrue(withDisconnectedNodes.contains("\"edges\":[]"));
+        assertTrue(withDisconnectedNodes.contains("Edge로 연결되지 않은 Node 사이에 인과관계를 만들지 말고"));
+        assertTrue(withDisconnectedNodes.contains("graphExhausted=true"));
+        assertTrue(withoutFlow.contains("(검증된 Economic Principle 없음)"));
+        assertTrue(withoutFlow.contains("Principle Context에 없는 경제 메커니즘과 파급효과를 모델 지식으로 보충하지 마세요"));
+    }
+
+    @Test
+    void shouldKeepPrincipleSeparateFromRealWorldFlow() {
+        String prompt = AnalysisPromptBuilder.build(createArticles(), LocalDate.of(2025, 1, 15), 5,
+                new AudienceProfile("beginner", List.of(NewsCategory.INTEREST_RATE), List.of()),
+                "{\"articles\":[]}", "{\"nodes\":[],\"edges\":[]}",
+                "{\"queries\":[{\"results\":[{\"sourceType\":\"BOOK\"}]}]}");
+
+        assertTrue(prompt.contains("\"sourceType\":\"BOOK\""));
+        assertTrue(prompt.contains("새로운 Flow Node/Edge로 사용하지 마세요"));
+    }
+
     private List<Article> createArticles() {
         OffsetDateTime publishedAt = LocalDate.of(2025, 1, 15)
                 .atTime(10, 0).atOffset(ZoneOffset.ofHours(9));

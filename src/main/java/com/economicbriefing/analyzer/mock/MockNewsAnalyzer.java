@@ -11,6 +11,8 @@ import java.util.stream.Collectors;
 import com.economicbriefing.analyzer.NewsAnalyzer;
 import com.economicbriefing.analyzer.dto.AnalyzeNewsRequest;
 import com.economicbriefing.analyzer.dto.AnalyzeNewsResult;
+import com.economicbriefing.analyzer.openai.dto.ArticleAnalysisResponse;
+import com.economicbriefing.analyzer.openai.dto.RetrievalRouterResponse;
 import com.economicbriefing.domain.analysis.AnalyzedNews;
 import com.economicbriefing.domain.analysis.EconomicTerm;
 import com.economicbriefing.domain.analysis.NewsEvidenceStatus;
@@ -183,7 +185,20 @@ public class MockNewsAnalyzer implements NewsAnalyzer {
         log.info("[MOCK] Analysis complete: selected={}, rejected={}",
                 news.size(), rejectedArticleIds.size());
 
-        return new AnalyzeNewsResult(briefing, rejectedArticleIds, List.of());
+        ArticleAnalysisResponse articleAnalysis = new ArticleAnalysisResponse(selectedArticles.stream()
+                .map(article -> new ArticleAnalysisResponse.ArticleAnalysis(article.id(), List.of(
+                        new ArticleAnalysisResponse.Issue(
+                                article.title(),
+                                List.of(article.summary() != null ? article.summary() : article.title()),
+                                List.of(), List.of(), List.of(), List.of()))))
+                .toList());
+        RetrievalRouterResponse routerResult = new RetrievalRouterResponse(articleAnalysis.articles().stream()
+                .map(article -> new RetrievalRouterResponse.ArticleRoute(article.articleId(), article.issues().stream()
+                        .map(issue -> new RetrievalRouterResponse.IssueRoute(issue.name(), false, List.of()))
+                        .toList()))
+                .toList());
+        return new AnalyzeNewsResult(
+                briefing, rejectedArticleIds, List.of(), null, articleAnalysis, routerResult);
     }
 
     private AnalyzedNews articleToAnalyzedNews(Article article, int index) {

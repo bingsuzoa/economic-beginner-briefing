@@ -20,6 +20,8 @@ public final class ArticleValidatorPromptBuilder {
             - WRONG_TYPE, WRONG_SPEAKER, UNSUPPORTED, INACCURATE 외의 finding type을 만들지 마세요.
             - 각 finding은 판단에 필요한 최소 원문 evidence를 포함하세요.
               단, 원문 근거가 없다는 UNSUPPORTED의 evidence는 null이어야 합니다.
+            - issue는 아래 Allowed issue references에 있는 이름을 글자까지 정확히 복사하세요.
+              targetReference의 issues[index]도 같은 issue를 가리켜야 하며 새 issue 이름이나 index를 만들지 마세요.
             - Analyzer 결과의 모든 mainFact, change, relation, statement, keyTerm을 하나씩 원문에 대조하세요.
             - relation은 항목별로 relationType과 evidenceType을 반드시 따로 판정하세요. 한쪽이 맞아도 다른 쪽 검사를
               생략하지 말고, 둘 다 틀리면 서로 다른 targetReference를 가진 finding으로 각각 보고하세요.
@@ -90,7 +92,7 @@ public final class ArticleValidatorPromptBuilder {
                   "type": "WRONG_TYPE|WRONG_SPEAKER|UNSUPPORTED|INACCURATE",
                   "issue": "",
                   "targetType": "ISSUE|MAIN_FACT|CHANGE|RELATION|ARTICLE_EXPLANATION|STATEMENT|KEY_TERM",
-                  "targetReference": null,
+                  "targetReference": "issues[0].mainFacts[0]",
                   "description": "",
                   "currentValue": null,
                   "suggestedValue": null,
@@ -129,6 +131,8 @@ public final class ArticleValidatorPromptBuilder {
             - targetType은 자연스러운 위치를 고르세요: 사실·수치·비교는 MAIN_FACT, 변경 전후는 CHANGE,
               명시적 연결은 RELATION, 주장·전망·제안은 STATEMENT, 용어 후보는 KEY_TERM입니다.
             - 각 finding에 판단을 뒷받침하는 최소 원문 evidence를 포함하세요.
+            - issue는 아래 Allowed issue references에 있는 이름을 글자까지 정확히 복사하고,
+              targetReference에는 반드시 그 이름과 짝인 issues[index]를 기록하세요. 새 issue를 만들지 마세요.
             - description과 suggestedValue도 원문의 검토·전망·전언 수준을 높이거나 낮추지 말고 그대로 보존하세요.
             - MISSING을 만들기 직전에 baseline의 모든 issue와 모든 배열을 다시 검색하세요.
               같은 사실·수치·주장·관계가 이미 어느 위치에든 의미상 보존되어 있으면 MISSING이 아닙니다.
@@ -148,7 +152,7 @@ public final class ArticleValidatorPromptBuilder {
                   "type": "MISSING",
                   "issue": "",
                   "targetType": "ISSUE|MAIN_FACT|CHANGE|RELATION|ARTICLE_EXPLANATION|STATEMENT|KEY_TERM",
-                  "targetReference": null,
+                  "targetReference": "issues[0]",
                   "description": "",
                   "currentValue": null,
                   "suggestedValue": null,
@@ -161,6 +165,18 @@ public final class ArticleValidatorPromptBuilder {
             """;
 
     public static String build(List<Article> articles, String analyzerJson) {
+        return build(articles, analyzerJson, null);
+    }
+
+    public static String build(List<Article> articles, String analyzerJson,
+            com.economicbriefing.analyzer.openai.dto.ArticleAnalysisResponse baseline) {
+        String allowed = baseline == null ? "Analyzer JSON의 기존 issue만 사용"
+                : baseline.articles().stream().map(article -> {
+                    String refs = java.util.stream.IntStream.range(0, article.issues().size())
+                            .mapToObj(i -> "issues[" + i + "] = " + article.issues().get(i).name())
+                            .collect(java.util.stream.Collectors.joining("\n"));
+                    return "articleId=" + article.articleId() + "\n" + refs;
+                }).collect(java.util.stream.Collectors.joining("\n\n"));
         return """
                 ## 기사 원문
 
@@ -170,7 +186,11 @@ public final class ArticleValidatorPromptBuilder {
 
                 %s
 
+                ## Allowed issue references
+
+                %s
+
                 결과를 수정하지 말고 원문과 문단별로 대조해 findings만 출력하세요.
-                """.formatted(ArticleAnalyzerPromptBuilder.formatArticles(articles), analyzerJson);
+                """.formatted(ArticleAnalyzerPromptBuilder.formatArticles(articles), analyzerJson, allowed);
     }
 }

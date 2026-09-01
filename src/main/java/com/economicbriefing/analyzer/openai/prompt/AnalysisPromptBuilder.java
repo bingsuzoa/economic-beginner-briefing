@@ -17,6 +17,18 @@ public final class AnalysisPromptBuilder {
             int maxSelectedNews,
             AudienceProfile audience,
             String articleAnalysisJson) {
+        return build(articles, targetDate, maxSelectedNews, audience, articleAnalysisJson, null);
+    }
+
+    public static String build(List<Article> articles, LocalDate targetDate, int maxSelectedNews,
+            AudienceProfile audience, String articleAnalysisJson, String economicFlowContextJson) {
+        return build(articles, targetDate, maxSelectedNews, audience, articleAnalysisJson,
+                economicFlowContextJson, null);
+    }
+
+    public static String build(List<Article> articles, LocalDate targetDate, int maxSelectedNews,
+            AudienceProfile audience, String articleAnalysisJson, String economicFlowContextJson,
+            String economicPrincipleContextJson) {
 
         String audienceSection = String.join("\n",
                 "- 경제 지식 수준: " + formatKnowledgeLevel(audience.economicKnowledgeLevel()),
@@ -39,6 +51,26 @@ public final class AnalysisPromptBuilder {
                 ## 대상 독자 프로필
                 %s
 
+                ## 검증된 Economic Flow Context
+
+                %s
+
+                이 Context의 node/edge만 이번 현실 흐름으로 사용하세요. Graph에 없는 현실 원인을 추측하지 마세요.
+                principleQuery는 검증된 관계의 일반 메커니즘 조회 요청일 뿐, 현실 원인의 증거가 아닙니다.
+                Edge로 연결되지 않은 Node 사이에 인과관계를 만들지 말고, Topic이 같다는 이유로 연결하지 마세요.
+                graphExhausted=true이거나 Context가 없으면 확보된 사실까지만 설명하고 빠진 과거 원인을 채우지 마세요.
+                principleQuery 자체는 근거가 아니며, 아래 검색 결과가 있을 때만 일반 메커니즘을 설명하세요.
+
+                ## 검증된 Economic Principle Context
+
+                %s
+
+                Principle Context는 Article/Flow에서 이미 확인된 관계의 일반 작동 원리만 설명합니다.
+                이를 이번 사건의 실제 원인이나 새로운 Flow Node/Edge로 사용하지 마세요.
+                Principle Context에 없는 경제 메커니즘과 파급효과를 모델 지식으로 보충하지 마세요.
+                검색 결과가 없으면 beginnerExplanation은 기사에서 확인된 관계까지만 설명하고,
+                economicImpact는 기사 또는 Flow에서 확인된 영향이 없다고 명시하세요.
+
                 ## 분석할 기사 목록
 
                 %s
@@ -60,6 +92,8 @@ public final class AnalysisPromptBuilder {
                         targetDate.toString(),
                         articles.size(),
                         audienceSection,
+                        economicFlowContextJson == null ? "(검증된 Economic Flow 없음)" : economicFlowContextJson,
+                        economicPrincipleContextJson == null ? "(검증된 Economic Principle 없음)" : economicPrincipleContextJson,
                         articlesSection,
                         articleAnalysisJson
                 );

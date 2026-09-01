@@ -17,7 +17,8 @@ build/
 
 # Logs
 *.log
-/pipeline-debug/
+/pipeline-debug/*
+!/pipeline-debug/manual-articles.example.json
 
 # Frontend
 node_modules/
