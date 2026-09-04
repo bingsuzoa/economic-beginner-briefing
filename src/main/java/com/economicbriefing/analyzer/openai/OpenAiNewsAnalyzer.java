@@ -51,6 +51,8 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
     private final com.economicbriefing.economicflow.EconomicFlowIngestor economicFlowIngestor;
     private final com.economicbriefing.economicflow.EconomicFlowContextService economicFlowContextService;
     private final com.economicbriefing.economicflow.EconomicPrincipleRetriever economicPrincipleRetriever;
+    private final ArticlePresenter articlePresenter;
+    private final com.economicbriefing.economicflow.EconomicFlowRetriever economicFlowRetriever;
     private final RelationValidator relationValidator;
     private final EconomicFlowJudge economicFlowJudge;
     private final RelationCandidateExtractor relationCandidateExtractor;
@@ -64,7 +66,9 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
             ArticleBodyFetcher articleBodyFetcher,
             com.economicbriefing.economicflow.EconomicFlowIngestor economicFlowIngestor,
             com.economicbriefing.economicflow.EconomicFlowContextService economicFlowContextService,
-            com.economicbriefing.economicflow.EconomicPrincipleRetriever economicPrincipleRetriever) {
+            com.economicbriefing.economicflow.EconomicPrincipleRetriever economicPrincipleRetriever,
+            ArticlePresenter articlePresenter,
+            com.economicbriefing.economicflow.EconomicFlowRetriever economicFlowRetriever) {
         this.aiClient = aiClient;
         this.objectMapper = objectMapper;
         this.openAiProperties = openAiProperties;
@@ -73,6 +77,8 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         this.economicFlowIngestor = economicFlowIngestor;
         this.economicFlowContextService = economicFlowContextService;
         this.economicPrincipleRetriever = economicPrincipleRetriever;
+        this.articlePresenter = articlePresenter;
+        this.economicFlowRetriever = economicFlowRetriever;
         this.relationValidator = new RelationValidator(aiClient, objectMapper, openAiProperties, appProperties);
         this.economicFlowJudge = new EconomicFlowJudge(aiClient, objectMapper, openAiProperties, appProperties);
         this.relationCandidateExtractor = new RelationCandidateExtractor(aiClient, objectMapper, appProperties);
@@ -85,6 +91,8 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         this.appProperties = appProperties; this.articleBodyFetcher = articleBodyFetcher;
         this.economicFlowIngestor = null; this.economicFlowContextService = null;
         this.economicPrincipleRetriever = null;
+        this.articlePresenter = null;
+        this.economicFlowRetriever = null;
         this.relationValidator = openAiProperties == null || appProperties == null ? null
                 : new RelationValidator(aiClient, objectMapper, openAiProperties, appProperties);
         this.economicFlowJudge = openAiProperties == null || appProperties == null ? null
@@ -148,7 +156,10 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                                 articleAnalysisJson, flowClaimsJson, explainedPathsJson), articleAnalysis),
                 appProperties.retry()
         );
+        var relatedFlows = flowRequests(routerResult, economicFlow.startNodeIds());
+        log.info("Retrieved related historical flow paths={}", relatedFlows.results().size());
         String economicPrincipleContextJson = economicPrincipleContext(routerResult, economicFlow.context());
+        var presenterPrinciples = presenterPrinciples(articleAnalysis);
         String validationPrompt = ArticleValidatorPromptBuilder.build(
                 selectedArticles, articleAnalysisJson, articleAnalysis);
         ArticleValidationResult itemValidation = validateWithRetry(
@@ -164,6 +175,8 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                 Set.of(ArticleValidationResult.FindingType.MISSING));
         ArticleValidationResult validation = ArticleValidationMerger.merge(
                 selectedArticles, articleAnalysis, itemValidation, missingReview);
+        var presentations = articlePresenter == null ? List.<ArticlePresenter.PresentedArticle>of()
+                : articlePresenter.present(articleAnalysis, analyzerBundle.economicFlows(), presenterPrinciples);
         log.info("Stage 2 completed: structured {} articles, validator findings={}",
                 articleAnalysis.articles().size(),
                 validation.articles().stream().mapToInt(a -> a.findings().size()).sum());
@@ -210,21 +223,31 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
 
         return new AnalyzeNewsResult(
                 briefing, rejectedArticleIds, List.of(), validation, articleAnalysis, routerResult,
-                analyzerBundle.eventCandidates(), analyzerBundle.eventRelations());
+                analyzerBundle.eventCandidates(), analyzerBundle.eventRelations(), presentations);
+    }
+
+    private com.economicbriefing.economicflow.EconomicPrincipleRetriever.Context presenterPrinciples(
+            ArticleAnalysisResponse analysis) {
+        if (economicPrincipleRetriever == null) return new com.economicbriefing.economicflow.EconomicPrincipleRetriever.Context(List.of());
+        var queries = articlePresenter == null ? ArticlePresenter.flowRequests(analysis).stream().map(request ->
+                new com.economicbriefing.economicflow.EconomicPrincipleRetriever.Query(
+                        "ANALYZER_RELATION", request.sourceReference(), request.query())).toList()
+                : articlePresenter.principleQueries(analysis);
+        return economicPrincipleRetriever.retrieve(queries);
     }
 
     private FlowBundle economicFlowContext(AnalyzerDraftBundle bundle, String currentEvent) {
         if (economicFlowIngestor == null || bundle.economicFlows().stream()
-                .allMatch(item -> item.flow().flowClaims().isEmpty())) return new FlowBundle(null, null);
+                .allMatch(item -> item.flow().flowClaims().isEmpty())) return new FlowBundle(null, null, Set.of());
         var startIds = bundle.economicFlows().stream()
                 .map(item -> economicFlowIngestor.ingestFlow(item.article(), item.flow()))
                 .flatMap(result -> result.resolvedNodes().stream())
                 .map(com.economicbriefing.economicflow.EconomicFlowIngestor.ResolvedFlowNode::resolvedNodeId)
                 .collect(java.util.stream.Collectors.toSet());
-        if (startIds.isEmpty()) return new FlowBundle(null, null);
+        if (startIds.isEmpty()) return new FlowBundle(null, null, Set.of());
         try {
             var context = economicFlowContextService.retrieve(currentEvent, startIds);
-            return new FlowBundle(context, objectMapper.writeValueAsString(context));
+            return new FlowBundle(context, objectMapper.writeValueAsString(context), Set.copyOf(startIds));
         } catch (JsonProcessingException e) {
             throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR, e);
         }
@@ -236,7 +259,8 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         if (economicPrincipleRetriever == null) return null;
         var queries = router.articles().stream().flatMap(article -> article.issues().stream())
                 .flatMap(issue -> issue.requests().stream())
-                .filter(request -> request.gapType() == RetrievalRouterResponse.GapType.WHY)
+                .filter(request -> request.gapType() == RetrievalRouterResponse.GapType.WHY
+                        && request.knowledgeType() == RetrievalRouterResponse.KnowledgeType.PRINCIPLE)
                 .map(request -> new com.economicbriefing.economicflow.EconomicPrincipleRetriever.Query(
                         "ROUTER_WHY", request.sourceReference(), request.query()))
                 .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
@@ -253,8 +277,20 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         }
     }
 
+    private com.economicbriefing.economicflow.EconomicFlowRetriever.Context flowRequests(
+            RetrievalRouterResponse router, Set<Long> anchors) {
+        if (economicFlowRetriever == null) return new com.economicbriefing.economicflow.EconomicFlowRetriever.Context(List.of());
+        var requests = router.articles().stream().flatMap(article -> article.issues().stream())
+                .flatMap(issue -> issue.requests().stream())
+                .filter(request -> request.gapType() == RetrievalRouterResponse.GapType.WHY
+                        && request.knowledgeType() == RetrievalRouterResponse.KnowledgeType.FLOW)
+                .map(request -> new com.economicbriefing.economicflow.EconomicFlowRetriever.Request(
+                        request.sourceReference(), request.query())).toList();
+        return economicFlowRetriever.retrieve(requests, anchors);
+    }
+
     private record FlowBundle(
-            com.economicbriefing.economicflow.EconomicFlowContextService.Context context, String json) {}
+            com.economicbriefing.economicflow.EconomicFlowContextService.Context context, String json, Set<Long> startNodeIds) {}
 
     static AiResponse applyPrincipleBoundary(
             AiResponse response, ArticleAnalysisResponse analysis, boolean hasPrinciples) {
@@ -312,6 +348,10 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                     if (request == null || request.gapType() == null || request.priority() == null
                             || isBlank(request.target()) || isBlank(request.query())
                             || isBlank(request.reason())
+                            || (request.gapType() == RetrievalRouterResponse.GapType.WHY
+                                    && request.knowledgeType() == null)
+                            || (request.gapType() != RetrievalRouterResponse.GapType.WHY
+                                    && request.knowledgeType() != null)
                             || !validSourceReference(request.sourceReference(), issueIndex, sourceIssue)) {
                         throw new IllegalArgumentException("Invalid Router request at issue " + issueIndex);
                     }
@@ -719,6 +759,7 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         return switch (type) {
             case CAUSE_OR_RESULT, CLAIMED_EFFECT -> com.economicbriefing.economicflow.EventRelationType.DIRECT_CAUSE;
             case CONDITION -> com.economicbriefing.economicflow.EventRelationType.CONDITION;
+            case MOTIVATION -> com.economicbriefing.economicflow.EventRelationType.MOTIVATION;
             case EXPECTED_EFFECT -> com.economicbriefing.economicflow.EventRelationType.EXPECTED_EFFECT;
             case PURPOSE -> com.economicbriefing.economicflow.EventRelationType.PURPOSE;
             default -> com.economicbriefing.economicflow.EventRelationType.RELATED_TO;

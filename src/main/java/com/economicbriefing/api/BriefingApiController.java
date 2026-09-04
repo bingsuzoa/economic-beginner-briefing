@@ -12,6 +12,7 @@ import com.economicbriefing.classifier.entity.ArticleAnalysisEntity;
 import com.economicbriefing.classifier.entity.ArticleEntity;
 import com.economicbriefing.classifier.entity.TeacherLabelEntity;
 import com.economicbriefing.classifier.repository.ArticleAnalysisRepository;
+import com.economicbriefing.classifier.repository.ArticlePresentationRepository;
 import com.economicbriefing.classifier.repository.ArticleRepository;
 import com.economicbriefing.classifier.repository.TeacherLabelRepository;
 import com.economicbriefing.reading.entity.ArticleReadingHistoryEntity;
@@ -37,6 +38,7 @@ public class BriefingApiController {
     private static final String SESSION_USER_ID = "USER_ID";
 
     private final ArticleAnalysisRepository analysisRepo;
+    private final ArticlePresentationRepository presentationRepo;
     private final ArticleRepository articleRepo;
     private final TeacherLabelRepository labelRepo;
     private final ArticleReadingHistoryRepository readingHistoryRepo;
@@ -44,11 +46,13 @@ public class BriefingApiController {
 
     public BriefingApiController(
             ArticleAnalysisRepository analysisRepo,
+            ArticlePresentationRepository presentationRepo,
             ArticleRepository articleRepo,
             TeacherLabelRepository labelRepo,
             ArticleReadingHistoryRepository readingHistoryRepo,
             ObjectMapper objectMapper) {
         this.analysisRepo = analysisRepo;
+        this.presentationRepo = presentationRepo;
         this.articleRepo = articleRepo;
         this.labelRepo = labelRepo;
         this.readingHistoryRepo = readingHistoryRepo;
@@ -200,6 +204,21 @@ public class BriefingApiController {
         } catch (Exception e) {
             return ResponseEntity.status(500)
                     .body(ApiResponse.error("PARSE_ERROR", "분석 데이터 파싱 실패"));
+        }
+    }
+
+    @GetMapping("/articles/{articleId}/presentation")
+    public ResponseEntity<ApiResponse<?>> getArticlePresentation(@PathVariable String articleId) {
+        var presentations = presentationRepo.findByArticleIdOrderByCreatedAtDesc(articleId);
+        if (presentations.isEmpty()) return ResponseEntity.status(404)
+                .body(ApiResponse.error("NOT_FOUND", "사용자용 기사 설명을 찾을 수 없습니다."));
+        try {
+            ObjectNode node = (ObjectNode) objectMapper.readTree(presentations.getFirst().getPresentationJson());
+            node.put("articleId", articleId);
+            node.put("presentedAt", presentations.getFirst().getCreatedAt().toString());
+            return ResponseEntity.ok(ApiResponse.ok(node));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(ApiResponse.error("PARSE_ERROR", "기사 설명 데이터 파싱 실패"));
         }
     }
 }

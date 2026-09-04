@@ -48,7 +48,7 @@ public final class ArticleAnalyzerPromptBuilder {
                         "properties":{"evidence":{"type":"string"},"atomicRelations":{"type":"array","minItems":1,"items":{
                           "type":"object","additionalProperties":false,
                           "properties":{"from":{"type":"string"},"to":{"type":"string"},
-                            "relationType":{"type":"string","enum":["CAUSE_OR_RESULT","PURPOSE","CHANGE","COMPARISON","CONDITION","ASSOCIATION","CLAIMED_EFFECT","EXPECTED_EFFECT","NEXT_STEP","EXPECTED_PROCESS"]},
+                            "relationType":{"type":"string","enum":["CAUSE_OR_RESULT","PURPOSE","CHANGE","COMPARISON","CONDITION","MOTIVATION","ASSOCIATION","CLAIMED_EFFECT","EXPECTED_EFFECT","NEXT_STEP","EXPECTED_PROCESS"]},
                             "evidenceType":{"type":"string","enum":["FACT","CLAIM","INTERPRETATION","PREDICTION","PROPOSAL","PLAN"]},
                             "speaker":{"type":["string","null"]}},
                           "required":["from","to","relationType","evidenceType","speaker"]}}},

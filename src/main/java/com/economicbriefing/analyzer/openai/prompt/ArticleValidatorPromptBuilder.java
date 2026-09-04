@@ -57,7 +57,7 @@ public final class ArticleValidatorPromptBuilder {
               articleExplanation, evidenceType, speaker를 각각 확인합니다.
               원문 근거는 있으나 방향이나 의미가 뭉개졌다면 INACCURATE입니다.
               relationType은 관계의 논리 형태이며 다음 값 중 하나입니다:
-              CAUSE_OR_RESULT, PURPOSE, CHANGE, COMPARISON, CONDITION, ASSOCIATION,
+              CAUSE_OR_RESULT, PURPOSE, CHANGE, COMPARISON, CONDITION, MOTIVATION, ASSOCIATION,
               CLAIMED_EFFECT, EXPECTED_EFFECT, NEXT_STEP, EXPECTED_PROCESS.
               evidenceType은 관계가 기사에서 제시된 성격이며 다음 값 중 하나입니다:
               FACT, CLAIM, INTERPRETATION, PREDICTION, PROPOSAL, PLAN.

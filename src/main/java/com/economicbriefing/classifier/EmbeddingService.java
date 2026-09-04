@@ -17,11 +17,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 @Service
-@ConditionalOnProperty(name = "briefing.embedding.enabled", havingValue = "true")
 public class EmbeddingService {
 
     private static final Logger log = LoggerFactory.getLogger(EmbeddingService.class);
@@ -56,7 +54,7 @@ public class EmbeddingService {
         }
 
         String input = buildInput(article);
-        float[] vector = callEmbeddingApi(input, model);
+        float[] vector = embed(input, model, dimensions);
 
         ArticleEmbeddingEntity entity = new ArticleEmbeddingEntity();
         entity.setArticleId(article.id());
@@ -66,6 +64,11 @@ public class EmbeddingService {
         embeddingRepository.save(entity);
 
         log.debug("Embedding saved: articleId={}, dimensions={}", article.id(), vector.length);
+    }
+
+    /** Creates a query embedding without persisting it. */
+    public float[] embed(String input, String model, int dimensions) {
+        return callEmbeddingApi(input, model, dimensions);
     }
 
     private String buildInput(Article article) {
@@ -79,11 +82,12 @@ public class EmbeddingService {
         return input;
     }
 
-    private float[] callEmbeddingApi(String input, String model) {
+    private float[] callEmbeddingApi(String input, String model, int dimensions) {
         try {
             ObjectNode body = objectMapper.createObjectNode();
             body.put("model", model);
             body.put("input", input);
+            body.put("dimensions", dimensions);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(EMBEDDING_API_URL))
@@ -107,6 +111,9 @@ public class EmbeddingService {
             for (int i = 0; i < embeddingNode.size(); i++) {
                 vector[i] = (float) embeddingNode.get(i).asDouble();
             }
+            if (vector.length != dimensions) {
+                throw new RuntimeException("Embedding dimension mismatch: expected " + dimensions + ", got " + vector.length);
+            }
             return vector;
 
         } catch (IOException | InterruptedException e) {
@@ -118,7 +125,7 @@ public class EmbeddingService {
     }
 
     // ponytail: pgvector text format "[0.1,0.2,...]"
-    static String toVectorString(float[] vector) {
+    public static String toVectorString(float[] vector) {
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < vector.length; i++) {
             if (i > 0) sb.append(',');

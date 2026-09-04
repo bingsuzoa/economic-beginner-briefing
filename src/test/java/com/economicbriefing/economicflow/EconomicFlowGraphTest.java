@@ -9,8 +9,8 @@ import com.economicbriefing.economicflow.entity.EconomicEventEntity;
 import com.economicbriefing.economicflow.entity.EventRelationEntity;
 import com.economicbriefing.economicflow.repository.EconomicEventRepository;
 import com.economicbriefing.economicflow.repository.EventRelationRepository;
-import com.economicbriefing.economicflow.repository.EconomicPrincipleChunkRepository;
-import com.economicbriefing.economicflow.entity.EconomicPrincipleChunkEntity;
+import com.economicbriefing.economicflow.repository.PrincipleVectorRepository;
+import com.economicbriefing.classifier.EmbeddingService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,9 +33,10 @@ class EconomicFlowGraphTest {
     @Autowired EconomicFlowContextService contextService;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
-    @Autowired EconomicPrincipleChunkRepository principleChunks;
     @Autowired EconomicPrincipleRetriever principleRetriever;
     @MockitoBean EconomicFlowTraversalJudge judge;
+    @MockitoBean PrincipleVectorRepository principleChunks;
+    @MockitoBean EmbeddingService embeddings;
 
     @Test
     void expandsOnlyRequestedFrontierByAnotherThreeHops() throws Exception {
@@ -59,11 +60,13 @@ class EconomicFlowGraphTest {
         assertNotNull(context.principleQuery());
         verify(judge, times(2)).judge(anyString(), anyList(), anyList(), anySet());
 
-        var chunk = new EconomicPrincipleChunkEntity();
-        chunk.setContent("고용 악화와 경기 둔화는 통화 완화 필요를 높여 금리 인하 판단에 영향을 줄 수 있다.");
-        chunk.setConcepts("고용 악화 경기 둔화 통화 완화 금리 인하 판단");
-        chunk.setSourceType("TEST_FIXTURE"); chunk.setSourceTitle("통화정책 fixture");
-        principleChunks.save(chunk);
+        var profile = new PrincipleVectorRepository.EmbeddingProfile("test-model", 2);
+        when(principleChunks.embeddingProfile()).thenReturn(java.util.Optional.of(profile));
+        when(embeddings.embed(anyString(), eq("test-model"), eq(2))).thenReturn(new float[] {0.1f, 0.2f});
+        when(principleChunks.search(anyString(), eq("test-model"), eq(2), eq(3))).thenReturn(List.of(
+                new PrincipleVectorRepository.SearchResult("test-chunk",
+                        "고용 악화와 경기 둔화는 통화 완화 필요를 높여 금리 인하 판단에 영향을 줄 수 있다.",
+                        "TEST_FIXTURE", "통화정책 fixture", 1, 2, 0.9)));
         var principle = principleRetriever.retrieve(List.of(new EconomicPrincipleRetriever.Query(
                 "FLOW_JUDGE", "economicFlow.principleQuery", context.principleQuery())));
         assertFalse(principle.queries().isEmpty());
@@ -94,6 +97,65 @@ class EconomicFlowGraphTest {
         assertTrue(context.graphExhausted());
         assertNull(context.principleQuery());
         verifyNoInteractions(judge);
+    }
+
+    @Test
+    void loadsIncomingAndOutgoingNeighborhoodWithoutDuplicatingCycles() {
+        var a = event("물가 압력");
+        var center = event("미국 기준금리 인상 가능성");
+        var b = event("한국 국고채 금리 상승");
+        var c = event("달러 강세");
+        relation(a, center);
+        relation(center, b);
+        relation(b, c);
+        relation(c, center);
+
+        var depthOne = graph.loadAround(center.getId(), 1).orElseThrow();
+        assertEquals(Set.of(a.getId(), center.getId(), b.getId(), c.getId()),
+                depthOne.nodes().stream().map(EconomicFlowGraphRepository.NodeView::nodeId)
+                        .collect(java.util.stream.Collectors.toSet()));
+        assertEquals(3, depthOne.edges().size());
+        assertTrue(depthOne.edges().stream().anyMatch(edge ->
+                edge.fromNodeId().equals(a.getId()) && edge.toNodeId().equals(center.getId())));
+        assertTrue(depthOne.edges().stream().anyMatch(edge ->
+                edge.fromNodeId().equals(center.getId()) && edge.toNodeId().equals(b.getId())));
+
+        var depthTwo = graph.loadAround(center.getId(), 2).orElseThrow();
+        assertEquals(4, depthTwo.nodes().size());
+        assertEquals(4, depthTwo.edges().size());
+        assertEquals(4, depthTwo.edges().stream()
+                .map(edge -> edge.fromNodeId() + ":" + edge.toNodeId() + ":" + edge.relationType())
+                .distinct().count());
+    }
+
+    @Test
+    void returnsEmptyForMissingCenter() {
+        assertTrue(graph.loadAround(Long.MAX_VALUE, 2).isEmpty());
+    }
+
+    @Test
+    void capsWideThreeHopGraphAtFiftyNodes() {
+        var center = event("CENTER");
+        for (int i = 0; i < 60; i++) relation(center, event("NODE-" + i));
+
+        var result = graph.loadAround(center.getId(), 3).orElseThrow();
+
+        assertEquals(50, result.nodes().size());
+        assertEquals(49, result.edges().size());
+    }
+
+    @Test
+    void overviewReturnsRelationsBetweenIncludedNodes() {
+        var old = event("OLD");
+        var recentA = event("RECENT-A");
+        var recentB = event("RECENT-B");
+        relation(old, recentA);
+        relation(recentA, recentB);
+
+        var result = graph.loadOverview();
+
+        assertEquals(3, result.nodes().size());
+        assertEquals(2, result.edges().size());
     }
 
     private EconomicEventEntity event(String title) {

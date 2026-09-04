@@ -26,6 +26,9 @@ public final class RetrievalRouterPromptBuilder {
             - 각 핵심 issue에서 relations, articleExplanation, statements, mainFacts, changes가 보존한
               실제 연결만 따라가며 WHY, SYSTEM, SIGNIFICANCE 순서로 이해가 끊기는 지점을 검토하세요.
             - WHY는 Analyzer에 A→B 연결이 있지만 왜 연결되는지 충분히 설명되지 않은 경우입니다.
+            - WHY마다 knowledgeType을 반드시 지정하세요. 특정 날짜·정부·기업·과거 사건을 몰라도 일반 경제 메커니즘으로
+              답할 수 있으면 PRINCIPLE, 과거 실제 정책·사건·행동·누적 흐름을 알아야 답할 수 있으면 FLOW입니다.
+              현재 기사에 답이 있다는 이유만으로 FLOW를 선택하지 마세요.
             - SYSTEM은 시장·정책·제도의 구조 없이는 기사의 핵심 인과관계를 이해할 수 없는 경우에만 사용하세요.
               산업 전체의 일반 구조처럼 범위가 넓고 알아두면 좋은 배경지식은 요청하지 마세요.
             - SIGNIFICANCE는 변화 자체는 명확하지만 왜 중요한지 충분히 설명되지 않은 경우입니다.
@@ -102,7 +105,8 @@ public final class RetrievalRouterPromptBuilder {
                     "query": "",
                     "sourceReference": "issues[0].keyTerms[0]",
                     "reason": "",
-                    "priority": "HIGH|MEDIUM|LOW"
+                    "priority": "HIGH|MEDIUM|LOW",
+                    "knowledgeType": "PRINCIPLE|FLOW (WHY에만 필수, 나머지는 null)"
                   }]
                 }]
               }]

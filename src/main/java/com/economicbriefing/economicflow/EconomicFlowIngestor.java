@@ -57,7 +57,8 @@ public class EconomicFlowIngestor {
         for (var claim : claims) {
             if (claim == null || claim.relationType() == null
                     || !Set.of(EventRelationType.CAUSE, EventRelationType.PURPOSE,
-                            EventRelationType.RESPONSE, EventRelationType.CONDITION).contains(claim.relationType())
+                            EventRelationType.RESPONSE, EventRelationType.CONDITION,
+                            EventRelationType.MOTIVATION).contains(claim.relationType())
                     || !byText.containsKey(claim.from()) || !byText.containsKey(claim.to())
                     || claim.from().equals(claim.to())) {
                 throw new IllegalArgumentException("Invalid flow claim endpoints");

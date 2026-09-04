@@ -28,5 +28,6 @@ public class EventRelationEntity {
     public EconomicEventEntity getToEvent() { return toEvent; }
     public EventRelationType getRelationType() { return relationType; }
     public RelationProvenance getProvenance() { return provenance; }
+    public String getEvidenceArticleId() { return evidenceArticleId; }
     public void setProvenance(RelationProvenance value) { provenance = value; }
 }

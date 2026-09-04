@@ -7,6 +7,7 @@ import java.util.Optional;
 import com.economicbriefing.admin.dto.ApiResponse;
 import com.economicbriefing.classifier.entity.ArticleAnalysisEntity;
 import com.economicbriefing.classifier.repository.ArticleAnalysisRepository;
+import com.economicbriefing.classifier.repository.ArticlePresentationRepository;
 import com.economicbriefing.classifier.repository.ArticleRepository;
 import com.economicbriefing.classifier.repository.TeacherLabelRepository;
 import com.economicbriefing.reading.repository.ArticleReadingHistoryRepository;
@@ -40,12 +41,13 @@ class BriefingApiControllerTest {
 
     private static BriefingApiController controller(ArticleAnalysisRepository analysisRepo) {
         ArticleRepository articleRepo = mock(ArticleRepository.class);
+        ArticlePresentationRepository presentationRepo = mock(ArticlePresentationRepository.class);
         TeacherLabelRepository labelRepo = mock(TeacherLabelRepository.class);
         ArticleReadingHistoryRepository readingHistoryRepo = mock(ArticleReadingHistoryRepository.class);
         when(articleRepo.findById(anyString())).thenReturn(Optional.empty());
         when(labelRepo.findAllByArticleId(anyString())).thenReturn(List.of());
         when(readingHistoryRepo.findByUserIdAndArticleIdIn(anyString(), any())).thenReturn(List.of());
-        return new BriefingApiController(analysisRepo, articleRepo, labelRepo, readingHistoryRepo, new ObjectMapper());
+        return new BriefingApiController(analysisRepo, presentationRepo, articleRepo, labelRepo, readingHistoryRepo, new ObjectMapper());
     }
 
     @Test

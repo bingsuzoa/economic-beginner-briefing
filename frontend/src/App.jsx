@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { lazy, Suspense, useState, useEffect } from 'react'
 import s from './App.module.css'
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
@@ -8,6 +8,8 @@ import Footer from './components/Footer'
 import BottomNav from './components/BottomNav'
 import LoginScreen from './components/LoginScreen'
 import AccountManagement from './components/AccountManagement'
+
+const EconomicNetwork = lazy(() => import('./components/EconomicNetwork'))
 
 const API_BASE = '/api/briefing'
 
@@ -29,7 +31,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const titles = { news: 'Thoth - 오늘의 토트', stock: 'Thoth - 주식', realestate: 'Thoth - 부동산', loan: 'Thoth - 대출계산기' }
+    const titles = { news: 'Thoth - 오늘의 토트', stock: 'Thoth - 주식', realestate: 'Thoth - 부동산', network: 'Thoth - 토트 경제망', loan: 'Thoth - 대출계산기' }
     document.title = titles[activeMenu] || 'Thoth'
   }, [activeMenu])
 
@@ -63,6 +65,9 @@ export default function App() {
         <Sidebar activeMenu={activeMenu} onMenuChange={setActiveMenu} onAccountClick={() => setActiveMenu('account')} />
         <main className={s.main}>
           {activeMenu === 'account' && <AccountManagement user={user} onDeleted={() => setUser(null)} />}
+          {activeMenu === 'network' && <Suspense fallback={<div className={s.status}>3D 경제망을 준비하고 있어요...</div>}>
+            <EconomicNetwork />
+          </Suspense>}
           {activeMenu === 'news' && <HeroSection />}
           {activeMenu === 'stock' && (
             <section className={s.loanHero}>
@@ -80,7 +85,7 @@ export default function App() {
               <p className={s.loanMessage}>대출계산기는 업데이트중이예요.</p>
             </div>
           )}
-          {activeMenu !== 'loan' && activeMenu !== 'account' && (
+          {['news', 'stock', 'realestate'].includes(activeMenu) && (
             <>
               {loading && (
                 <div className={s.status}>

@@ -22,6 +22,8 @@ final class EconomicFlowJudge {
             from이 경제 변수·경제주체의 상태·행동·정책·제약이고, to의 금리·환율·가격·수요·공급·생산·투자·소비·
             수주·매출·비용·고용·자금조달·유동성·정책·리스크·시장 행동을 실제로 변화시키면 포함할 수 있습니다.
             미래·전망 관계도 이러한 전달경로가 있으면 포함합니다. 특정 기업 관계도 실제 수주·매출 변화면 포함합니다.
+            국가·국제기구가 자원·안보·전략적 위치의 명시된 중요성에 따라 위협·병합 시도·투자·관리·외교 행동을 하는 관계도 포함합니다.
+            단, 그 조건이 해당 행동의 동기·목적·배경으로 기사 근거에 직접 연결된 경우만 포함하고, 단순 병렬 언급은 제외하세요.
             단순 주목·조명·거론·평가·전망 문구·일정·정의·순위·수치 재표현은 제외하세요.
             같은 결과에 대해 일회성 인물 발언 relation과 더 일반적인 경제 상태 relation이 함께 있으면 경제 상태 relation을
             우선하고 발언 relation은 제외하세요. 다만 기준금리 결정·규제 시행·재정지출 같은 실제 정책 행동은 포함합니다.
@@ -102,6 +104,7 @@ final class EconomicFlowJudge {
         return switch (type) {
             case PURPOSE -> EventRelationType.PURPOSE;
             case CONDITION -> EventRelationType.CONDITION;
+            case MOTIVATION -> EventRelationType.MOTIVATION;
             default -> EventRelationType.CAUSE;
         };
     }

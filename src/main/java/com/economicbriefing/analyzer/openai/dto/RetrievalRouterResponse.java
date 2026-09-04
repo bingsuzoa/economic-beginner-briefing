@@ -14,9 +14,12 @@ public record RetrievalRouterResponse(List<ArticleRoute> articles) {
             String query,
             String sourceReference,
             String reason,
-            Priority priority) {}
+            Priority priority,
+            KnowledgeType knowledgeType) {}
 
     public enum GapType { TERM, WHY, SYSTEM, SIGNIFICANCE }
 
     public enum Priority { HIGH, MEDIUM, LOW }
+
+    public enum KnowledgeType { PRINCIPLE, FLOW }
 }

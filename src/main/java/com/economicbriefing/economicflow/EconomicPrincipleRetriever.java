@@ -1,54 +1,41 @@
 package com.economicbriefing.economicflow;
 
-import java.util.*;
-import java.util.stream.Collectors;
-import com.economicbriefing.economicflow.repository.EconomicPrincipleChunkRepository;
+import com.economicbriefing.classifier.EmbeddingService;
+import com.economicbriefing.economicflow.repository.PrincipleVectorRepository;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class EconomicPrincipleRetriever {
-    private final EconomicPrincipleChunkRepository chunks;
+    private static final int TOP_K = 3;
+    private final PrincipleVectorRepository chunks;
+    private final EmbeddingService embeddings;
 
-    public EconomicPrincipleRetriever(EconomicPrincipleChunkRepository chunks) { this.chunks = chunks; }
+    public EconomicPrincipleRetriever(PrincipleVectorRepository chunks, EmbeddingService embeddings) {
+        this.chunks = chunks;
+        this.embeddings = embeddings;
+    }
 
     @Transactional(readOnly = true)
     public Context retrieve(List<Query> queries) {
         if (queries == null || queries.isEmpty()) return new Context(List.of());
-        var available = chunks.findByActiveTrue();
-        return new Context(queries.stream().map(query -> new QueryResult(query,
-                available.stream().map(chunk -> new Scored(chunk, score(query.query(), searchable(chunk))))
-                        .filter(item -> item.score >= 2).sorted(Comparator.comparingInt(Scored::score).reversed())
-                        .limit(3).map(item -> new Chunk(item.chunk.getId(), item.chunk.getContent(),
-                                item.chunk.getSourceType(), item.chunk.getSourceTitle(),
-                                item.chunk.getSourceSection(), item.score)).toList()))
+        var profile = chunks.embeddingProfile();
+        if (profile.isEmpty()) return new Context(List.of());
+        return new Context(queries.stream().map(query -> new QueryResult(query, search(query, profile.get())))
                 .filter(result -> !result.results().isEmpty()).toList());
     }
 
-    private static int score(String query, String document) {
-        Set<String> terms = terms(query);
-        Set<String> found = terms(document);
-        terms.retainAll(found);
-        return terms.size();
+    private List<Chunk> search(Query query, PrincipleVectorRepository.EmbeddingProfile profile) {
+        var vector = embeddings.embed(query.query(), profile.model(), profile.dimensions());
+        return chunks.search(EmbeddingService.toVectorString(vector), profile.model(), profile.dimensions(), TOP_K)
+                .stream().map(result -> new Chunk(result.chunkId(), result.text(), result.source(),
+                        result.sectionTitle(), result.pageStart() + "-" + result.pageEnd(), result.similarity())).toList();
     }
 
-    private static Set<String> terms(String text) {
-        if (text == null) return new HashSet<>();
-        return Arrays.stream(text.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}_]+"))
-                .filter(term -> term.length() >= 2)
-                .collect(Collectors.toCollection(HashSet::new));
-    }
-
-    private static String searchable(com.economicbriefing.economicflow.entity.EconomicPrincipleChunkEntity chunk) {
-        return String.join(" ", chunk.getContent(), chunk.getConcepts(),
-                Objects.toString(chunk.getFromConcept(), ""), Objects.toString(chunk.getToConcept(), ""),
-                Objects.toString(chunk.getMechanism(), ""));
-    }
-
-    private record Scored(com.economicbriefing.economicflow.entity.EconomicPrincipleChunkEntity chunk, int score) {}
     public record Query(String origin, String sourceReference, String query) {}
     public record Context(List<QueryResult> queries) {}
     public record QueryResult(Query request, List<Chunk> results) {}
-    public record Chunk(Long chunkId, String content, String sourceType, String sourceTitle,
-            String section, int score) {}
+    public record Chunk(String chunkId, String content, String sourceType, String sourceTitle,
+            String section, double score) {}
 }

@@ -75,7 +75,7 @@ final class ArticleValidationMerger {
             String current = finding.currentValue().asText();
             String suggested = finding.suggestedValue().asText();
             Set<String> relationTypes = Set.of(
-                    "CAUSE_OR_RESULT", "PURPOSE", "CHANGE", "COMPARISON", "CONDITION",
+                    "CAUSE_OR_RESULT", "PURPOSE", "CHANGE", "COMPARISON", "CONDITION", "MOTIVATION",
                     "ASSOCIATION", "CLAIMED_EFFECT", "EXPECTED_EFFECT", "NEXT_STEP", "EXPECTED_PROCESS");
             Set<String> evidenceTypes = Set.of(
                     "FACT", "CLAIM", "INTERPRETATION", "PREDICTION", "PROPOSAL", "PLAN");

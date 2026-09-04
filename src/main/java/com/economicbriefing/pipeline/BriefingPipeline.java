@@ -23,10 +23,12 @@ import com.economicbriefing.classifier.TeacherLabelResponse;
 import com.economicbriefing.classifier.entity.ArticleAnalysisEntity;
 import com.economicbriefing.classifier.entity.ArticleAnalyzerResultEntity;
 import com.economicbriefing.classifier.entity.ArticleRouterResultEntity;
+import com.economicbriefing.classifier.entity.ArticlePresentationEntity;
 import com.economicbriefing.classifier.entity.TeacherLabelEntity;
 import com.economicbriefing.classifier.repository.ArticleAnalysisRepository;
 import com.economicbriefing.classifier.repository.ArticleAnalyzerResultRepository;
 import com.economicbriefing.classifier.repository.ArticleRouterResultRepository;
+import com.economicbriefing.classifier.repository.ArticlePresentationRepository;
 import com.economicbriefing.classifier.repository.TeacherLabelRepository;
 import com.economicbriefing.collector.NewsCollector;
 import com.economicbriefing.collector.dto.CollectNewsRequest;
@@ -70,6 +72,7 @@ public class BriefingPipeline {
     private final ArticleAnalysisRepository articleAnalysisRepository;
     private final ArticleAnalyzerResultRepository articleAnalyzerResultRepository;
     private final ArticleRouterResultRepository articleRouterResultRepository;
+    private final ArticlePresentationRepository articlePresentationRepository;
     private final EmbeddingService embeddingService; // null when embedding disabled
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final EconomicFlowIngestor economicFlowIngestor;
@@ -89,6 +92,7 @@ public class BriefingPipeline {
             ArticleAnalysisRepository articleAnalysisRepository,
             ArticleAnalyzerResultRepository articleAnalyzerResultRepository,
             ArticleRouterResultRepository articleRouterResultRepository,
+            ArticlePresentationRepository articlePresentationRepository,
             com.fasterxml.jackson.databind.ObjectMapper objectMapper,
             EconomicFlowIngestor economicFlowIngestor,
             @org.springframework.lang.Nullable EmbeddingService embeddingService) {
@@ -106,6 +110,7 @@ public class BriefingPipeline {
         this.articleAnalysisRepository = articleAnalysisRepository;
         this.articleAnalyzerResultRepository = articleAnalyzerResultRepository;
         this.articleRouterResultRepository = articleRouterResultRepository;
+        this.articlePresentationRepository = articlePresentationRepository;
         this.objectMapper = objectMapper;
         this.economicFlowIngestor = economicFlowIngestor;
         this.embeddingService = embeddingService;
@@ -269,6 +274,7 @@ public class BriefingPipeline {
         saveArticleAnalyses(filteredBriefing);
         saveArticleAnalyzerResults(analyzeResult, analyzeResult.briefing().id());
         saveArticleRouterResults(analyzeResult, analyzeResult.briefing().id());
+        saveArticlePresentations(analyzeResult, analyzeResult.briefing().id());
         executionTracker.markAnalyzed(runId, analyzedUrls(analyzeResult.briefing()));
         executionTracker.log(runId, "INFO", "ANALYZE", "ANALYZE_DONE",
                 analyzeResult.briefing().news().size() + "건의 분석 결과를 저장했습니다.");
@@ -377,6 +383,22 @@ public class BriefingPipeline {
             } catch (Exception e) {
                 log.warn("Failed to save article router result: articleId={}, briefingId={}, cause={}",
                         route.articleId(), briefingId, e.getMessage());
+            }
+        }
+    }
+
+    private void saveArticlePresentations(AnalyzeNewsResult result, String briefingId) {
+        for (var presentation : result.presentations()) {
+            try {
+                ArticlePresentationEntity entity = new ArticlePresentationEntity();
+                entity.setArticleId(presentation.articleId()); entity.setBriefingId(briefingId);
+                entity.setPresentationJson(objectMapper.writeValueAsString(presentation));
+                entity.setModelName(result.briefing().metadata().modelName());
+                entity.setPromptVersion(com.economicbriefing.analyzer.openai.prompt.ArticlePresenterPromptBuilder.PROMPT_VERSION);
+                articlePresentationRepository.save(entity);
+            } catch (Exception e) {
+                log.warn("Failed to save article presentation: articleId={}, briefingId={}, cause={}",
+                        presentation.articleId(), briefingId, e.getMessage());
             }
         }
     }

@@ -15,10 +15,11 @@ public record AnalyzeNewsResult(
     ArticleAnalysisResponse articleAnalysis,
     RetrievalRouterResponse routerResult,
     List<EventCandidate> eventCandidates,
-    List<com.economicbriefing.economicflow.EventRelationCandidate> eventRelations
+    List<com.economicbriefing.economicflow.EventRelationCandidate> eventRelations,
+    List<com.economicbriefing.analyzer.openai.ArticlePresenter.PresentedArticle> presentations
 ) {
     public AnalyzeNewsResult(Briefing briefing, List<String> rejectedArticleIds, List<String> warnings) {
-        this(briefing, rejectedArticleIds, warnings, null, null, null, List.of(), List.of());
+        this(briefing, rejectedArticleIds, warnings, null, null, null, List.of(), List.of(), List.of());
     }
 
     public AnalyzeNewsResult(
@@ -26,7 +27,7 @@ public record AnalyzeNewsResult(
             List<String> rejectedArticleIds,
             List<String> warnings,
             ArticleValidationResult validation) {
-        this(briefing, rejectedArticleIds, warnings, validation, null, null, List.of(), List.of());
+        this(briefing, rejectedArticleIds, warnings, validation, null, null, List.of(), List.of(), List.of());
     }
 
     public AnalyzeNewsResult(
@@ -35,12 +36,12 @@ public record AnalyzeNewsResult(
             List<String> warnings,
             ArticleValidationResult validation,
             ArticleAnalysisResponse articleAnalysis) {
-        this(briefing, rejectedArticleIds, warnings, validation, articleAnalysis, null, List.of(), List.of());
+        this(briefing, rejectedArticleIds, warnings, validation, articleAnalysis, null, List.of(), List.of(), List.of());
     }
 
     public AnalyzeNewsResult(Briefing briefing, List<String> rejectedArticleIds, List<String> warnings,
             ArticleValidationResult validation, ArticleAnalysisResponse articleAnalysis,
             RetrievalRouterResponse routerResult) {
-        this(briefing, rejectedArticleIds, warnings, validation, articleAnalysis, routerResult, List.of(), List.of());
+        this(briefing, rejectedArticleIds, warnings, validation, articleAnalysis, routerResult, List.of(), List.of(), List.of());
     }
 }

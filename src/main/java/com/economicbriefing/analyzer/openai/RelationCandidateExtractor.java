@@ -121,6 +121,7 @@ final class RelationCandidateExtractor {
                 }
                 for (var relation : candidate.atomicRelations()) {
                     validateEndpoint("from", relation.from()); validateEndpoint("to", relation.to());
+                    validateMotivation(relation);
                     var key = new Key(relation.from(), relation.to(), relation.relationType(),
                             relation.evidenceType(), relation.speaker());
                     target.putIfAbsent(key, new ArticleAnalysisResponse.Relation(relation.from(), relation.to(),
@@ -142,6 +143,14 @@ final class RelationCandidateExtractor {
         for (String marker : List.of("에 따른", "로 인한", "때문에", "로 인해"))
             if (value.contains(marker)) throw new IllegalArgumentException(
                     "Invalid " + field + " contains embedded causal phrase: " + value);
+    }
+
+    private static void validateMotivation(AtomicRelation relation) {
+        if (relation.relationType() == ArticleAnalysisResponse.RelationType.MOTIVATION
+                && relation.from().contains("을 향한")) {
+            throw new IllegalArgumentException("MOTIVATION from must contain only the value or condition, not the action: "
+                    + relation.from());
+        }
     }
 
     private static String normalize(String value) {

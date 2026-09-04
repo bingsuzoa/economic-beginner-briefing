@@ -43,6 +43,7 @@ public record ArticleAnalysisResponse(List<ArticleAnalysis> articles) {
         CHANGE,
         COMPARISON,
         CONDITION,
+        MOTIVATION,
         ASSOCIATION,
         CLAIMED_EFFECT,
         EXPECTED_EFFECT,

@@ -13,6 +13,7 @@ public interface EconomicEventRepository extends JpaRepository<EconomicEventEnti
     Optional<EconomicEventEntity> findByDedupKey(String dedupKey);
     List<EconomicEventEntity> findBySubjectKey(String subjectKey);
     List<EconomicEventEntity> findTop20ByTitleContainingIgnoreCaseOrderByIdDesc(String text);
+    List<EconomicEventEntity> findTop50ByOrderByIdDesc();
     List<EconomicEventEntity> findByEventTypeAndEventDateBetween(EventType type, LocalDate from, LocalDate to);
     List<EconomicEventEntity> findBySubjectKeyAndEventDateBeforeOrderByEventDateDesc(String subjectKey, LocalDate date);
 

@@ -60,6 +60,7 @@ class EconomicFlowJudgeTest {
                 judged.economicFlows().getFirst().flow().flowClaims().stream()
                         .map(com.economicbriefing.economicflow.FlowClaimCandidate::from).toList());
         assertEquals(true, system[0].contains("일회성 인물 발언"));
+        assertEquals(true, system[0].contains("자원·안보·전략적 위치"));
     }
 
     private static ArticleAnalysisResponse.Relation relation(String from, String to, String evidence) {

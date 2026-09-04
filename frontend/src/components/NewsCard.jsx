@@ -68,7 +68,17 @@ export default function NewsCard({ news, onMarkRead }) {
   const cardRef = useRef(null)
   const [isRead, setIsRead] = useState(!!news.readAt)
   const [readAt, setReadAt] = useState(news.readAt)
+  const [presentation, setPresentation] = useState(null)
   const visibilityTimerRef = useRef(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/briefing/articles/${news.articleId}/presentation`)
+      .then(res => res.ok ? res.json() : null)
+      .then(body => { if (!cancelled) setPresentation(body?.data || null) })
+      .catch(() => { if (!cancelled) setPresentation(null) })
+    return () => { cancelled = true }
+  }, [news.articleId])
 
   // Update state when news.readAt changes (e.g., when navigating back)
   useEffect(() => {
@@ -114,6 +124,12 @@ export default function NewsCard({ news, onMarkRead }) {
     }
   }, [news.articleId, isRead, onMarkRead])
 
+  const displayedSummary = presentation?.summary?.length ? presentation.summary : summary
+  const whyExplanations = (presentation?.whyExplanations || []).filter(item => item.explanation)
+    .filter((item, index, all) => item.explanationKind !== 'ARTICLE_EVIDENCE'
+      ? all.findIndex(other => other.explanation === item.explanation) === index
+      : all.findIndex(other => other.explanationKind === 'ARTICLE_EVIDENCE') === index)
+
   return (
     <article
       ref={cardRef}
@@ -137,12 +153,14 @@ export default function NewsCard({ news, onMarkRead }) {
         )}
       </div>
 
-      <h3 className={s.title}>{news.easyTitle || news.originalTitle || '제목 없음'}</h3>
+      <h3 className={s.title}>{presentation?.displayTitle || news.easyTitle || news.originalTitle || '제목 없음'}</h3>
 
-      {summary.length > 0 && <SummaryBox lines={summary} />}
+      {displayedSummary.length > 0 && <SummaryBox lines={displayedSummary} />}
 
-      {news.whatHappened && <FlowSection icon="📰" heading="무슨 일이 있었나요?">{news.whatHappened}</FlowSection>}
-      {news.whyItHappened && <FlowSection icon="🤔" heading="왜 이런 일이 생겼나요?">{news.whyItHappened}</FlowSection>}
+      {(presentation?.whatHappened || news.whatHappened) && <FlowSection icon="📰" heading="무슨 일이 있었나요?">{presentation?.whatHappened || news.whatHappened}</FlowSection>}
+      {whyExplanations.length > 0
+        ? <FlowSection icon="🤔" heading="왜 이렇게 움직였나요?"><div className={s.whyList}>{whyExplanations.map(item => <p key={item.requestId}>{item.explanation}</p>)}</div></FlowSection>
+        : news.whyItHappened && <FlowSection icon="🤔" heading="왜 이런 일이 생겼나요?">{news.whyItHappened}</FlowSection>}
       {news.economicImpact && <FlowSection icon="📊" heading="경제에 어떤 영향이 있나요?">{news.economicImpact}</FlowSection>}
 
       {terms.length > 0 && <TermsAccordion terms={terms} />}

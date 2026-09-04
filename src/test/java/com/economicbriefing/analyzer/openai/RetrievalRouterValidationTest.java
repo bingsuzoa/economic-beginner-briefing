@@ -53,11 +53,28 @@ class RetrievalRouterValidationTest {
                 () -> OpenAiNewsAnalyzer.validateRouterResult(response, baseline));
     }
 
+    @Test
+    void requiresKnowledgeTypeOnlyForWhy() {
+        var why = new RetrievalRouterResponse.RetrievalRequest(RetrievalRouterResponse.GapType.WHY,
+                "원화 강세", "원화 강세가 왜 국고채 금리 하락에 영향을 미치는가?",
+                "issues[0].mainFacts[0]", "작동 원리 부족", RetrievalRouterResponse.Priority.HIGH,
+                RetrievalRouterResponse.KnowledgeType.PRINCIPLE);
+        var valid = new RetrievalRouterResponse(List.of(new RetrievalRouterResponse.ArticleRoute("article-1", List.of(
+                new RetrievalRouterResponse.IssueRoute("ISA 개편", true, List.of(why))))));
+        assertDoesNotThrow(() -> OpenAiNewsAnalyzer.validateRouterResult(valid, baseline));
+
+        var missingType = new RetrievalRouterResponse.RetrievalRequest(
+                why.gapType(), why.target(), why.query(), why.sourceReference(), why.reason(), why.priority(), null);
+        var invalid = new RetrievalRouterResponse(List.of(new RetrievalRouterResponse.ArticleRoute("article-1", List.of(
+                new RetrievalRouterResponse.IssueRoute("ISA 개편", true, List.of(missingType))))));
+        assertThrows(IllegalArgumentException.class, () -> OpenAiNewsAnalyzer.validateRouterResult(invalid, baseline));
+    }
+
     private RetrievalRouterResponse route(String reference) {
         var request = new RetrievalRouterResponse.RetrievalRequest(
                 RetrievalRouterResponse.GapType.TERM,
                 "ISA", "ISA란 무엇인가", reference, "핵심 제도 용어",
-                RetrievalRouterResponse.Priority.HIGH);
+                RetrievalRouterResponse.Priority.HIGH, null);
         return new RetrievalRouterResponse(List.of(
                 new RetrievalRouterResponse.ArticleRoute("article-1", List.of(
                         new RetrievalRouterResponse.IssueRoute("ISA 개편", true, List.of(request))))));

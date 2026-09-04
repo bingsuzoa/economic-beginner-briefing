@@ -28,6 +28,18 @@ class RelationCandidateExtractorTest {
     }
 
     @Test
+    void shouldRequireAnExplicitLinkForStrategicMotivationRelations() {
+        assertEquals(true, RelationCandidateExtractorPromptBuilder.SYSTEM_PROMPT
+                .contains("원문이 연결하지 않으면 만들지 마세요"));
+        assertEquals(true, RelationCandidateExtractorPromptBuilder.SYSTEM_PROMPT
+                .contains("위협·병합 시도·투자·외교 행동"));
+        assertEquals(true, RelationCandidateExtractorPromptBuilder.SYSTEM_PROMPT
+                .contains("그 구 전체를 from으로 쓰지 마세요"));
+        assertEquals(true, RelationCandidateExtractorPromptBuilder.SYSTEM_PROMPT
+                .contains("MOTIVATION은 행동 대상의 자원·안보·전략적 가치"));
+    }
+
+    @Test
     void shouldMergeExactSourceRelationsAndRemoveExactDuplicates() {
         var relation = new RelationCandidateExtractor.AtomicRelation("기준금리 인상 가능성", "국고채 금리 상승",
                 ArticleAnalysisResponse.RelationType.CAUSE_OR_RESULT,
@@ -53,6 +65,19 @@ class RelationCandidateExtractorTest {
         var response = new RelationCandidateExtractor.Response(List.of(
                 new RelationCandidateExtractor.RelationArticle("a1", List.of(
                         new RelationCandidateExtractor.Candidate("채권시장", "LLM이 바꿔 쓴 근거", List.of(relation))))));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> RelationCandidateExtractor.merge(response, List.of(article), baseline));
+    }
+
+    @Test
+    void shouldRejectMotivationThatLeavesTheActionInsideFrom() {
+        var relation = new RelationCandidateExtractor.AtomicRelation("풍부한 광물자원을 가진 지역을 향한 위협", "투자 확대",
+                ArticleAnalysisResponse.RelationType.MOTIVATION, ArticleAnalysisResponse.StatementType.FACT, null);
+        var response = new RelationCandidateExtractor.Response(List.of(
+                new RelationCandidateExtractor.RelationArticle("a1", List.of(
+                        new RelationCandidateExtractor.Candidate("채권시장",
+                                "기준금리 인상 가능성이 부각되면서 국고채 금리가 상승했다.", List.of(relation))))));
 
         assertThrows(IllegalArgumentException.class,
                 () -> RelationCandidateExtractor.merge(response, List.of(article), baseline));
