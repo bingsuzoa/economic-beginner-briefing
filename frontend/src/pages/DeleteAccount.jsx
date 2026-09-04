@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import Footer from '../components/Footer'
-import { apiUrl } from '../api'
+import { apiFetch } from '../api'
 import s from './DeleteAccount.module.css'
 
 export default function DeleteAccount() {
@@ -15,7 +15,7 @@ export default function DeleteAccount() {
   const submit = async () => {
     setLoading(true); setError('')
     try {
-      const res = await fetch(apiUrl('/api/auth/delete-account'), {
+      const res = await apiFetch('/api/auth/delete-account', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
       })
       const data = await res.json().catch(() => ({}))

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import accountLogo from '../assets/account-logo.png'
-import { apiUrl } from '../api'
+import { apiFetch } from '../api'
 import s from './AccountManagement.module.css'
 
 export default function AccountManagement({ user, onDeleted }) {
@@ -14,7 +14,7 @@ export default function AccountManagement({ user, onDeleted }) {
     event.preventDefault()
     setLoading(true); setError('')
     try {
-      const res = await fetch(apiUrl('/api/auth/me'), {
+      const res = await apiFetch('/api/auth/me', {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       })

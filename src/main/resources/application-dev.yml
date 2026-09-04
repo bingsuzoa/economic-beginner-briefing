@@ -9,12 +9,14 @@ spring:
 
 auth:
   require-https: false
+  allowed-origin: ${AUTH_ALLOWED_ORIGIN:https://economic-beginner.onrender.com}
 
 server:
   servlet:
     session:
       cookie:
-        secure: false
+        same-site: ${SESSION_COOKIE_SAME_SITE:none}
+        secure: ${AUTH_SECURE_COOKIE:true}
 
 logging:
   level:

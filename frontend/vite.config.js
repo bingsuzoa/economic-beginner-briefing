@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const WEB_API = 'https://economic-beginner.com/dev-api'
+const WEB_API = 'https://dev-api.economic-beginner.com'
 const APP_PROD_API = 'https://economic-beginner.com/api'
 
 export default defineConfig(({ mode }) => {

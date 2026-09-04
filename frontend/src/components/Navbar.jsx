@@ -1,9 +1,9 @@
 import s from './Navbar.module.css'
-import { apiUrl } from '../api'
+import { apiFetch } from '../api'
 
 export default function Navbar({ user, onLogout, onAccountClick }) {
   const logout = () =>
-    fetch(apiUrl('/api/auth/logout'), { method: 'POST' })
+    apiFetch('/api/auth/logout', { method: 'POST' })
       .then(() => { onLogout(); window.location.href = '/' })
 
   return (
