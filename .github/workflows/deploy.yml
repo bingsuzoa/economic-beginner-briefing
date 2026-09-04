@@ -50,6 +50,7 @@ jobs:
           $start = Join-Path $root 'start-dev.ps1'
           $stop = Join-Path $root 'stop-dev.ps1'
           $target = Join-Path $root 'deploy\dev\economic-briefing.jar'
+          $taskName = 'Economic Briefing DEV'
           foreach ($path in @($start, $stop)) { if (-not (Test-Path $path)) { throw "Missing DEV script: $path" } }
 
           $startText = Get-Content $start -Raw
@@ -64,6 +65,15 @@ jobs:
           $prodBefore = (ListenerPids 3000) -join ','
           if (-not $prodBefore) { throw 'PROD safety check failed: port 3000 is not listening.' }
 
+          $taskQuery = & schtasks.exe /Query /TN $taskName 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            if (($taskQuery -join "`n") -match 'Access is denied') {
+              Write-Warning 'Cannot query the DEV scheduled task with this runner account; /Run will be checked after JAR replacement.'
+            } else {
+              throw "DEV scheduled task is unavailable: $($taskQuery -join ' ')"
+            }
+          }
+
           # DEV scripts throw on real failure; LASTEXITCODE may belong to a process they stopped.
           & $stop
           for ($i = 0; $i -lt 30 -and (ListenerPids 8081); $i++) { Start-Sleep -Seconds 1 }
@@ -77,11 +87,15 @@ jobs:
           }
           Copy-Item $env:BOOT_JAR $target -Force
 
-          & $start
+          # Task Scheduler owns the JVM, so it survives GitHub Actions job cleanup.
+          & schtasks.exe /Run /TN $taskName
+          if ($LASTEXITCODE -ne 0) { throw "Failed to start DEV scheduled task: $taskName" }
           & .\scripts\health-check.ps1 -Url 'http://127.0.0.1:8081/api/health/briefing' -TimeoutSec 60 -IntervalSec 5 -Strict
           if ($LASTEXITCODE -ne 0) { throw 'DEV health check failed.' }
           $health = (Invoke-WebRequest 'http://127.0.0.1:8081/api/health/briefing' -UseBasicParsing).Content | ConvertFrom-Json
           if ($health.status -ne 'UP' -or $health.dbConnected -ne $true) { throw 'DEV health response is not UP with a connected database.' }
+          Start-Sleep -Seconds 3
+          if (-not (ListenerPids 8081)) { throw 'DEV process disappeared after successful health check.' }
           if (((ListenerPids 3000) -join ',') -ne $prodBefore) { throw 'PROD safety check failed: port 3000 changed during DEV deployment.' }
 
       - name: DEV diagnostics on failure
