@@ -67,6 +67,6 @@ class DefaultConfigSchedulerTest {
                 .map(task -> ((CronTask) task).getExpression())
                 .toList();
 
-        assertEquals(Set.of("0 0 * * * *", "0 0 12 * * MON-FRI"), Set.copyOf(crons));
+        assertEquals(Set.of("0 0 * * * *", "0 0 9,18 * * *", "0 30 18 * * *"), Set.copyOf(crons));
     }
 }

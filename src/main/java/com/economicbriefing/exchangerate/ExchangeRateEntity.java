@@ -16,8 +16,8 @@ import jakarta.persistence.UniqueConstraint;
 
 @Entity
 @Table(name = "exchange_rates", uniqueConstraints = @UniqueConstraint(
-        name = "uq_exchange_rates_pair_date",
-        columnNames = {"rate_date", "base_currency", "quote_currency"}))
+        name = "uq_exchange_rates_pair_date_source",
+        columnNames = {"rate_date", "base_currency", "quote_currency", "source"}))
 public class ExchangeRateEntity {
 
     @Id
@@ -50,14 +50,16 @@ public class ExchangeRateEntity {
 
     protected ExchangeRateEntity() {}
 
-    public ExchangeRateEntity(LocalDate rateDate, SupportedCurrency currency, BigDecimal rate) {
+    public ExchangeRateEntity(LocalDate rateDate, SupportedCurrency currency, BigDecimal rate, String source) {
         this.rateDate = rateDate;
         this.rate = rate;
         this.baseCurrency = currency.name();
         this.quoteCurrency = "KRW";
         this.unit = currency.unit();
-        this.source = "KOREA_EXIM";
+        this.source = source;
     }
+
+    public void updateRate(BigDecimal rate) { this.rate = rate; }
 
     @PrePersist
     void prePersist() {

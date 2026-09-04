@@ -120,13 +120,19 @@ admin:
   default-page-size: 20
 
 exchange-rate:
-  korea-exim:
-    api-key: ${KOREA_EXIM_API_KEY:}
-    api-url: https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON
+  fixer:
+    api-key: ${FIXER_API_KEY:}
+    api-url: http://data.fixer.io/api/latest
     timeout: 15s
     scheduler-enabled: ${EXCHANGE_RATE_SCHEDULER_ENABLED:true}
-    # Official data is unavailable before 11:00 KST; collect at noon on weekdays.
-    scheduler-cron: ${EXCHANGE_RATE_SCHEDULER_CRON:0 0 12 * * MON-FRI}
+    scheduler-cron: ${FIXER_SCHEDULER_CRON:0 0 9,18 * * *}
+  ecos:
+    api-key: ${ECOS_API_KEY:}
+    api-url: https://ecos.bok.or.kr/api
+    timeout: 30s
+    scheduler-enabled: ${EXCHANGE_RATE_SCHEDULER_ENABLED:true}
+    # Daily series is available after the business-day fixing; seven-day lookback repairs gaps.
+    scheduler-cron: ${ECOS_SCHEDULER_CRON:0 30 18 * * *}
 
 logging:
   level:

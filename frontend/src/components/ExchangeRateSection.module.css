@@ -16,6 +16,7 @@
 .header h2 { font-size: clamp(2rem, 5vw, 2.8rem); line-height: 1.2; margin-bottom: 8px; }
 .header span, .updated { color: var(--color-text-secondary); font-size: .85rem; }
 .updated { text-align: right; }
+.currentMeta { color: var(--color-text-secondary); font-size: .9rem; }
 .up { color: #d9480f; font-weight: 700; }
 .down { color: #1971c2; font-weight: 700; }
 .periods { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
