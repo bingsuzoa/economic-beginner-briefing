@@ -21,7 +21,7 @@ public class ArticleAnalyzerResultEntity {
     @Column(name = "article_id", nullable = false, length = 64)
     private String articleId;
 
-    @Column(name = "briefing_id", nullable = false, length = 128)
+    @Column(name = "briefing_id", length = 128)
     private String briefingId;
 
     @Column(name = "analysis_json", nullable = false, columnDefinition = "TEXT")
@@ -30,7 +30,7 @@ public class ArticleAnalyzerResultEntity {
     @Column(name = "model_name", length = 128)
     private String modelName;
 
-    @Column(name = "analyzer_prompt_version", nullable = false, length = 64)
+    @Column(name = "analyzer_prompt_version", length = 64)
     private String promptVersion;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -52,5 +52,7 @@ public class ArticleAnalyzerResultEntity {
     public void setModelName(String modelName) { this.modelName = modelName; }
     public String getPromptVersion() { return promptVersion; }
     public void setPromptVersion(String promptVersion) { this.promptVersion = promptVersion; }
+    public String getAnalyzerPromptVersion() { return promptVersion; }
+    public void setAnalyzerPromptVersion(String promptVersion) { this.promptVersion = promptVersion; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
 }

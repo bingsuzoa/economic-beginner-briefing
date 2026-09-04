@@ -357,9 +357,8 @@ public class BriefingPipeline {
                 entity.setArticleId(analysis.articleId());
                 entity.setBriefingId(briefingId);
                 entity.setAnalysisJson(objectMapper.writeValueAsString(analysis));
-                entity.setModelName(result.briefing().metadata().modelName());
-                entity.setPromptVersion(
-                        com.economicbriefing.analyzer.openai.prompt.ArticleAnalyzerPromptBuilder.PROMPT_VERSION);
+                entity.setModelName(result.analyzerModelName());
+                entity.setAnalyzerPromptVersion(result.analyzerPromptVersion());
                 articleAnalyzerResultRepository.save(entity);
             } catch (Exception e) {
                 log.warn("Failed to save article analyzer result: articleId={}, briefingId={}, cause={}",

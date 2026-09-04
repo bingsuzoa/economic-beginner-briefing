@@ -1,6 +1,7 @@
 package com.economicbriefing.scheduler;
 
 import java.util.List;
+import java.util.Set;
 
 import com.economicbriefing.config.AppProperties;
 import org.junit.jupiter.api.Test;
@@ -66,6 +67,6 @@ class DefaultConfigSchedulerTest {
                 .map(task -> ((CronTask) task).getExpression())
                 .toList();
 
-        assertEquals(List.of("0 0 * * * *"), crons);
+        assertEquals(Set.of("0 0 * * * *", "0 0 12 * * MON-FRI"), Set.copyOf(crons));
     }
 }

@@ -82,8 +82,7 @@ class DryRunE2ETest {
         assertNotNull(analyzerResult.getArticleId());
         assertEquals(first.getBriefingId(), analyzerResult.getBriefingId());
         assertEquals("mock", analyzerResult.getModelName());
-        assertEquals(com.economicbriefing.analyzer.openai.prompt.ArticleAnalyzerPromptBuilder.PROMPT_VERSION,
-                analyzerResult.getPromptVersion());
+        assertEquals("mock-article-analyzer-v1", analyzerResult.getPromptVersion());
         assertTrue(analyzerResult.getAnalysisJson().contains("\"issues\""));
         assertTrue(analyzerResult.getAnalysisJson().contains("\"mainFacts\""));
         assertTrue(analyzerResult.getAnalysisJson().contains("\"changes\""));

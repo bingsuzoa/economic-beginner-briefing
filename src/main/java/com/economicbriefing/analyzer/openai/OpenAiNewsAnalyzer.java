@@ -223,7 +223,8 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
 
         return new AnalyzeNewsResult(
                 briefing, rejectedArticleIds, List.of(), validation, articleAnalysis, routerResult,
-                analyzerBundle.eventCandidates(), analyzerBundle.eventRelations(), presentations);
+                analyzerBundle.eventCandidates(), analyzerBundle.eventRelations(), presentations,
+                openAiProperties.model(), ArticleAnalyzerPromptBuilder.PROMPT_VERSION);
     }
 
     private com.economicbriefing.economicflow.EconomicPrincipleRetriever.Context presenterPrinciples(

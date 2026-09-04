@@ -198,7 +198,8 @@ public class MockNewsAnalyzer implements NewsAnalyzer {
                         .toList()))
                 .toList());
         return new AnalyzeNewsResult(
-                briefing, rejectedArticleIds, List.of(), null, articleAnalysis, routerResult);
+                briefing, rejectedArticleIds, List.of(), null, articleAnalysis, routerResult,
+                List.of(), List.of(), List.of(), "mock", "mock-article-analyzer-v1");
     }
 
     private AnalyzedNews articleToAnalyzedNews(Article article, int index) {
