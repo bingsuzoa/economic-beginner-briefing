@@ -64,8 +64,8 @@ jobs:
           $prodBefore = (ListenerPids 3000) -join ','
           if (-not $prodBefore) { throw 'PROD safety check failed: port 3000 is not listening.' }
 
+          # DEV scripts throw on real failure; LASTEXITCODE may belong to a process they stopped.
           & $stop
-          if ($LASTEXITCODE -ne 0) { throw 'stop-dev.ps1 failed.' }
           for ($i = 0; $i -lt 30 -and (ListenerPids 8081); $i++) { Start-Sleep -Seconds 1 }
           if (ListenerPids 8081) { throw 'DEV safety check failed: port 8081 is still listening.' }
           if (((ListenerPids 3000) -join ',') -ne $prodBefore) { throw 'PROD safety check failed: port 3000 changed during DEV stop.' }
@@ -78,7 +78,6 @@ jobs:
           Copy-Item $env:BOOT_JAR $target -Force
 
           & $start
-          if ($LASTEXITCODE -ne 0) { throw 'start-dev.ps1 failed.' }
           & .\scripts\health-check.ps1 -Url 'http://127.0.0.1:8081/api/health/briefing' -TimeoutSec 60 -IntervalSec 5 -Strict
           if ($LASTEXITCODE -ne 0) { throw 'DEV health check failed.' }
           $health = (Invoke-WebRequest 'http://127.0.0.1:8081/api/health/briefing' -UseBasicParsing).Content | ConvertFrom-Json
