@@ -5,6 +5,7 @@ import FlowSection from './FlowSection'
 import ImpactSection from './ImpactSection'
 import TermsAccordion from './TermsAccordion'
 import SourceList from './SourceList'
+import { apiUrl } from '../api'
 
 // Keys match the NewsCategory / NewsEvidenceStatus enums. Both serialise through @JsonValue as
 // name().toLowerCase(), so the API always sends lowercase and lookups are normalised below --
@@ -52,7 +53,7 @@ const formatRelativeTime = (timestamp) => {
 
 const markAsRead = async (articleId) => {
   try {
-    await fetch(`/api/briefing/articles/${articleId}/mark-read`, { method: 'POST' })
+    await fetch(apiUrl(`/api/briefing/articles/${articleId}/mark-read`), { method: 'POST' })
   } catch (err) {
     // Silent fail - reading history is not critical
   }
@@ -73,7 +74,7 @@ export default function NewsCard({ news, onMarkRead }) {
 
   useEffect(() => {
     let cancelled = false
-    fetch(`/api/briefing/articles/${news.articleId}/presentation`)
+    fetch(apiUrl(`/api/briefing/articles/${news.articleId}/presentation`))
       .then(res => res.ok ? res.json() : null)
       .then(body => { if (!cancelled) setPresentation(body?.data || null) })
       .catch(() => { if (!cancelled) setPresentation(null) })

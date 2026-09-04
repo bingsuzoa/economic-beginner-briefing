@@ -8,10 +8,11 @@ import Footer from './components/Footer'
 import BottomNav from './components/BottomNav'
 import LoginScreen from './components/LoginScreen'
 import AccountManagement from './components/AccountManagement'
+import { apiUrl } from './api'
 
 const EconomicNetwork = lazy(() => import('./components/EconomicNetwork'))
 
-const API_BASE = '/api/briefing'
+const API_BASE = apiUrl('/api/briefing')
 
 const STOCK_CATEGORIES = ['investment']
 const REALESTATE_CATEGORIES = ['housing', 'jeonse_monthly_rent', 'subscription']
@@ -24,7 +25,7 @@ export default function App() {
   const [activeMenu, setActiveMenu] = useState('news')
 
   useEffect(() => {
-    fetch('/api/auth/me')
+    fetch(apiUrl('/api/auth/me'))
       .then(r => r.ok ? r.json() : null)
       .then(setUser)
       .catch(() => setUser(null))

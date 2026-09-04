@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import s from './LoginScreen.module.css'
+import { apiUrl } from '../api'
 
 const useTitle = (title) => useEffect(() => { document.title = title }, [title])
 const fields = [
@@ -36,7 +37,7 @@ export default function LoginScreen({ onLoginSuccess }) {
   const check = async (name) => {
     const value = form[name].trim()
     try {
-      const res = await fetch(`/api/auth/check-${name}?${name}=${encodeURIComponent(value)}`)
+      const res = await fetch(apiUrl(`/api/auth/check-${name}?${name}=${encodeURIComponent(value)}`))
       const data = await res.json()
       return data.taken ? 'taken' : 'available'
     } catch { /* 다음 버튼에서 재시도 안내 */ }
@@ -65,7 +66,7 @@ export default function LoginScreen({ onLoginSuccess }) {
   const submitSignup = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/signup', {
+      const res = await fetch(apiUrl('/api/auth/signup'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
       })
       const data = await res.json()
@@ -80,7 +81,7 @@ export default function LoginScreen({ onLoginSuccess }) {
     setError('')
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(apiUrl('/api/auth/login'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: form.username, password: form.password }),
       })

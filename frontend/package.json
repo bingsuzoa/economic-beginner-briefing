@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:web": "vite build --mode web",
+    "build:app:prod": "vite build --mode app-prod && npx cap sync android",
     "preview": "vite preview"
   },
   "dependencies": {

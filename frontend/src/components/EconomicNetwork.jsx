@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph3D from 'react-force-graph-3d'
 import s from './EconomicNetwork.module.css'
+import { apiUrl } from '../api'
 
 const nodeId = (value) => String(typeof value === 'object' ? value.id : value)
 
@@ -34,7 +35,7 @@ export default function EconomicNetwork() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/economic-network/overview')
+    fetch(apiUrl('/api/economic-network/overview'))
       .then((response) => response.ok ? response.json() : Promise.reject())
       .then((body) => {
         setGraph({
