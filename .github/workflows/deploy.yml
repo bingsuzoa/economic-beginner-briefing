@@ -1,53 +1,32 @@
-name: Deploy Economic Briefing
+name: Deploy Economic Briefing DEV
 
-# push to main only. Do NOT add pull_request: this repository is public and the job runs on a
-# self-hosted runner as SYSTEM, so a fork's PR would execute arbitrary code on the home desktop.
+# This job runs only on the home desktop's self-hosted runner. It deploys the DEV service
+# on :8081; PROD :3000 and its database are intentionally outside this workflow.
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
-# One deploy at a time. Two concurrent runs would fight over the service and the JAR file.
-# cancel-in-progress stays false: killing a deploy midway leaves the service stopped.
+# Deploys change files and restarts a process. Queue a newer revision rather than cancelling an
+# in-progress restart, which could leave DEV stopped halfway through a deployment.
 concurrency:
-  group: deploy-production
+  group: economic-briefing-dev
   cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  deploy:
+  deploy-dev:
     runs-on: [self-hosted, Windows, X64, economic-briefing]
     timeout-minutes: 30
     defaults:
       run:
-        # Not the built-in `shell: powershell`. That one runs `powershell -command ". '<step>.ps1'"`
-        # with no -ExecutionPolicy flag, and this runner is a service running as SYSTEM: SYSTEM has
-        # no CurrentUser policy and LocalMachine is Undefined, so its effective policy is Restricted
-        # and every step dies in under a second with "running scripts is disabled on this system".
-        # Setting the machine-wide policy would fix it too; keeping it here keeps the workaround in
-        # the repository instead of in undocumented machine state.
-        # A custom shell string skips the built-in template, so the two things that template adds -
-        # stop-on-error and exit-code propagation - have to be spelled out.
         shell: powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; . '{0}'; exit $LASTEXITCODE"
 
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v4
-
-      # A UI-only commit once swapped the live fetch for a bundled mockData.js and left the real
-      # call commented out. The pipeline deployed it exactly as told, and the public site served
-      # fabricated briefings while the API was returning real ones. Cheap check, runs before the
-      # build so it fails in seconds.
-      - name: Guard against mock data in the frontend
-        run: |
-          $hits = Get-ChildItem frontend\src -Recurse -File -Include *.js,*.jsx |
-                  Select-String -Pattern 'mockData|mockNews'
-          if ($hits) {
-            $hits | ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber): $($_.Line.Trim())" }
-            throw 'Mock data is referenced in frontend/src. Restore the real API call before deploying.'
-          }
-          Write-Host 'No mock data references in frontend/src.'
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -55,34 +34,63 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # No actions/cache for Gradle on purpose. A self-hosted runner keeps ~/.gradle between
-      # runs, so the dependency cache is already warm on disk; actions/cache would instead
-      # push and pull hundreds of MB over a home uplink every run and count against the 10 GB
-      # repo cache quota. If this ever moves to a GitHub-hosted runner, add
-      # `cache: gradle` to the setup-java step above.
+      - name: Test and build boot JAR
+        run: .\gradlew.bat test bootJar --console=plain
 
-      - name: Test
-        run: .\gradlew.bat test --console=plain
+      - name: Locate boot JAR
+        run: |
+          $jars = @(Get-ChildItem build\libs -File -Filter '*.jar' |
+            Where-Object { $_.Name -notlike '*-plain.jar' -and $_.Name -notlike '*-tests.jar' })
+          if ($jars.Count -ne 1) { throw "Expected one boot JAR, found $($jars.Count)." }
+          "BOOT_JAR=$($jars[0].FullName)" | Add-Content $env:GITHUB_ENV
 
-      # Builds the JAR and the frontend here in the workspace, then stops the service, copies
-      # the artifacts into the production directory and restarts. Production's git tree is
-      # never touched, so a deploy cannot disturb whatever branch is checked out there.
-      # Rolls back to the previous JAR automatically if the new one fails its health check.
-      - name: Deploy
-        run: >
-          powershell -NoProfile -ExecutionPolicy Bypass -File scripts\deploy.ps1
-          -ProdRoot "C:\economic-beginner-briefing"
+      - name: Deploy DEV backend
+        run: |
+          $root = 'C:\economic-beginner-briefing'
+          $start = Join-Path $root 'start-dev.ps1'
+          $stop = Join-Path $root 'stop-dev.ps1'
+          $target = Join-Path $root 'deploy\dev\economic-briefing.jar'
+          foreach ($path in @($start, $stop)) { if (-not (Test-Path $path)) { throw "Missing DEV script: $path" } }
 
-      - name: Health check
-        run: >
-          powershell -NoProfile -ExecutionPolicy Bypass -File scripts\health-check.ps1
-          -TimeoutSec 120
+          $startText = Get-Content $start -Raw
+          if ($startText -notmatch '(?i)(spring\.profiles\.active|spring_profiles_active).*dev') { throw 'start-dev.ps1 does not force profile=dev.' }
+          if ($startText -notmatch '8081') { throw 'start-dev.ps1 does not target port 8081.' }
+          if ($startText -notmatch 'economic_briefing_dev') { throw 'start-dev.ps1 does not target economic_briefing_dev.' }
 
-      - name: Diagnostics on failure
+          function ListenerPids([int]$port) {
+            @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue |
+              Select-Object -ExpandProperty OwningProcess -Unique)
+          }
+          $prodBefore = (ListenerPids 3000) -join ','
+          if (-not $prodBefore) { throw 'PROD safety check failed: port 3000 is not listening.' }
+
+          & $stop
+          if ($LASTEXITCODE -ne 0) { throw 'stop-dev.ps1 failed.' }
+          for ($i = 0; $i -lt 30 -and (ListenerPids 8081); $i++) { Start-Sleep -Seconds 1 }
+          if (ListenerPids 8081) { throw 'DEV safety check failed: port 8081 is still listening.' }
+          if (((ListenerPids 3000) -join ',') -ne $prodBefore) { throw 'PROD safety check failed: port 3000 changed during DEV stop.' }
+
+          if (Test-Path $target) {
+            $backup = Join-Path (Split-Path $target -Parent) 'backup\economic-briefing.jar.prev'
+            New-Item -ItemType Directory -Force (Split-Path $backup -Parent) | Out-Null
+            Copy-Item $target $backup -Force
+          }
+          Copy-Item $env:BOOT_JAR $target -Force
+
+          & $start
+          if ($LASTEXITCODE -ne 0) { throw 'start-dev.ps1 failed.' }
+          & .\scripts\health-check.ps1 -Url 'http://127.0.0.1:8081/api/health/briefing' -TimeoutSec 60 -IntervalSec 5 -Strict
+          if ($LASTEXITCODE -ne 0) { throw 'DEV health check failed.' }
+          $health = (Invoke-WebRequest 'http://127.0.0.1:8081/api/health/briefing' -UseBasicParsing).Content | ConvertFrom-Json
+          if ($health.status -ne 'UP' -or $health.dbConnected -ne $true) { throw 'DEV health response is not UP with a connected database.' }
+          if (((ListenerPids 3000) -join ',') -ne $prodBefore) { throw 'PROD safety check failed: port 3000 changed during DEV deployment.' }
+
+      - name: DEV diagnostics on failure
         if: failure()
         run: |
-          Get-Service EconomicBriefing, postgresql-x64-17, cloudflared | Format-Table Name, Status
-          Write-Host '--- service-stdout.log (tail) ---'
-          Get-Content C:\economic-beginner-briefing\logs\service-stdout.log -Tail 80 -ErrorAction SilentlyContinue
-          Write-Host '--- service-stderr.log (tail) ---'
-          Get-Content C:\economic-beginner-briefing\logs\service-stderr.log -Tail 40 -ErrorAction SilentlyContinue
+          Get-NetTCPConnection -State Listen -LocalPort 8081,3000 -ErrorAction SilentlyContinue |
+            Format-Table LocalPort, OwningProcess, State
+          Write-Host '--- dev-server.stdout.log (tail) ---'
+          Get-Content C:\economic-beginner-briefing\logs\dev-server.stdout.log -Tail 120 -ErrorAction SilentlyContinue
+          Write-Host '--- dev-server.stderr.log (tail) ---'
+          Get-Content C:\economic-beginner-briefing\logs\dev-server.stderr.log -Tail 120 -ErrorAction SilentlyContinue
