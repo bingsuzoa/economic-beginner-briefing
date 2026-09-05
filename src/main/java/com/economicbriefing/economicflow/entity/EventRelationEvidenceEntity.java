@@ -24,4 +24,5 @@ public class EventRelationEvidenceEntity {
     public void setEvidenceHash(String value) { evidenceHash = value; }
     public void setEvidenceType(ArticleAnalysisResponse.StatementType value) { evidenceType = value; }
     public void setSpeaker(String value) { speaker = value; }
+    public EventRelationEntity getRelation() { return relation; }
 }

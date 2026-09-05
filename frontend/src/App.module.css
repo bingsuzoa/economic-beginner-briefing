@@ -12,10 +12,9 @@
 .main {
   flex: 1;
   min-width: 0;
-  background: #FFD43B;
+  background: #fff;
   padding: 24px 32px;
 }
-.newsMain { background: #fff; }
 .articleList {
   display: grid;
   gap: 10px;

@@ -20,3 +20,10 @@ export async function fetchCurrentExchangeRate(currency) {
   if (!response.ok || !body.success) throw new Error(body.message || '현재 환율을 불러오지 못했어요.')
   return body.data
 }
+
+export async function fetchExchangeRateBriefing(currency) {
+  const response = await apiFetch(`/api/exchange-rate/briefing/${currency}`)
+  const body = await response.json()
+  if (!response.ok || !body.success) throw new Error(body.message || '환율 설명을 불러오지 못했어요.')
+  return body.data
+}

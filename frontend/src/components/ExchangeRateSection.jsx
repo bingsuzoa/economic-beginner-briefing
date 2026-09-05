@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import s from './ExchangeRateSection.module.css'
-import { EXCHANGE_RATE_PERIODS, fetchCurrentExchangeRate, fetchExchangeRateHistory } from '../data/exchangeRate'
+import { EXCHANGE_RATE_PERIODS, fetchCurrentExchangeRate, fetchExchangeRateBriefing, fetchExchangeRateHistory } from '../data/exchangeRate'
+import { formatRelativeTime } from './NewsCard'
 
 const formatRate = (value) => value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const formatPercent = (value) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
@@ -44,7 +45,7 @@ const impacts = {
 
 function RateChart({ points, average }) {
   const width = 760
-  const height = 260
+  const height = 210
   const padding = 28
   const rates = points.map(({ rate }) => rate)
   const min = Math.min(...rates, average)
@@ -79,6 +80,7 @@ export default function ExchangeRateSection() {
   const [error, setError] = useState(null)
   const [current, setCurrent] = useState(null)
   const [currentError, setCurrentError] = useState(false)
+  const [briefing, setBriefing] = useState(null)
 
   useEffect(() => {
     let active = true
@@ -87,6 +89,13 @@ export default function ExchangeRateSection() {
     fetchCurrentExchangeRate(currency)
       .then((result) => active && setCurrent(result))
       .catch(() => active && setCurrentError(true))
+    return () => { active = false }
+  }, [currency])
+
+  useEffect(() => {
+    let active = true
+    setBriefing(null)
+    fetchExchangeRateBriefing(currency).then((result) => active && setBriefing(result)).catch(() => {})
     return () => { active = false }
   }, [currency])
 
@@ -125,6 +134,20 @@ export default function ExchangeRateSection() {
   return (
     <section className={s.section} aria-labelledby="exchange-rate-title">
       {currencySelector}
+      {briefing && <article className={s.briefing}>
+        <p className={s.briefingEyebrow}>🐥 지금 환율, 왜 움직였을까요?</p>
+        <h3>{briefing.title}</h3>
+        <p>{briefing.explanation}</p>
+        {briefing.flow?.length > 0 && <div className={s.flow} aria-label="기사의 경제 흐름">
+          {briefing.flow.map((item, index) => <span key={`${item.from}-${item.to}`}>
+            {index > 0 && <b>→</b>}{item.from} <b>→</b> {item.to}
+          </span>)}
+        </div>}
+        <div className={s.briefingFooter}>
+          <span>{briefing.publishedAt && `${formatRelativeTime(briefing.publishedAt)} · `}{briefing.source || '연합뉴스'}</span>
+          <a href={briefing.articleUrl} target="_blank" rel="noreferrer">기사 자세히 보기 →</a>
+        </div>
+      </article>}
       <header className={s.header}>
         <div>
           <p className={s.eyebrow}>{data.flag} 원/{data.currencyName} 환율</p>

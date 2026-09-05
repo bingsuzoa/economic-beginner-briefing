@@ -79,7 +79,7 @@ export default function App() {
       <Navbar user={user} onLogout={() => setUser(null)} onAccountClick={() => selectMenu('account')} />
       <div className={s.layout}>
         <Sidebar activeMenu={activeMenu} onMenuChange={selectMenu} onAccountClick={() => selectMenu('account')} />
-        <main className={`${s.main} ${activeMenu === 'news' ? s.newsMain : ''}`}>
+        <main className={s.main}>
           {activeMenu === 'account' && <AccountManagement user={user} onDeleted={() => setUser(null)} />}
           {activeMenu === 'home' && <ExchangeRateSection />}
           {activeMenu === 'network' && <Suspense fallback={<div className={s.status}>3D 경제망을 준비하고 있어요...</div>}>
