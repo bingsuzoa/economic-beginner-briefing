@@ -1,6 +1,6 @@
 import s from './SourceList.module.css'
 
-export default function SourceList({ sources, originalUrl, sourceName, originalTitle, author, publishedAt, modelName, analyzedAt }) {
+export default function SourceList({ originalUrl, sourceName, originalTitle, author, publishedAt, modelName, analyzedAt }) {
   return (
     <div className={s.section}>
       <div className={s.title}>출처 및 정보</div>
@@ -43,22 +43,6 @@ export default function SourceList({ sources, originalUrl, sourceName, originalT
         </div>
       )}
 
-      {/* Additional sources from analysis */}
-      {sources && sources.length > 0 && (
-        <>
-          <div className={s.subtitle}>추가 참고자료</div>
-          <ul className={s.list}>
-            {sources.map((src, i) => (
-              <li key={src.articleId || i}>
-                <a href={src.url} target="_blank" rel="noopener noreferrer">
-                  [{src.sourceName}] {src.title}
-                </a>
-                {src.isPrimary && <span className={s.badge}>주요</span>}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
     </div>
   )
 }

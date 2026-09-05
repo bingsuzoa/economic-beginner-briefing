@@ -66,7 +66,6 @@ export default function NewsCard({ news, onMarkRead, showReadState = true }) {
   const evidenceClass = s[evidenceStatus.toLowerCase()] || ''
   const summary = news.threeLineSummary || []
   const terms = news.terms || []
-  const sources = news.sources || []
 
   const cardRef = useRef(null)
   const [isRead, setIsRead] = useState(!!news.readAt)
@@ -169,7 +168,6 @@ export default function NewsCard({ news, onMarkRead, showReadState = true }) {
       {terms.length > 0 && <TermsAccordion terms={terms} />}
 
       <SourceList
-        sources={sources}
         originalUrl={news.originalUrl}
         sourceName={news.sourceName}
         originalTitle={news.originalTitle}

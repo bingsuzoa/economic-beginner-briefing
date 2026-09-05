@@ -55,6 +55,7 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
     private final com.economicbriefing.economicflow.EconomicFlowRetriever economicFlowRetriever;
     private final RelationValidator relationValidator;
     private final EconomicFlowJudge economicFlowJudge;
+    private final RelationDeduplicator relationDeduplicator;
     private final RelationCandidateExtractor relationCandidateExtractor;
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -81,6 +82,7 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         this.economicFlowRetriever = economicFlowRetriever;
         this.relationValidator = new RelationValidator(aiClient, objectMapper, openAiProperties, appProperties);
         this.economicFlowJudge = new EconomicFlowJudge(aiClient, objectMapper, openAiProperties, appProperties);
+        this.relationDeduplicator = new RelationDeduplicator(aiClient, objectMapper, openAiProperties, appProperties);
         this.relationCandidateExtractor = new RelationCandidateExtractor(aiClient, objectMapper, appProperties);
     }
 
@@ -97,6 +99,8 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                 : new RelationValidator(aiClient, objectMapper, openAiProperties, appProperties);
         this.economicFlowJudge = openAiProperties == null || appProperties == null ? null
                 : new EconomicFlowJudge(aiClient, objectMapper, openAiProperties, appProperties);
+        this.relationDeduplicator = openAiProperties == null || appProperties == null ? null
+                : new RelationDeduplicator(aiClient, objectMapper, openAiProperties, appProperties);
         this.relationCandidateExtractor = appProperties == null ? null
                 : new RelationCandidateExtractor(aiClient, objectMapper, appProperties);
     }
@@ -428,7 +432,8 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                     bundle.eventCandidates(), bundle.eventRelations(), bundle.economicFlows());
         }
         if (relationValidator == null) return bundle;
-        return economicFlowJudge.judge(relationValidator.validate(bundle));
+        bundle = economicFlowJudge.judge(relationValidator.validate(bundle));
+        return relationDeduplicator == null ? bundle : relationDeduplicator.deduplicate(bundle);
     }
 
     private AnalyzerDraftBundle callAndParseArticleAnalysis(
