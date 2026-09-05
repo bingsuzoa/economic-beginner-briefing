@@ -6,5 +6,5 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record SelectionResponse(
-        List<String> selectedArticleIds
+        List<Integer> selectedArticleIndexes
 ) {}

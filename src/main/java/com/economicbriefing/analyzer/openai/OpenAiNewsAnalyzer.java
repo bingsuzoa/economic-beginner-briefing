@@ -124,24 +124,18 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         );
 
         com.economicbriefing.analyzer.openai.dto.SelectionResponse selectionResponse = RetryExecutor.execute(
-                () -> callAndParseSelection(selectionPrompt),
+                () -> callAndParseSelection(selectionPrompt, request.articles().size(), request.maxSelectedNews()),
                 appProperties.retry()
         );
 
-        List<String> selectedIds = selectionResponse.selectedArticleIds();
-        log.info("Stage 1 completed: selected {} articles", selectedIds.size());
+        List<Integer> selectedIndexes = selectionResponse.selectedArticleIndexes();
+        log.info("Stage 1 completed: selected {} articles", selectedIndexes.size());
+        if (selectedIndexes.isEmpty()) {
+            return emptySelectionResult(request);
+        }
 
-        // Filter selected articles in order
-        Map<String, com.economicbriefing.domain.article.Article> articleMap = request.articles().stream()
-                .collect(Collectors.toMap(
-                        com.economicbriefing.domain.article.Article::id,
-                        a -> a
-                ));
-
-        List<com.economicbriefing.domain.article.Article> selectedArticles = articleBodyFetcher.enrich(selectedIds.stream()
-                .map(articleMap::get)
-                .filter(a -> a != null)
-                .toList());
+        List<com.economicbriefing.domain.article.Article> selectedArticles = articleBodyFetcher.enrich(
+                selectedArticles(request.articles(), selectedIndexes));
 
         // Stage 2: Article analysis
         log.info("Stage 2: Structuring selected article evidence...");
@@ -217,9 +211,11 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                 request.targetHour()
         );
 
+        Set<String> selectedArticleIds = selectedArticles.stream()
+                .map(com.economicbriefing.domain.article.Article::id).collect(Collectors.toSet());
         List<String> rejectedArticleIds = request.articles().stream()
                 .map(com.economicbriefing.domain.article.Article::id)
-                .filter(id -> !selectedIds.contains(id))
+                .filter(id -> !selectedArticleIds.contains(id))
                 .toList();
 
         log.info("AI analysis completed: selected={}, rejected={}",
@@ -229,6 +225,15 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                 briefing, rejectedArticleIds, List.of(), validation, articleAnalysis, routerResult,
                 analyzerBundle.eventCandidates(), analyzerBundle.eventRelations(), presentations,
                 openAiProperties.model(), ArticleAnalyzerPromptBuilder.PROMPT_VERSION);
+    }
+
+    private AnalyzeNewsResult emptySelectionResult(AnalyzeNewsRequest request) {
+        Briefing briefing = BriefingBuilder.build(new AiResponse(List.of(), List.of(), List.of()),
+                request.targetDate(), List.of(), request.articles().size(), openAiProperties.model(),
+                ArticleAnalyzerPromptBuilder.PROMPT_VERSION, request.briefingTitle(), request.targetHour());
+        return new AnalyzeNewsResult(briefing,
+                request.articles().stream().map(com.economicbriefing.domain.article.Article::id).toList(),
+                List.of("No articles selected by the selection stage"));
     }
 
     private com.economicbriefing.economicflow.EconomicPrincipleRetriever.Context presenterPrinciples(
@@ -397,12 +402,13 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         return value == null || value.isBlank();
     }
 
-    private com.economicbriefing.analyzer.openai.dto.SelectionResponse callAndParseSelection(String userPrompt) {
+    private com.economicbriefing.analyzer.openai.dto.SelectionResponse callAndParseSelection(
+            String userPrompt, int articleCount, int maxSelectedNews) {
         String content = aiClient.complete(
                 com.economicbriefing.analyzer.openai.prompt.SelectionPromptBuilder.SYSTEM_PROMPT,
                 userPrompt
         );
-        return parseSelection(content);
+        return parseSelection(content, articleCount, maxSelectedNews);
     }
 
     private AiResponse callAndParseAnalysis(String userPrompt) {
@@ -875,18 +881,36 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                 """.formatted(error.getMessage(), allowed).trim();
     }
 
-    private com.economicbriefing.analyzer.openai.dto.SelectionResponse parseSelection(String content) {
+    com.economicbriefing.analyzer.openai.dto.SelectionResponse parseSelection(
+            String content, int articleCount, int maxSelectedNews) {
         log.info("Parsing selection response...");
         try {
             com.economicbriefing.analyzer.openai.dto.SelectionResponse response =
                     objectMapper.readValue(content, com.economicbriefing.analyzer.openai.dto.SelectionResponse.class);
-            log.info("Selection parsed successfully: {} articles selected", response.selectedArticleIds().size());
+            if (response.selectedArticleIndexes() == null) {
+                throw new IllegalArgumentException("selectedArticleIndexes is required");
+            }
+            if (response.selectedArticleIndexes().size() > maxSelectedNews) {
+                throw new IllegalArgumentException("Selection cannot exceed " + maxSelectedNews + " articles");
+            }
+            Set<Integer> seen = new java.util.HashSet<>();
+            for (Integer index : response.selectedArticleIndexes()) {
+                if (index == null || index < 1 || index > articleCount || !seen.add(index)) {
+                    throw new IllegalArgumentException("Selection index must be unique and between 1 and " + articleCount);
+                }
+            }
+            log.info("Selection parsed successfully: {} articles selected", response.selectedArticleIndexes().size());
             return response;
-        } catch (JsonProcessingException e) {
+        } catch (JsonProcessingException | IllegalArgumentException e) {
             log.error("Failed to parse selection response", e);
             log.error("Full content for debugging: {}", content);
-            throw new AnalyzeException(ErrorCode.ANALYZE_VALIDATION_ERROR, e);
+            throw new AnalyzeException(ErrorCode.ANALYZE_SELECTION_ERROR, e);
         }
+    }
+
+    static List<com.economicbriefing.domain.article.Article> selectedArticles(
+            List<com.economicbriefing.domain.article.Article> articles, List<Integer> indexes) {
+        return indexes.stream().map(index -> articles.get(index - 1)).toList();
     }
 
     private AiResponse parseAndValidateAnalysis(String content) {

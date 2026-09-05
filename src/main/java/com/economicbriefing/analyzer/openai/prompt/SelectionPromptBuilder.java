@@ -33,8 +33,10 @@ public final class SelectionPromptBuilder {
 
             JSON 형식으로 응답하세요:
             {
-              "selectedArticleIds": ["article-id-1", "article-id-2", ...]
+              "selectedArticleIndexes": [1, 2, ...]
             }
+            selectedArticleIndexes에는 기사 목록의 대괄호 안 1-based 순번만 정수로 넣으세요.
+            article ID를 복사하거나 문자열로 반환하지 마세요.
             """;
 
     public static String build(
@@ -70,7 +72,8 @@ public final class SelectionPromptBuilder {
                 %s
 
                 ## 요청사항
-                위 기사 중 대상 독자에게 가장 중요한 뉴스를 최대 %d개 선별하여 article ID만 반환하세요.
+                위 기사 중 대상 독자에게 가장 중요한 뉴스를 최대 %d개 선별하여 기사 순번만 반환하세요.
+                예: [3]번과 [7]번을 고르면 {"selectedArticleIndexes":[3,7]}를 반환합니다.
                 같은 사건에 대한 기사는 하나만 선택하세요.
                 """
                 .formatted(

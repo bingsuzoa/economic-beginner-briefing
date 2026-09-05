@@ -52,6 +52,7 @@ class YonhapCollectionAccuracyTest {
             Map.entry("society", "https://www.yna.co.kr/rss/society.xml"),
             Map.entry("international", "https://www.yna.co.kr/rss/international.xml"),
             Map.entry("industry", "https://www.yna.co.kr/rss/industry.xml"),
+            Map.entry("market", "https://www.yna.co.kr/rss/market.xml"),
             Map.entry("culture", "https://www.yna.co.kr/rss/culture.xml")
     );
 

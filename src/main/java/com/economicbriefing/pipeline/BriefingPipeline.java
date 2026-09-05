@@ -243,6 +243,15 @@ public class BriefingPipeline {
             return executionLog;
         }
 
+        if (analyzeResult.briefing().news().isEmpty()) {
+            log.info("No articles selected for briefing, finishing successfully");
+            executionLog.setSelectedNewsCount(0);
+            executionTracker.log(runId, "INFO", "ANALYZE", "ANALYZE_EMPTY",
+                    "선별 기준을 충족한 기사가 없습니다.");
+            executionLog.markSuccess(KstDateTimeUtil.now());
+            return executionLog;
+        }
+
         // 2.5 Validate analyze result
         PipelineDataValidator.AnalyzeValidationResult analyzeValidation =
                 validator.validateAnalyzeResult(analyzeResult, targetDate);

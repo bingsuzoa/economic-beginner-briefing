@@ -100,7 +100,6 @@ export default function EconomicNetwork() {
     <section className={s.section}>
       <header>
         <p className={s.eyebrow}>THOTH ECONOMIC NETWORK</p>
-        <h1>토트 경제망</h1>
         <p>경제 세계를 돌려보고, 궁금한 지점을 누르면 연결된 원인과 결과를 가까이 볼 수 있어요.</p>
       </header>
 

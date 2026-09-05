@@ -26,6 +26,7 @@ public class YonhapSourceAdapter extends AbstractRssSourceAdapter {
             "https://www.yna.co.kr/rss/society.xml",
             "https://www.yna.co.kr/rss/international.xml",
             "https://www.yna.co.kr/rss/industry.xml",
+            "https://www.yna.co.kr/rss/market.xml",
             "https://www.yna.co.kr/rss/culture.xml"
     );
 
