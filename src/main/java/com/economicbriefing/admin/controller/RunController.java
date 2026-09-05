@@ -6,6 +6,7 @@ import java.util.Map;
 
 import com.economicbriefing.admin.dto.ApiResponse;
 import com.economicbriefing.admin.dto.PageResponse;
+import com.economicbriefing.admin.ManualArticleFetcher;
 import com.economicbriefing.admin.entity.PipelineLogEntity;
 import com.economicbriefing.admin.entity.PipelineRunEntity;
 import com.economicbriefing.admin.repository.PipelineItemRepository;
@@ -35,18 +36,21 @@ public class RunController {
     private final PipelineItemRepository itemRepo;
     private final PipelineExecutionService executionService;
     private final AdminProperties adminProperties;
+    private final ManualArticleFetcher manualArticleFetcher;
 
     public RunController(
             PipelineRunRepository runRepo,
             PipelineLogRepository logRepo,
             PipelineItemRepository itemRepo,
             PipelineExecutionService executionService,
-            AdminProperties adminProperties) {
+            AdminProperties adminProperties,
+            ManualArticleFetcher manualArticleFetcher) {
         this.runRepo = runRepo;
         this.logRepo = logRepo;
         this.itemRepo = itemRepo;
         this.executionService = executionService;
         this.adminProperties = adminProperties;
+        this.manualArticleFetcher = manualArticleFetcher;
     }
 
     @GetMapping("/runs")
@@ -153,5 +157,21 @@ public class RunController {
 
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(ApiResponse.ok(Map.of("message", "파이프라인 실행이 시작되었습니다.")));
+    }
+
+    /** Analyzes one operator-supplied Yonhap URL without invoking RSS collection. */
+    @PostMapping("/articles")
+    public ResponseEntity<ApiResponse<?>> triggerArticle(@RequestBody(required = false) Map<String, String> body) {
+        try {
+            var article = manualArticleFetcher.fetch(body != null ? body.get("url") : null);
+            if (!executionService.tryRunAsync(PipelineOptions.ofToday(), List.of(article))) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(ApiResponse.error("PIPELINE_ALREADY_RUNNING", "파이프라인이 이미 실행 중입니다."));
+            }
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(Map.of(
+                    "message", "단일 기사 분석이 시작되었습니다.", "articleId", article.id(), "url", article.url())));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("INVALID_ARTICLE_URL", e.getMessage()));
+        }
     }
 }

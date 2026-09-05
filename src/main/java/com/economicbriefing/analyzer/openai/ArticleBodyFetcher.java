@@ -77,7 +77,7 @@ public class ArticleBodyFetcher {
         return response.body();
     }
 
-    static ExtractedBody extractYonhap(String html) {
+    public static ExtractedBody extractYonhap(String html) {
         var body = YONHAP_BODY.matcher(html);
         if (!body.find()) return new ExtractedBody("", 0);
 
@@ -136,5 +136,5 @@ public class ArticleBodyFetcher {
                 article.language(), content);
     }
 
-    record ExtractedBody(String body, int paragraphs) {}
+    public record ExtractedBody(String body, int paragraphs) {}
 }

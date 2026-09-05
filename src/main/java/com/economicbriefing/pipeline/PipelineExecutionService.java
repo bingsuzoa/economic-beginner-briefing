@@ -1,9 +1,11 @@
 package com.economicbriefing.pipeline;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import com.economicbriefing.domain.execution.ExecutionLog;
+import com.economicbriefing.domain.article.Article;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -58,6 +60,11 @@ public class PipelineExecutionService {
      * @return false when another run holds the lock
      */
     public boolean tryRunAsync(PipelineOptions options) {
+        return tryRunAsync(options, null);
+    }
+
+    /** Starts the same pipeline for an operator-supplied article without touching RSS collection. */
+    public boolean tryRunAsync(PipelineOptions options, List<Article> suppliedArticles) {
         String token = newToken();
         String source = sourceOf(options);
 
@@ -66,7 +73,7 @@ public class PipelineExecutionService {
             return false;
         }
 
-        Thread.startVirtualThread(() -> runHoldingLock(token, options, source));
+        Thread.startVirtualThread(() -> runHoldingLock(token, options, source, suppliedArticles));
         return true;
     }
 
@@ -80,11 +87,17 @@ public class PipelineExecutionService {
      * lock held and block every later run.
      */
     private ExecutionLog runHoldingLock(String token, PipelineOptions options, String source) {
+        return runHoldingLock(token, options, source, null);
+    }
+
+    private ExecutionLog runHoldingLock(String token, PipelineOptions options, String source,
+                                        List<Article> suppliedArticles) {
         long startedAt = System.nanoTime();
         log.info("[{}] Pipeline started", source);
 
         try {
-            ExecutionLog result = pipeline.run(options);
+            ExecutionLog result = suppliedArticles == null ? pipeline.run(options)
+                    : pipeline.run(options, suppliedArticles);
             log.info("[{}] Pipeline finished ({}s) status={}",
                     source, elapsedSeconds(startedAt), result.getStatus());
             return result;

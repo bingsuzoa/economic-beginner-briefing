@@ -117,6 +117,11 @@ public class BriefingPipeline {
     }
 
     public ExecutionLog run(PipelineOptions options) {
+        return run(options, null);
+    }
+
+    /** Runs the normal analysis/persistence flow for operator-supplied articles. */
+    public ExecutionLog run(PipelineOptions options, List<Article> suppliedArticles) {
         LocalDate targetDate = options.targetDate() != null
                 ? options.targetDate()
                 : KstDateTimeUtil.getCurrentDate();
@@ -129,7 +134,9 @@ public class BriefingPipeline {
         log.info("Starting pipeline: executionId={}, targetDate={}", executionId, targetDate);
 
         // 0. Check duplicate execution
-        String dedupeKey = timeRange != null
+        String dedupeKey = suppliedArticles != null
+                ? "ARTICLE:" + suppliedArticles.get(0).id()
+                : timeRange != null
                 ? targetDate + "T" + String.format("%02d", timeRange.hour())
                 : targetDate.toString();
 
@@ -144,7 +151,7 @@ public class BriefingPipeline {
 
         // Every exit path below must land in finishRun, or the run row stays RUNNING forever.
         try {
-            return execute(executionId, dedupeKey, targetDate, timeRange, executionLog);
+            return execute(executionId, dedupeKey, targetDate, timeRange, suppliedArticles, executionLog);
         } catch (RuntimeException e) {
             log.error("Pipeline aborted unexpectedly", e);
             executionLog.addError(toExecutionError("system", e));
@@ -157,16 +164,22 @@ public class BriefingPipeline {
     }
 
     private ExecutionLog execute(String runId, String dedupeKey, LocalDate targetDate,
-                                 KstDateTimeUtil.TimeRange timeRange, ExecutionLog executionLog) {
+                                 KstDateTimeUtil.TimeRange timeRange, List<Article> suppliedArticles,
+                                 ExecutionLog executionLog) {
 
         // 1. Collect
         CollectNewsResult collectResult;
         try {
             executionTracker.log(runId, "INFO", "COLLECT", "COLLECT_START", "뉴스 수집을 시작합니다.");
-            CollectNewsRequest request = timeRange != null
-                    ? CollectNewsRequest.of(targetDate, timeRange.start(), timeRange.end())
-                    : CollectNewsRequest.of(targetDate);
-            collectResult = collector.collect(request);
+            if (suppliedArticles != null) {
+                collectResult = new CollectNewsResult(targetDate, suppliedArticles, List.of(),
+                        suppliedArticles.size(), suppliedArticles.size(), 0);
+            } else {
+                CollectNewsRequest request = timeRange != null
+                        ? CollectNewsRequest.of(targetDate, timeRange.start(), timeRange.end())
+                        : CollectNewsRequest.of(targetDate);
+                collectResult = collector.collect(request);
+            }
         } catch (Exception e) {
             log.error("Collection failed", e);
             executionLog.addError(toExecutionError("collect", e));

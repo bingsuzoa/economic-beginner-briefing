@@ -7,11 +7,15 @@ import java.util.Optional;
 import com.economicbriefing.admin.entity.PipelineItemEntity;
 import com.economicbriefing.admin.entity.PipelineLogEntity;
 import com.economicbriefing.admin.entity.PipelineRunEntity;
+import com.economicbriefing.admin.ManualArticleFetcher;
 import com.economicbriefing.admin.repository.PipelineItemRepository;
 import com.economicbriefing.admin.repository.PipelineLogRepository;
 import com.economicbriefing.admin.repository.PipelineRunRepository;
 import com.economicbriefing.admin.security.SecurityConfig;
 import com.economicbriefing.pipeline.PipelineExecutionService;
+import com.economicbriefing.domain.article.Article;
+import com.economicbriefing.domain.article.ArticleSourceType;
+import com.economicbriefing.domain.article.NewsCategory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -48,6 +52,9 @@ class RunControllerTest {
 
     @MockitoBean
     private PipelineExecutionService executionService;
+
+    @MockitoBean
+    private ManualArticleFetcher manualArticleFetcher;
 
     private static final String AUTH = "Bearer test-admin-token";
 
@@ -182,6 +189,22 @@ class RunControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"targetDate\": \"2025-01-15\"}"))
                 .andExpect(status().isAccepted());
+    }
+
+    @Test
+    void shouldTriggerSingleArticleAnalysis() throws Exception {
+        Article article = new Article("article-1", "기사 제목", "요약", "연합뉴스",
+                ArticleSourceType.NEWS_MEDIA, OffsetDateTime.now(), OffsetDateTime.now(),
+                "https://www.yna.co.kr/view/AKR1", List.of(NewsCategory.OTHER), "ko", "본문");
+        when(manualArticleFetcher.fetch("https://www.yna.co.kr/view/AKR1")).thenReturn(article);
+        when(executionService.tryRunAsync(any(), anyList())).thenReturn(true);
+
+        mockMvc.perform(post("/api/admin/articles")
+                        .header("Authorization", AUTH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"url\": \"https://www.yna.co.kr/view/AKR1\"}"))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data.articleId").value("article-1"));
     }
 
     private PipelineRunEntity createRun(String id, String status) {
