@@ -89,8 +89,11 @@ class BriefingPipelineTest {
         pipeline.run(PipelineOptions.manual(date));
         long firstCount = analyzerResultRepository.count();
 
-        ExecutionLog failed = new ExecutionLog("exec-analyzer-history", date, KstDateTimeUtil.now());
-        failed.markFailed(KstDateTimeUtil.now());
+        // Make the injected failure unambiguously newer than the first successful run.
+        // Without this, timestamp ties can cause duplicate detection to pick the success row.
+        var failedAt = KstDateTimeUtil.now().plusSeconds(1);
+        ExecutionLog failed = new ExecutionLog("exec-analyzer-history", date, failedAt);
+        failed.markFailed(failedAt);
         executionTracker.startRun("exec-analyzer-history", "2025-01-21", "MANUAL", failed.getStartedAt());
         executionTracker.finishRun("exec-analyzer-history", "2025-01-21", failed);
 
