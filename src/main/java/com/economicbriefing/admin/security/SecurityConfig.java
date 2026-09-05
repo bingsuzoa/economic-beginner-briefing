@@ -2,6 +2,7 @@ package com.economicbriefing.admin.security;
 
 import com.economicbriefing.config.AdminProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -68,10 +69,13 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         var source = new UrlBasedCorsConfigurationSource();
-        if (allowedOrigin.isBlank()) return source;
+        var origins = new ArrayList<String>();
+        if (!allowedOrigin.isBlank()) origins.add(allowedOrigin);
+        if (!requireHttps) origins.addAll(List.of("http://127.0.0.1:5175", "http://localhost:5175"));
+        if (origins.isEmpty()) return source;
 
         var configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(allowedOrigin));
+        configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Content-Type", "Accept"));
         configuration.setAllowCredentials(true);

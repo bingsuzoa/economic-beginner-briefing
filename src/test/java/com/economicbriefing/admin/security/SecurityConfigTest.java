@@ -19,4 +19,15 @@ class SecurityConfigTest {
         assertEquals("https://economic-beginner.onrender.com", cors.getAllowedOrigins().getFirst());
         assertTrue(cors.getAllowCredentials());
     }
+
+    @Test
+    void allowsLocalViteOriginsInDevelopment() {
+        var config = new SecurityConfig(new AdminProperties("token", 20), new ObjectMapper(), false,
+                "https://economic-beginner.onrender.com");
+        var cors = config.corsConfigurationSource().getCorsConfiguration(
+                new MockHttpServletRequest("OPTIONS", "/api/auth/login"));
+
+        assertTrue(cors.getAllowedOrigins().contains("http://127.0.0.1:5175"));
+        assertTrue(cors.getAllowedOrigins().contains("http://localhost:5175"));
+    }
 }

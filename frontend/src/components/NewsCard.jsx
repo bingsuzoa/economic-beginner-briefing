@@ -28,7 +28,9 @@ const EVIDENCE_LABELS = {
 const labelFor = (map, value, fallback) =>
   (value && map[String(value).toUpperCase()]) || value || fallback
 
-const formatRelativeTime = (timestamp) => {
+export const categoryLabel = (value) => labelFor(CATEGORY_LABELS, value, '기타')
+
+export const formatRelativeTime = (timestamp) => {
   if (!timestamp) return ''
   const now = new Date()
   const readTime = new Date(timestamp)
@@ -51,7 +53,7 @@ const formatRelativeTime = (timestamp) => {
   return readTime.toLocaleDateString('ko-KR')
 }
 
-const markAsRead = async (articleId) => {
+export const markAsRead = async (articleId) => {
   try {
     await apiFetch(`/api/briefing/articles/${articleId}/mark-read`, { method: 'POST' })
   } catch (err) {
@@ -59,7 +61,7 @@ const markAsRead = async (articleId) => {
   }
 }
 
-export default function NewsCard({ news, onMarkRead }) {
+export default function NewsCard({ news, onMarkRead, showReadState = true }) {
   const evidenceStatus = news.evidenceStatus || 'EXPECTED'
   const evidenceClass = s[evidenceStatus.toLowerCase()] || ''
   const summary = news.threeLineSummary || []
@@ -134,15 +136,15 @@ export default function NewsCard({ news, onMarkRead }) {
   return (
     <article
       ref={cardRef}
-      className={`${s.card} ${isRead ? s.read : ''}`}
+      className={`${s.card} ${showReadState && isRead ? s.read : ''}`}
       id={news.articleId || news.id}>
       <div className={s.header}>
-        {isRead && readAt && (
+        {showReadState && isRead && readAt && (
           <span className={s.readBadge}>
             읽음 · {formatRelativeTime(readAt)}
           </span>
         )}
-        <span className={s.category}>{labelFor(CATEGORY_LABELS, news.category, '기타')}</span>
+        <span className={s.category}>{categoryLabel(news.category)}</span>
         <span className={`${s.evidence} ${evidenceClass}`}>
           {labelFor(EVIDENCE_LABELS, evidenceStatus, '예상')}
         </span>

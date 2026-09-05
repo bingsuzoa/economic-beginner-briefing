@@ -3,7 +3,8 @@ import s from './App.module.css'
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
 import HeroSection from './components/HeroSection'
-import NewsCard from './components/NewsCard'
+import NewsCard, { categoryLabel, formatRelativeTime, markAsRead } from './components/NewsCard'
+import ExchangeRateSection from './components/ExchangeRateSection'
 import Footer from './components/Footer'
 import BottomNav from './components/BottomNav'
 import LoginScreen from './components/LoginScreen'
@@ -12,15 +13,13 @@ import { apiFetch } from './api'
 
 const EconomicNetwork = lazy(() => import('./components/EconomicNetwork'))
 
-const STOCK_CATEGORIES = ['investment']
-const REALESTATE_CATEGORIES = ['housing', 'jeonse_monthly_rent', 'subscription']
-
 export default function App() {
   const [user, setUser] = useState(undefined) // undefined = loading, null = not logged in
   const [news, setNews] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [activeMenu, setActiveMenu] = useState('news')
+  const [activeMenu, setActiveMenu] = useState('home')
+  const [selectedArticle, setSelectedArticle] = useState(null)
 
   useEffect(() => {
     apiFetch('/api/auth/me')
@@ -30,7 +29,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const titles = { news: 'Thoth - 오늘의 토트', stock: 'Thoth - 주식', realestate: 'Thoth - 부동산', network: 'Thoth - 토트 경제망', loan: 'Thoth - 대출계산기' }
+    const titles = { home: 'Thoth - 홈', news: 'Thoth - 오늘의 토트', network: 'Thoth - 토트 경제망' }
     document.title = titles[activeMenu] || 'Thoth'
   }, [activeMenu])
 
@@ -57,35 +56,38 @@ export default function App() {
   // not logged in → login screen
   if (user === null) return <LoginScreen onLoginSuccess={setUser} />
 
+  const selectMenu = (menu) => {
+    setActiveMenu(menu)
+    if (menu !== 'news') setSelectedArticle(null)
+  }
+
+  const markArticleRead = (articleId, readAt) => {
+    setNews(current => current.map(article => article.articleId === articleId ? { ...article, readAt } : article))
+  }
+
+  const openArticle = (article) => {
+    const readAt = article.readAt || new Date().toISOString()
+    setSelectedArticle({ ...article, readAt })
+    if (!article.readAt) {
+      markArticleRead(article.articleId, readAt)
+      markAsRead(article.articleId)
+    }
+  }
+
   return (
-    <>
-      <Navbar user={user} onLogout={() => setUser(null)} onAccountClick={() => setActiveMenu('account')} />
+    <div className={s.page}>
+      <Navbar user={user} onLogout={() => setUser(null)} onAccountClick={() => selectMenu('account')} />
       <div className={s.layout}>
-        <Sidebar activeMenu={activeMenu} onMenuChange={setActiveMenu} onAccountClick={() => setActiveMenu('account')} />
-        <main className={s.main}>
+        <Sidebar activeMenu={activeMenu} onMenuChange={selectMenu} onAccountClick={() => selectMenu('account')} />
+        <main className={`${s.main} ${activeMenu === 'news' ? s.newsMain : ''}`}>
           {activeMenu === 'account' && <AccountManagement user={user} onDeleted={() => setUser(null)} />}
+          {activeMenu === 'home' && <ExchangeRateSection />}
           {activeMenu === 'network' && <Suspense fallback={<div className={s.status}>3D 경제망을 준비하고 있어요...</div>}>
             <EconomicNetwork />
           </Suspense>}
-          {activeMenu === 'news' && <HeroSection />}
-          {activeMenu === 'stock' && (
-            <section className={s.loanHero}>
-              <img src="/images/stock-hero.png" alt="주식" className={s.loanImage} />
-            </section>
-          )}
-          {activeMenu === 'realestate' && (
-            <section className={s.loanHero}>
-              <img src="/images/realestate-hero.png" alt="부동산" className={s.loanImage} />
-            </section>
-          )}
-          {activeMenu === 'loan' && (
-            <div className={s.loanHero}>
-              <img src="/images/loan-hero.png" alt="대출계산기" className={s.loanImage} />
-              <p className={s.loanMessage}>대출계산기는 업데이트중이예요.</p>
-            </div>
-          )}
-          {['news', 'stock', 'realestate'].includes(activeMenu) && (
+          {activeMenu === 'news' && (
             <>
+              {!selectedArticle && <HeroSection />}
               {loading && (
                 <div className={s.status}>
                   <span className={s.chick}>🐥</span>
@@ -99,23 +101,27 @@ export default function App() {
               )}
               {!loading && !error && news.length === 0 && (
                 <div className={s.status}>
-                  아직 분석이 완료된 경제 뉴스가 없어요.<br />잠시 후 다시 확인해주세요.
+                  토트가 열심히 기사를 찾고 있어요.
                 </div>
               )}
-              {news.filter((n) => {
-                const cat = (n.category || '').toLowerCase()
-                if (activeMenu === 'stock') return STOCK_CATEGORIES.includes(cat)
-                if (activeMenu === 'realestate') return REALESTATE_CATEGORIES.includes(cat)
-                return !STOCK_CATEGORIES.includes(cat) && !REALESTATE_CATEGORIES.includes(cat)
-              }).map((n, i) => (
-                <NewsCard key={n.articleId || n.id || i} news={n} />
-              ))}
+              {!loading && !error && selectedArticle && <>
+                <button className={s.backToList} onClick={() => setSelectedArticle(null)}>← 오늘의 토트 목록</button>
+                <NewsCard news={selectedArticle} onMarkRead={markArticleRead} showReadState={false} />
+              </>}
+              {!loading && !error && !selectedArticle && <section className={s.articleList} aria-label="오늘의 토트 기사 목록">
+                {news.map((article, index) => (
+                  <button key={article.articleId || article.id || index} className={`${s.articleRow} ${article.readAt ? s.articleRead : ''}`} onClick={() => openArticle(article)}>
+                    <span className={s.articleMeta}>{article.readAt ? `읽음 · ${formatRelativeTime(article.readAt)}` : `${categoryLabel(article.category)} · 발행 ${new Date(article.publishedAt).toLocaleString('ko-KR')}`}</span>
+                    <strong>{article.easyTitle || article.originalTitle || '제목 없음'}</strong>
+                  </button>
+                ))}
+              </section>}
             </>
           )}
         </main>
       </div>
       <Footer />
-      <BottomNav activeMenu={activeMenu} onMenuChange={setActiveMenu} />
-    </>
+      <BottomNav activeMenu={activeMenu} onMenuChange={selectMenu} />
+    </div>
   )
 }

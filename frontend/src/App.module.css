@@ -1,12 +1,61 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
 .layout {
   display: flex;
   gap: 8px;
+  flex: 1;
 }
 .main {
   flex: 1;
   min-width: 0;
   background: #FFD43B;
   padding: 24px 32px;
+}
+.newsMain { background: #fff; }
+.articleList {
+  display: grid;
+  gap: 10px;
+}
+.articleRow {
+  width: 100%;
+  min-height: 72px;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--color-card);
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+  box-shadow: var(--shadow);
+}
+.articleRow:hover { transform: translateY(-1px); }
+.articleRead {
+  background: #f4f4f4;
+  color: #777;
+}
+.articleRow strong {
+  display: block;
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+.articleMeta {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+.backToList {
+  margin-bottom: 12px;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font-weight: 700;
 }
 .status {
   text-align: center;
@@ -44,6 +93,7 @@
 @media (max-width: 700px) {
   /* 사이드바가 숨는 구간. 좌우 12px만 남겨 콘텐츠가 화면 폭의 92~96%를 쓰게 한다. */
   .main { padding: 16px 12px calc(60px + env(safe-area-inset-bottom, 0px)); }
+  .articleRow { min-height: 72px; padding: 14px 16px; }
   .status { padding: 32px 8px; font-size: 1rem; }
   .loanHero { padding: 48px 0; }
   .loanImage { width: 150px; height: 150px; }
