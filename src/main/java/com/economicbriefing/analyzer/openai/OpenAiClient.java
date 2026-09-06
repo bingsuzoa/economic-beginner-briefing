@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -31,10 +32,18 @@ public class OpenAiClient {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final OpenAiProperties properties;
+    private final OpenAiTokenRateLimiter tokenRateLimiter;
 
     public OpenAiClient(OpenAiProperties properties, ObjectMapper objectMapper) {
+        this(properties, objectMapper, new OpenAiTokenRateLimiter());
+    }
+
+    @Autowired
+    public OpenAiClient(OpenAiProperties properties, ObjectMapper objectMapper,
+            OpenAiTokenRateLimiter tokenRateLimiter) {
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.tokenRateLimiter = tokenRateLimiter;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(properties.timeout())
                 .build();
@@ -84,6 +93,8 @@ public class OpenAiClient {
         try {
             String requestBody = buildRequestBody(
                     systemPrompt, userPrompt, model, temperature, schemaName, schema);
+            OpenAiTokenRateLimiter.TokenReservation reservation = tokenRateLimiter.acquire(
+                    model, OpenAiTokenRateLimiter.estimateTokens(systemPrompt, userPrompt, schema));
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(API_URL))
@@ -101,10 +112,17 @@ public class OpenAiClient {
                 Duration retryAfter = response.statusCode() == 429
                         ? parseRetryAfter(response)
                         : null;
+                if (response.statusCode() == 429) {
+                    tokenRateLimiter.recordRateLimited(model, retryAfter);
+                }
                 throw new AnalyzeException(ErrorCode.ANALYZE_API_ERROR, retryAfter);
             }
 
             JsonNode root = objectMapper.readTree(response.body());
+            int actualTokens = root.path("usage").path("total_tokens").asInt(0);
+            if (actualTokens > 0) {
+                tokenRateLimiter.recordSuccess(reservation, actualTokens);
+            }
             JsonNode content = root.path("choices").path(0).path("message").path("content");
 
             if (content.isMissingNode() || content.isNull() || content.asText().isBlank()) {

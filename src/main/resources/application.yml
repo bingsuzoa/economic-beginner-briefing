@@ -108,6 +108,11 @@ openai:
   max-selected-news: 15
   economic-flow-comparison-model: ${ECONOMIC_FLOW_COMPARISON_MODEL:gpt-4o-mini}
   economic-flow-traversal-model: ${ECONOMIC_FLOW_TRAVERSAL_MODEL:gpt-4o-mini}
+  rate-limit:
+    # The account permits 30,000 TPM for gpt-4o. Reserve headroom for token-estimation error
+    # and other account activity, then pace every model independently in a rolling minute.
+    safe-tokens-per-minute: ${OPENAI_SAFE_TOKENS_PER_MINUTE:24000}
+    window: 60s
 
 auth:
   require-https: ${AUTH_REQUIRE_HTTPS:true}
