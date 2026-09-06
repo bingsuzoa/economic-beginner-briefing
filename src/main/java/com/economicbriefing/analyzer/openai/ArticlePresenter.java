@@ -17,6 +17,11 @@ import org.springframework.stereotype.Service;
 @Service
 @ConditionalOnProperty(name = "briefing.dry-run", havingValue = "false")
 public class ArticlePresenter {
+    private static final String RESPONSE_SCHEMA = """
+            {"type":"object","additionalProperties":false,"properties":{"articles":{"type":"array","items":
+            {"type":"object","additionalProperties":false,"properties":{"articleId":{"type":"string"},"displayTitle":{"type":"string"},"summary":{"type":"array","items":{"type":"string"}},"whatHappened":{"type":"string"},"whyExplanations":{"type":"array","items":
+            {"type":"object","additionalProperties":false,"properties":{"requestId":{"type":"string"},"question":{"type":"string"},"explanation":{"type":["string","null"]},"explanationKind":{"type":["string","null"],"enum":["GENERAL_PRINCIPLE","ARTICLE_EVIDENCE",null]},"usedPrincipleChunkIds":{"type":"array","items":{"type":"string"}}},"required":["requestId","question","explanation","explanationKind","usedPrincipleChunkIds"]}}},"required":["articleId","displayTitle","summary","whatHappened","whyExplanations"]}}},"required":["articles"]}
+            """;
     private final OpenAiClient client;
     private final ObjectMapper json;
     private final AppProperties app;
@@ -41,13 +46,22 @@ public class ArticlePresenter {
         if (analysis == null || analysis.articles().isEmpty()) return new PresentationRun(List.of(), "", "", null, List.of());
         var input = input(analysis, flows, principles);
         String prompt = ArticlePresenterPromptBuilder.build(new Input(input), json);
-        String raw = RetryExecutor.execute(() -> client.complete(ArticlePresenterPromptBuilder.SYSTEM_PROMPT, prompt, 0), app.retry());
+        PresentationRun run = RetryExecutor.execute(() -> presentOnce(input, prompt), app.retry());
+        saveAssets(run.presentations(), input);
+        return run;
+    }
+
+    private PresentationRun presentOnce(List<InputArticle> input, String prompt) {
+        String raw = client.completeWithSchema(ArticlePresenterPromptBuilder.SYSTEM_PROMPT, prompt, 0,
+                "article_presentation", RESPONSE_SCHEMA);
         try {
             ArticlePresentationResponse parsed = cached(json.readValue(raw, ArticlePresentationResponse.class), input);
             var presentations = validate(parsed, input);
-            saveAssets(presentations, input);
             return new PresentationRun(input, prompt, raw, parsed, presentations);
-        } catch (Exception e) { throw new IllegalArgumentException("Article Presenter response invalid", e); }
+        } catch (Exception e) {
+            throw new com.economicbriefing.exception.AnalyzeException(
+                    com.economicbriefing.exception.ErrorCode.ANALYZE_VALIDATOR_ERROR, e);
+        }
     }
 
     private List<PresentedArticle> validate(ArticlePresentationResponse response, List<InputArticle> input) {
@@ -73,6 +87,9 @@ public class ArticlePresenter {
                         || !request.chunkIds().containsAll(ids))
                     throw new IllegalArgumentException("Invalid presenter principle chunk selection");
                 why.add(item);
+            }
+            if (why.size() != requests.size()) {
+                throw new IllegalArgumentException("Presenter must return one WHY explanation per input request");
             }
             result.add(new PresentedArticle(article.articleId(), article.displayTitle(), List.copyOf(article.summary()),
                     article.whatHappened(), List.copyOf(why), source.flowClaims()));
