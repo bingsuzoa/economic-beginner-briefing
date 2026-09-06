@@ -116,7 +116,8 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
 
         List<Integer> selectedIndexes;
         if (request.forceAllArticles()) {
-            selectedIndexes = java.util.stream.IntStream.range(0, request.articles().size()).boxed().toList();
+            // SelectionResponse indexes are deliberately one-based, matching the prompt contract.
+            selectedIndexes = java.util.stream.IntStream.rangeClosed(1, request.articles().size()).boxed().toList();
             log.info("Stage 1 bypassed: analyzing all {} operator-supplied articles", selectedIndexes.size());
         } else {
             // Stage 1: Selection
