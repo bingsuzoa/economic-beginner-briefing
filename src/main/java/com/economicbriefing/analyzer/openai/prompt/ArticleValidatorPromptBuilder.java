@@ -59,6 +59,11 @@ public final class ArticleValidatorPromptBuilder {
               relationType은 관계의 논리 형태이며 다음 값 중 하나입니다:
               CAUSE_OR_RESULT, PURPOSE, CHANGE, COMPARISON, CONDITION, MOTIVATION, ASSOCIATION,
               CLAIMED_EFFECT, EXPECTED_EFFECT, NEXT_STEP, EXPECTED_PROCESS.
+              이 목록은 폐쇄 enum입니다. SEQUENCE, TEMPORAL, CORRELATION 등 새 relationType을 절대 만들지 마세요.
+              단순히 A가 B보다 먼저 일어났다는 시간 순서만 있고 경제적 인과·목적·조건·영향이 기사 근거로
+              확인되지 않으면 relationType을 새로 제안하지 마세요. 그 관계 자체에 대해 UNSUPPORTED finding을
+              반환하세요. UNSUPPORTED의 suggestedValue와 evidence는 반드시 null이고 currentValue는 baseline의
+              실제 relation 객체와 정확히 같아야 합니다.
               evidenceType은 관계가 기사에서 제시된 성격이며 다음 값 중 하나입니다:
               FACT, CLAIM, INTERPRETATION, PREDICTION, PROPOSAL, PLAN.
               두 축을 바꾸어 제안하지 마세요. 예를 들어 EXPECTED_PROCESS relation의 evidenceType이

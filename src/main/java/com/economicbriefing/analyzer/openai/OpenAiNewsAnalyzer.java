@@ -875,10 +875,15 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                 INVALID_VALIDATOR_RESPONSE
                 Reason:
                 %s
+                RelationType is a closed enum: %s
+                Never invent a temporal relation type. A merely chronological relation must be UNSUPPORTED,
+                with the exact baseline relation object as currentValue and null suggestedValue/evidence.
+                For every finding, currentValue must be copied exactly from the baseline field at targetReference.
                 Allowed issue references:
                 %s
                 Regenerate the entire response. Use only an exact allowed issue name and its matching issues[index].
-                """.formatted(error.getMessage(), allowed).trim();
+                """.formatted(error.getMessage(), java.util.Arrays.toString(
+                        ArticleAnalysisResponse.RelationType.values()), allowed).trim();
     }
 
     com.economicbriefing.analyzer.openai.dto.SelectionResponse parseSelection(
