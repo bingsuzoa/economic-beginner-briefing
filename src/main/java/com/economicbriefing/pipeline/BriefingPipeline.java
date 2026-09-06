@@ -247,7 +247,8 @@ public class BriefingPipeline {
                     articlesForAnalysis.size() + "건을 AI 분석합니다.");
             analyzeResult = analyzer.analyze(new AnalyzeNewsRequest(
                     articlesForAnalysis, targetDate,
-                    openAiProperties.maxSelectedNews(), audience, briefingTitle, targetHour));
+                    openAiProperties.maxSelectedNews(), audience, briefingTitle, targetHour,
+                    suppliedArticles != null));
         } catch (Exception e) {
             log.error("Analysis failed", e);
             executionLog.addError(toExecutionError("analyze", e));

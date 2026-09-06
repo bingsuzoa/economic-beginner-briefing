@@ -114,22 +114,21 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         log.info("Starting AI analysis (3-stage): articles={}, targetDate={}, maxNews={}",
                 request.articles().size(), request.targetDate(), request.maxSelectedNews());
 
-        // Stage 1: Selection
-        log.info("Stage 1: Selecting important articles...");
-        String selectionPrompt = com.economicbriefing.analyzer.openai.prompt.SelectionPromptBuilder.build(
-                request.articles(),
-                request.targetDate(),
-                request.maxSelectedNews(),
-                request.audience()
-        );
-
-        com.economicbriefing.analyzer.openai.dto.SelectionResponse selectionResponse = RetryExecutor.execute(
-                () -> callAndParseSelection(selectionPrompt, request.articles().size(), request.maxSelectedNews()),
-                appProperties.retry()
-        );
-
-        List<Integer> selectedIndexes = selectionResponse.selectedArticleIndexes();
-        log.info("Stage 1 completed: selected {} articles", selectedIndexes.size());
+        List<Integer> selectedIndexes;
+        if (request.forceAllArticles()) {
+            selectedIndexes = java.util.stream.IntStream.range(0, request.articles().size()).boxed().toList();
+            log.info("Stage 1 bypassed: analyzing all {} operator-supplied articles", selectedIndexes.size());
+        } else {
+            // Stage 1: Selection
+            log.info("Stage 1: Selecting important articles...");
+            String selectionPrompt = com.economicbriefing.analyzer.openai.prompt.SelectionPromptBuilder.build(
+                    request.articles(), request.targetDate(), request.maxSelectedNews(), request.audience());
+            com.economicbriefing.analyzer.openai.dto.SelectionResponse selectionResponse = RetryExecutor.execute(
+                    () -> callAndParseSelection(selectionPrompt, request.articles().size(), request.maxSelectedNews()),
+                    appProperties.retry());
+            selectedIndexes = selectionResponse.selectedArticleIndexes();
+            log.info("Stage 1 completed: selected {} articles", selectedIndexes.size());
+        }
         if (selectedIndexes.isEmpty()) {
             return emptySelectionResult(request);
         }

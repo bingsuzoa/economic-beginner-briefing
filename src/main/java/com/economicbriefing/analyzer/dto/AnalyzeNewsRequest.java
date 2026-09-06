@@ -12,13 +12,19 @@ public record AnalyzeNewsRequest(
     int maxSelectedNews,
     AudienceProfile audience,
     String briefingTitle,
-    Integer targetHour
+    Integer targetHour,
+    boolean forceAllArticles
 ) {
+    public AnalyzeNewsRequest(List<Article> articles, LocalDate targetDate, int maxSelectedNews,
+            AudienceProfile audience, String briefingTitle, Integer targetHour) {
+        this(articles, targetDate, maxSelectedNews, audience, briefingTitle, targetHour, false);
+    }
+
     public static AnalyzeNewsRequest of(
             List<Article> articles,
             LocalDate targetDate,
             int maxSelectedNews,
             AudienceProfile audience) {
-        return new AnalyzeNewsRequest(articles, targetDate, maxSelectedNews, audience, null, null);
+        return new AnalyzeNewsRequest(articles, targetDate, maxSelectedNews, audience, null, null, false);
     }
 }
