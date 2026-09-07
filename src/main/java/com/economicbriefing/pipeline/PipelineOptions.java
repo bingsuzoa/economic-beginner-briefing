@@ -22,6 +22,14 @@ public record PipelineOptions(
         return new PipelineOptions(targetDate, null, "MANUAL");
     }
 
+    /** Replays one exact KST RSS hour without changing the scheduler's normal clock window. */
+    public static PipelineOptions manualHourly(LocalDate targetDate, int hour) {
+        if (hour < 0 || hour > 23) throw new IllegalArgumentException("hour must be between 0 and 23");
+        var start = targetDate.atTime(hour, 0).atZone(KstDateTimeUtil.KST).toOffsetDateTime();
+        return new PipelineOptions(targetDate,
+                new KstDateTimeUtil.TimeRange(start, start.plusHours(1).minusSeconds(1)), "MANUAL");
+    }
+
     public static PipelineOptions ofToday() {
         return new PipelineOptions(KstDateTimeUtil.getCurrentDate(), null, "MANUAL");
     }

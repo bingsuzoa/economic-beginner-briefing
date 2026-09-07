@@ -133,6 +133,7 @@ public class RunController {
     @PostMapping("/runs")
     public ResponseEntity<ApiResponse<?>> triggerRun(@RequestBody(required = false) Map<String, String> body) {
         String targetDateStr = body != null ? body.get("targetDate") : null;
+        String targetHourStr = body != null ? body.get("targetHour") : null;
 
         if (targetDateStr != null) {
             try {
@@ -143,9 +144,22 @@ public class RunController {
                                 "유효하지 않은 날짜 형식입니다: " + targetDateStr));
             }
         }
+        Integer targetHour = null;
+        if (targetHourStr != null) {
+            if (targetDateStr == null) return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("INVALID_TARGET_HOUR", "targetHour에는 targetDate가 필요합니다."));
+            try {
+                targetHour = Integer.parseInt(targetHourStr);
+                if (targetHour < 0 || targetHour > 23) throw new NumberFormatException();
+            } catch (NumberFormatException e) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("INVALID_TARGET_HOUR", "targetHour는 0~23 사이여야 합니다."));
+            }
+        }
 
-        PipelineOptions options = targetDateStr != null
-                ? PipelineOptions.manual(LocalDate.parse(targetDateStr))
+        PipelineOptions options = targetHour != null
+                ? PipelineOptions.manualHourly(LocalDate.parse(targetDateStr), targetHour)
+                : targetDateStr != null ? PipelineOptions.manual(LocalDate.parse(targetDateStr))
                 : PipelineOptions.hourly();
 
         // Same service the scheduler uses; it takes the lock before dispatching, so a
