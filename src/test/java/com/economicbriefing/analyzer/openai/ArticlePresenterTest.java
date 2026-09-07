@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.economicbriefing.analyzer.openai.dto.ArticleAnalysisResponse;
@@ -34,7 +35,7 @@ class ArticlePresenterTest {
     void acceptsOnlyCandidateChunkIdsAndReturnsPresentation() {
         assertEquals(ARTICLE_ID + ":0", ArticlePresenter.flowRequests(analysis()).getFirst().id());
         var client = mock(OpenAiClient.class);
-        when(client.completeWithSchema(anyString(), anyString(), anyDouble(), anyString(), anyString())).thenReturn("""
+        when(client.completeWithSchema(anyString(), anyString(), anyDouble(), anyString(), anyString(), anyString())).thenReturn("""
                 {"articles":[{"articleId":"article-1","displayTitle":"국고채 금리 하락","summary":["국고채 금리가 내렸다.","원화 강세가 영향을 미쳤다."],"whatHappened":"국고채 금리가 하락했다.","whyExplanations":[{"requestId":"article-1:0","question":"‘원화 강세 → 국고채 금리 하락’는 왜 이어졌나요?","explanation":"원화 가치가 오르면 원화 채권 수요가 늘어 채권 금리가 내릴 수 있다.","explanationKind":"GENERAL_PRINCIPLE","usedPrincipleChunkIds":["direct"]}]}]}
                 """);
 
@@ -47,7 +48,7 @@ class ArticlePresenterTest {
     @Test
     void rejectsChunkIdOutsideRequestCandidates() {
         var client = mock(OpenAiClient.class);
-        when(client.completeWithSchema(anyString(), anyString(), anyDouble(), anyString(), anyString())).thenReturn("""
+        when(client.completeWithSchema(anyString(), anyString(), anyDouble(), anyString(), anyString(), anyString())).thenReturn("""
                 {"articles":[{"articleId":"article-1","displayTitle":"제목","summary":["요약 하나","요약 둘"],"whatHappened":"내용","whyExplanations":[{"requestId":"article-1:0","question":"‘원화 강세 → 국고채 금리 하락’는 왜 이어졌나요?","explanation":"설명","explanationKind":"GENERAL_PRINCIPLE","usedPrincipleChunkIds":["unknown"]}]}]}
                 """);
 
@@ -56,23 +57,26 @@ class ArticlePresenterTest {
     }
 
     @Test
-    void rejectsResponseThatOmitsAnInputArticle() {
+    void presentsEachInputArticleInAnIndependentCall() {
         var client = mock(OpenAiClient.class);
-        when(client.completeWithSchema(anyString(), anyString(), anyDouble(), anyString(), anyString())).thenReturn("""
+        when(client.completeWithSchema(anyString(), anyString(), anyDouble(), anyString(), anyString(), anyString())).thenReturn("""
                 {"articles":[{"articleId":"article-1","displayTitle":"제목","summary":["요약 하나","요약 둘"],"whatHappened":"내용","whyExplanations":[{"requestId":"article-1:0","question":"‘원화 강세 → 국고채 금리 하락’는 왜 이어졌나요?","explanation":"설명","explanationKind":"ARTICLE_EVIDENCE","usedPrincipleChunkIds":[]}]}]}
+                """, """
+                {"articles":[{"articleId":"article-2","displayTitle":"제목 2","summary":["요약 하나","요약 둘"],"whatHappened":"내용","whyExplanations":[]}]}
                 """);
 
         var second = new ArticleAnalysisResponse.ArticleAnalysis("article-2", List.of());
         var twoArticles = new ArticleAnalysisResponse(List.of(analysis().articles().getFirst(), second));
 
-        assertThrows(AnalyzeException.class,
-                () -> presenter(client).present(twoArticles, List.of(), principles()));
+        assertEquals(2, presenter(client).present(twoArticles, List.of(), principles()).size());
+        verify(client, org.mockito.Mockito.times(2)).completeWithSchema(
+                anyString(), anyString(), anyDouble(), anyString(), anyString(), anyString());
     }
 
     @Test
     void acceptsGeneralExplanationWithoutPrincipleChunk() {
         var client = mock(OpenAiClient.class);
-        when(client.completeWithSchema(anyString(), anyString(), anyDouble(), anyString(), anyString())).thenReturn("""
+        when(client.completeWithSchema(anyString(), anyString(), anyDouble(), anyString(), anyString(), anyString())).thenReturn("""
                 {"articles":[{"articleId":"article-1","displayTitle":"제목","summary":["요약 하나","요약 둘"],"whatHappened":"내용","whyExplanations":[{"requestId":"article-1:0","question":"‘원화 강세 → 국고채 금리 하락’는 왜 이어졌나요?","explanation":"일반적인 경제 설명","explanationKind":"GENERAL_PRINCIPLE","usedPrincipleChunkIds":[]}]}]}
                 """);
 
@@ -84,7 +88,7 @@ class ArticlePresenterTest {
     @Test
     void reusesCachedGeneralPrincipleExplanation() {
         var client = mock(OpenAiClient.class);
-        when(client.completeWithSchema(anyString(), anyString(), anyDouble(), anyString(), anyString())).thenReturn("""
+        when(client.completeWithSchema(anyString(), anyString(), anyDouble(), anyString(), anyString(), anyString())).thenReturn("""
                 {"articles":[{"articleId":"article-1","displayTitle":"제목","summary":["요약 하나","요약 둘"],"whatHappened":"내용","whyExplanations":[]}]}
                 """);
         var assets = mock(RelationExplanationAssetRepository.class);

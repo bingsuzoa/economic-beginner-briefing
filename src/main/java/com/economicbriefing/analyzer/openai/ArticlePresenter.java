@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 @Service
 @ConditionalOnProperty(name = "briefing.dry-run", havingValue = "false")
 public class ArticlePresenter {
+    private static final String PROMPT_CACHE_KEY = "article-presenter-v9";
     private static final String RESPONSE_SCHEMA = """
             {"type":"object","additionalProperties":false,"properties":{"articles":{"type":"array","items":
             {"type":"object","additionalProperties":false,"properties":{"articleId":{"type":"string"},"displayTitle":{"type":"string"},"summary":{"type":"array","items":{"type":"string"}},"whatHappened":{"type":"string"},"whyExplanations":{"type":"array","items":
@@ -45,22 +46,38 @@ public class ArticlePresenter {
             EconomicPrincipleRetriever.Context principles) {
         if (analysis == null || analysis.articles().isEmpty()) return new PresentationRun(List.of(), "", "", null, List.of());
         var input = input(analysis, flows, principles);
-        String prompt = ArticlePresenterPromptBuilder.build(new Input(input), json);
-        PresentationRun run = RetryExecutor.execute(() -> presentOnce(input, prompt), app.retry());
-        saveAssets(run.presentations(), input);
-        return run;
+        var presentations = new ArrayList<PresentedArticle>();
+        var prompts = new ArrayList<String>();
+        var rawResponses = new ArrayList<String>();
+        var parsedArticles = new ArrayList<ArticlePresentationResponse.ArticlePresentation>();
+
+        // A presenter response is intentionally limited to one article. This prevents an LLM from
+        // returning a valid-looking subset when a large hourly batch has many WHY explanations.
+        // The fixed system prompt and schema remain identical, so consecutive calls can reuse their prefix.
+        for (InputArticle article : input) {
+            var singleArticleInput = List.of(article);
+            String prompt = ArticlePresenterPromptBuilder.build(new Input(singleArticleInput), json);
+            PresentationRun run = RetryExecutor.execute(() -> presentOnce(singleArticleInput, prompt), app.retry());
+            prompts.add(run.prompt());
+            rawResponses.add(run.raw());
+            parsedArticles.addAll(run.parsed().articles());
+            presentations.addAll(run.presentations());
+        }
+        saveAssets(presentations, input);
+        return new PresentationRun(input, String.join("\n\n", prompts), String.join("\n\n", rawResponses),
+                new ArticlePresentationResponse(parsedArticles), List.copyOf(presentations));
     }
 
     private PresentationRun presentOnce(List<InputArticle> input, String prompt) {
         String raw = client.completeWithSchema(ArticlePresenterPromptBuilder.SYSTEM_PROMPT, prompt, 0,
-                "article_presentation", RESPONSE_SCHEMA);
+                "article_presentation", RESPONSE_SCHEMA, PROMPT_CACHE_KEY);
         try {
             ArticlePresentationResponse parsed = cached(json.readValue(raw, ArticlePresentationResponse.class), input);
             var presentations = validate(parsed, input);
             return new PresentationRun(input, prompt, raw, parsed, presentations);
         } catch (Exception e) {
             throw new com.economicbriefing.exception.AnalyzeException(
-                    com.economicbriefing.exception.ErrorCode.ANALYZE_VALIDATOR_ERROR, e);
+                    com.economicbriefing.exception.ErrorCode.ANALYZE_PRESENTER_ERROR, e);
         }
     }
 

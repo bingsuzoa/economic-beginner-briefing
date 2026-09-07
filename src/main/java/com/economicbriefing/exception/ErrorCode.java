@@ -14,6 +14,7 @@ public enum ErrorCode {
     ANALYZE_DRAFT_INTEGRITY_ERROR("Analyzer draft integrity invalid", true),
     ANALYZE_SELECTION_ERROR("Selection response invalid", true),
     ANALYZE_VALIDATOR_ERROR("Validator response invalid", true),
+    ANALYZE_PRESENTER_ERROR("Presenter response invalid", true),
     ANALYZE_VALIDATION_ERROR("Response schema invalid", false),
     ANALYZE_TIMEOUT("OpenAI API timeout", true),
     ANALYZE_EMPTY_INPUT("No articles to analyze", false),

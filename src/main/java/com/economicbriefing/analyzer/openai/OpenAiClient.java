@@ -66,6 +66,20 @@ public class OpenAiClient {
         return complete(systemPrompt, userPrompt, properties.model(), temperature, schemaName, schema);
     }
 
+    /**
+     * Uses a stable cache-routing key for a group of requests that share the same prompt prefix.
+     * The caller must keep the system prompt and response schema unchanged for this to be useful.
+     */
+    String completeWithSchema(
+            String systemPrompt,
+            String userPrompt,
+            double temperature,
+            String schemaName,
+            String schema,
+            String promptCacheKey) {
+        return complete(systemPrompt, userPrompt, properties.model(), temperature, schemaName, schema, promptCacheKey);
+    }
+
     public String completeWithSchema(String systemPrompt, String userPrompt, String model,
             double temperature, String schemaName, String schema) {
         return complete(systemPrompt, userPrompt, model, temperature, schemaName, schema);
@@ -90,9 +104,20 @@ public class OpenAiClient {
             double temperature,
             String schemaName,
             String schema) {
+        return complete(systemPrompt, userPrompt, model, temperature, schemaName, schema, null);
+    }
+
+    private String complete(
+            String systemPrompt,
+            String userPrompt,
+            String model,
+            double temperature,
+            String schemaName,
+            String schema,
+            String promptCacheKey) {
         try {
             String requestBody = buildRequestBody(
-                    systemPrompt, userPrompt, model, temperature, schemaName, schema);
+                    systemPrompt, userPrompt, model, temperature, schemaName, schema, promptCacheKey);
             OpenAiTokenRateLimiter.TokenReservation reservation = tokenRateLimiter.acquire(
                     model, OpenAiTokenRateLimiter.estimateTokens(systemPrompt, userPrompt, schema));
 
@@ -120,9 +145,15 @@ public class OpenAiClient {
 
             JsonNode root = objectMapper.readTree(response.body());
             int actualTokens = root.path("usage").path("total_tokens").asInt(0);
+            int promptTokens = root.path("usage").path("prompt_tokens").asInt(0);
+            int completionTokens = root.path("usage").path("completion_tokens").asInt(0);
+            int cachedTokens = root.path("usage").path("prompt_tokens_details")
+                    .path("cached_tokens").asInt(0);
             if (actualTokens > 0) {
                 tokenRateLimiter.recordSuccess(reservation, actualTokens);
             }
+            log.info("OpenAI usage: model={}, promptTokens={}, cachedPromptTokens={}, completionTokens={}, totalTokens={}",
+                    model, promptTokens, cachedTokens, completionTokens, actualTokens);
             JsonNode content = root.path("choices").path(0).path("message").path("content");
 
             if (content.isMissingNode() || content.isNull() || content.asText().isBlank()) {
@@ -195,11 +226,15 @@ public class OpenAiClient {
             String model,
             double temperature,
             String schemaName,
-            String schema) {
+            String schema,
+            String promptCacheKey) {
         try {
             ObjectNode root = objectMapper.createObjectNode();
             root.put("model", model);
             root.put("temperature", temperature);
+            if (promptCacheKey != null && !promptCacheKey.isBlank()) {
+                root.put("prompt_cache_key", promptCacheKey);
+            }
 
             ObjectNode responseFormat = objectMapper.createObjectNode();
             if (schema == null) {
