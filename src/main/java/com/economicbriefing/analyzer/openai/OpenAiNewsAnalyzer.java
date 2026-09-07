@@ -18,7 +18,6 @@ import com.economicbriefing.analyzer.openai.dto.ArticleAnalysisResponse;
 import com.economicbriefing.analyzer.openai.dto.ArticleAnalyzerDraftResponse;
 import com.economicbriefing.analyzer.openai.prompt.AnalysisPromptBuilder;
 import com.economicbriefing.analyzer.openai.prompt.ArticleAnalyzerPromptBuilder;
-import com.economicbriefing.analyzer.openai.prompt.ArticleValidatorPromptBuilder;
 import com.economicbriefing.analyzer.openai.prompt.SystemPromptBuilder;
 import com.economicbriefing.analyzer.openai.util.BriefingBuilder;
 import com.economicbriefing.analyzer.openai.util.RetryExecutor;
@@ -138,24 +137,9 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         String articleAnalysisJson = toJson(articleAnalysis);
         FlowBundle economicFlow = economicFlowContext(analyzerBundle, articleAnalysisJson);
         var presenterPrinciples = presenterPrinciples(articleAnalysis);
-        ArticleValidationResult itemValidation = validateEachArticle(
-                ArticleValidatorPromptBuilder.ITEM_VALIDATION_SYSTEM_PROMPT,
-                selectedArticles, articleAnalysis,
-                Set.of(ArticleValidationResult.FindingType.WRONG_TYPE,
-                        ArticleValidationResult.FindingType.WRONG_SPEAKER,
-                        ArticleValidationResult.FindingType.UNSUPPORTED,
-                        ArticleValidationResult.FindingType.INACCURATE));
-        ArticleValidationResult missingReview = validateEachArticle(
-                ArticleValidatorPromptBuilder.MISSING_REVIEW_SYSTEM_PROMPT,
-                selectedArticles, articleAnalysis,
-                Set.of(ArticleValidationResult.FindingType.MISSING));
-        ArticleValidationResult validation = ArticleValidationMerger.merge(
-                selectedArticles, articleAnalysis, itemValidation, missingReview);
         var presentations = articlePresenter == null ? List.<ArticlePresenter.PresentedArticle>of()
                 : articlePresenter.present(articleAnalysis, analyzerBundle.economicFlows(), presenterPrinciples);
-        log.info("Stage 2 completed: structured {} articles, validator findings={}",
-                articleAnalysis.articles().size(),
-                validation.articles().stream().mapToInt(a -> a.findings().size()).sum());
+        log.info("Stage 2 completed: structured {} articles", articleAnalysis.articles().size());
 
         // Stage 3: Final analysis
         log.info("Stage 3: Analyzing selected articles...");
@@ -199,7 +183,7 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
                 briefing.news().size(), rejectedArticleIds.size());
 
         return new AnalyzeNewsResult(
-                briefing, rejectedArticleIds, List.of(), validation, articleAnalysis, null,
+                briefing, rejectedArticleIds, List.of(), null, articleAnalysis, null,
                 analyzerBundle.eventCandidates(), analyzerBundle.eventRelations(), presentations,
                 openAiProperties.model(), ArticleAnalyzerPromptBuilder.PROMPT_VERSION);
     }
@@ -231,21 +215,6 @@ public class OpenAiNewsAnalyzer implements NewsAnalyzer {
         }
         return new AnalyzerDraftBundle(new ArticleAnalysisResponse(List.copyOf(analyses)), List.copyOf(candidates),
                 List.copyOf(relations), List.copyOf(flows));
-    }
-
-    private ArticleValidationResult validateEachArticle(
-            String systemPrompt,
-            List<com.economicbriefing.domain.article.Article> selectedArticles,
-            ArticleAnalysisResponse analysis,
-            Set<ArticleValidationResult.FindingType> allowedTypes) {
-        var validations = new ArrayList<ArticleValidationResult.ArticleValidation>();
-        for (int i = 0; i < selectedArticles.size(); i++) {
-            var oneArticle = List.of(selectedArticles.get(i));
-            var oneAnalysis = new ArticleAnalysisResponse(List.of(analysis.articles().get(i)));
-            String prompt = ArticleValidatorPromptBuilder.build(oneArticle, toJson(oneAnalysis), oneAnalysis);
-            validations.addAll(validateWithRetry(systemPrompt, prompt, oneArticle, oneAnalysis, allowedTypes).articles());
-        }
-        return new ArticleValidationResult(List.copyOf(validations));
     }
 
     private com.economicbriefing.economicflow.EconomicPrincipleRetriever.Context presenterPrinciples(
