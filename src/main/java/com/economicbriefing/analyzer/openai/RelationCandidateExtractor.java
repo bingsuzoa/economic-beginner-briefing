@@ -1,8 +1,10 @@
 package com.economicbriefing.analyzer.openai;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.economicbriefing.analyzer.openai.dto.ArticleAnalysisResponse;
@@ -84,16 +86,33 @@ final class RelationCandidateExtractor {
             ArticleAnalysisResponse analysis, boolean dropInvalidEvidence, boolean preserveExisting) {
         if (response.articles() == null || response.articles().size() != sources.size())
             throw new IllegalArgumentException("Expected exactly one relation article per source article");
+        Map<String, Article> sourceById = new LinkedHashMap<>();
+        Map<String, ArticleAnalysisResponse.ArticleAnalysis> baselineById = new HashMap<>();
+        for (int i = 0; i < sources.size(); i++) {
+            if (sourceById.putIfAbsent(sources.get(i).id(), sources.get(i)) != null)
+                throw new IllegalArgumentException("Duplicate source articleId: " + sources.get(i).id());
+            if (baselineById.putIfAbsent(analysis.articles().get(i).articleId(), analysis.articles().get(i)) != null)
+                throw new IllegalArgumentException("Duplicate baseline articleId: " + analysis.articles().get(i).articleId());
+        }
+        if (!sourceById.keySet().equals(baselineById.keySet()))
+            throw new IllegalArgumentException("Baseline articleIds do not match source articleIds");
+        Map<String, RelationArticle> extractedById = new HashMap<>();
+        for (var extracted : response.articles()) {
+            if (extracted == null || extracted.articleId() == null || !sourceById.containsKey(extracted.articleId()))
+                throw new IllegalArgumentException("Unexpected articleId: " + (extracted == null ? null : extracted.articleId()));
+            if (extractedById.putIfAbsent(extracted.articleId(), extracted) != null)
+                throw new IllegalArgumentException("Duplicate response articleId: " + extracted.articleId());
+        }
+        if (!extractedById.keySet().equals(sourceById.keySet()))
+            throw new IllegalArgumentException("Response articleIds do not match source articleIds");
         var result = new ArrayList<ArticleAnalysisResponse.ArticleAnalysis>();
         int candidateCount = 0;
         int acceptedCount = 0;
-        for (int i = 0; i < sources.size(); i++) {
-            var extracted = response.articles().get(i);
-            var baseline = analysis.articles().get(i);
-            if (!sources.get(i).id().equals(extracted.articleId()))
-                throw new IllegalArgumentException("Unexpected articleId: " + extracted.articleId());
-            String sourceText = normalize(sources.get(i).title() + "\n" + sources.get(i).summary() + "\n"
-                    + sources.get(i).content());
+        for (var source : sources) {
+            var extracted = extractedById.get(source.id());
+            var baseline = baselineById.get(source.id());
+            String sourceText = normalize(source.title() + "\n" + source.summary() + "\n"
+                    + source.content());
             var byIssue = new LinkedHashMap<String, LinkedHashMap<Key, ArticleAnalysisResponse.Relation>>();
             baseline.issues().forEach(issue -> {
                 var relations = new LinkedHashMap<Key, ArticleAnalysisResponse.Relation>();

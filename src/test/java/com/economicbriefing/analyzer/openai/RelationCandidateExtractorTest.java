@@ -58,6 +58,28 @@ class RelationCandidateExtractorTest {
     }
 
     @Test
+    void shouldMergeRelationCandidatesByArticleIdRatherThanResponseOrder() {
+        var relation = new RelationCandidateExtractor.AtomicRelation("기준금리 인상 가능성", "국고채 금리 상승",
+                ArticleAnalysisResponse.RelationType.CAUSE_OR_RESULT,
+                ArticleAnalysisResponse.StatementType.FACT, null);
+        var second = new Article("a2", "두 번째 기사", "", "연합뉴스", ArticleSourceType.NEWS_MEDIA,
+                OffsetDateTime.now(), OffsetDateTime.now(), "url2", List.of(), "ko", "두 번째 기사 본문");
+        var secondAnalysis = new ArticleAnalysisResponse.ArticleAnalysis("a2", List.of());
+        var reversed = new RelationCandidateExtractor.Response(List.of(
+                new RelationCandidateExtractor.RelationArticle("a2", List.of()),
+                new RelationCandidateExtractor.RelationArticle("a1", List.of(
+                        new RelationCandidateExtractor.Candidate("채권시장",
+                                "기준금리 인상 가능성이 부각되면서 국고채 금리가 상승했다.", List.of(relation))))));
+
+        var merged = RelationCandidateExtractor.merge(reversed, List.of(article, second),
+                new ArticleAnalysisResponse(List.of(baseline.articles().getFirst(), secondAnalysis)));
+
+        assertEquals(List.of("a1", "a2"), merged.articles().stream()
+                .map(ArticleAnalysisResponse.ArticleAnalysis::articleId).toList());
+        assertEquals(1, merged.articles().getFirst().issues().getFirst().relations().size());
+    }
+
+    @Test
     void shouldRejectEvidenceNotPresentInSource() {
         var relation = new RelationCandidateExtractor.AtomicRelation("기준금리", "국고채 금리",
                 ArticleAnalysisResponse.RelationType.CAUSE_OR_RESULT,
