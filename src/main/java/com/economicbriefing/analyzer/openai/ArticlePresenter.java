@@ -21,7 +21,7 @@ public class ArticlePresenter {
     private static final String RESPONSE_SCHEMA = """
             {"type":"object","additionalProperties":false,"properties":{"articles":{"type":"array","items":
             {"type":"object","additionalProperties":false,"properties":{"articleId":{"type":"string"},"displayTitle":{"type":"string"},"summary":{"type":"array","items":{"type":"string"}},"whatHappened":{"type":"string"},"whyExplanations":{"type":"array","items":
-            {"type":"object","additionalProperties":false,"properties":{"requestId":{"type":"string"},"question":{"type":"string"},"explanation":{"type":["string","null"]},"explanationKind":{"type":["string","null"],"enum":["GENERAL_PRINCIPLE","ARTICLE_EVIDENCE",null]},"usedPrincipleChunkIds":{"type":"array","items":{"type":"string"}}},"required":["requestId","question","explanation","explanationKind","usedPrincipleChunkIds"]}}},"required":["articleId","displayTitle","summary","whatHappened","whyExplanations"]}}},"required":["articles"]}
+            {"type":"object","additionalProperties":false,"properties":{"requestId":{"type":"string"},"question":{"type":"string"},"explanation":{"type":["string","null"]},"explanationKind":{"type":["string","null"],"enum":["GENERAL_PRINCIPLE","ARTICLE_EVIDENCE",null]},"usedPrincipleChunkIds":{"type":"array","items":{"type":"string"}}},"required":["requestId","question","explanation","explanationKind","usedPrincipleChunkIds"]},"minItems":__WHY_COUNT__,"maxItems":__WHY_COUNT__}},"required":["articleId","displayTitle","summary","whatHappened","whyExplanations"]}}},"required":["articles"]}
             """;
     private final OpenAiClient client;
     private final ObjectMapper json;
@@ -70,7 +70,7 @@ public class ArticlePresenter {
 
     private PresentationRun presentOnce(List<InputArticle> input, String prompt) {
         String raw = client.completeWithSchema(ArticlePresenterPromptBuilder.SYSTEM_PROMPT, prompt, 0,
-                "article_presentation", RESPONSE_SCHEMA, PROMPT_CACHE_KEY);
+                "article_presentation", responseSchema(input), PROMPT_CACHE_KEY);
         try {
             ArticlePresentationResponse parsed = cached(json.readValue(raw, ArticlePresentationResponse.class), input);
             var presentations = validate(parsed, input);
@@ -79,6 +79,11 @@ public class ArticlePresenter {
             throw new com.economicbriefing.exception.AnalyzeException(
                     com.economicbriefing.exception.ErrorCode.ANALYZE_PRESENTER_ERROR, e);
         }
+    }
+
+    static String responseSchema(List<InputArticle> input) {
+        if (input == null || input.size() != 1) throw new IllegalArgumentException("Presenter schema requires one article");
+        return RESPONSE_SCHEMA.replace("__WHY_COUNT__", Integer.toString(input.getFirst().requests().size()));
     }
 
     private List<PresentedArticle> validate(ArticlePresentationResponse response, List<InputArticle> input) {

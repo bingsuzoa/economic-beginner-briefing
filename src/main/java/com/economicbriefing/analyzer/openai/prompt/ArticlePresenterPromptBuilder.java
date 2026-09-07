@@ -37,9 +37,15 @@ public final class ArticlePresenterPromptBuilder {
             var tree = json.valueToTree(input);
             var articles = tree.path("articles");
             var ids = new java.util.ArrayList<String>();
-            articles.forEach(article -> ids.add(article.path("articleId").asText()));
+            var whyIds = new java.util.ArrayList<String>();
+            articles.forEach(article -> {
+                ids.add(article.path("articleId").asText());
+                article.path("requests").forEach(request -> whyIds.add(request.path("id").asText()));
+            });
             return "Completion contract: return " + ids.size() + " articles in this exact order: " + ids
-                    + ".\nPresenter input:\n" + json.writeValueAsString(input);
+                    + ". Return exactly one WHY explanation for every requestId in this exact set: " + whyIds
+                    + ". No requestId may be omitted, duplicated, or substituted.\n"
+                    + "Presenter input:\n" + json.writeValueAsString(input);
         }
         catch (JsonProcessingException e) { throw new IllegalArgumentException("Cannot serialize presenter input", e); }
     }
