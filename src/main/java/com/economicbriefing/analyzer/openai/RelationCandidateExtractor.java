@@ -159,9 +159,6 @@ final class RelationCandidateExtractor {
 
     private static void validateEndpoint(String field, String value) {
         if (value == null || value.isBlank()) throw new IllegalArgumentException(field + " must not be blank");
-        for (String marker : List.of("에 따른", "로 인한", "때문에", "로 인해"))
-            if (value.contains(marker)) throw new IllegalArgumentException(
-                    "Invalid " + field + " contains embedded causal phrase: " + value);
     }
 
     private static void validateMotivation(AtomicRelation relation) {

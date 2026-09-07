@@ -58,6 +58,27 @@ class RelationCandidateExtractorTest {
     }
 
     @Test
+    void shouldAllowAnExplanatoryOutcomeNodeWhenTheArticleEvidenceSupportsIt() {
+        var relation = new RelationCandidateExtractor.AtomicRelation(
+                "엔비디아의 허깅페이스 인수 발표", "AI 생태계 확장에 따른 메모리 수요 기대 강화",
+                ArticleAnalysisResponse.RelationType.CAUSE_OR_RESULT,
+                ArticleAnalysisResponse.StatementType.FACT, null);
+        var source = new Article("a1", "반도체 기사", "", "연합뉴스", ArticleSourceType.NEWS_MEDIA,
+                OffsetDateTime.now(), OffsetDateTime.now(), "url", List.of(), "ko",
+                "엔비디아의 허깅페이스 인수 발표는 AI 생태계 확장에 따른 메모리 수요 기대를 강화했다.");
+        var response = new RelationCandidateExtractor.Response(List.of(
+                new RelationCandidateExtractor.RelationArticle("a1", List.of(
+                        new RelationCandidateExtractor.Candidate("반도체", source.content(), List.of(relation))))));
+        var oneIssue = new ArticleAnalysisResponse(List.of(new ArticleAnalysisResponse.ArticleAnalysis("a1", List.of(
+                new ArticleAnalysisResponse.Issue("반도체", List.of(), List.of(), List.of(), List.of(), List.of())))));
+
+        var merged = RelationCandidateExtractor.merge(response, List.of(source), oneIssue);
+
+        assertEquals("AI 생태계 확장에 따른 메모리 수요 기대 강화",
+                merged.articles().getFirst().issues().getFirst().relations().getFirst().to());
+    }
+
+    @Test
     void shouldMergeRelationCandidatesByArticleIdRatherThanResponseOrder() {
         var relation = new RelationCandidateExtractor.AtomicRelation("기준금리 인상 가능성", "국고채 금리 상승",
                 ArticleAnalysisResponse.RelationType.CAUSE_OR_RESULT,
