@@ -12,7 +12,6 @@ import com.economicbriefing.analyzer.NewsAnalyzer;
 import com.economicbriefing.analyzer.dto.AnalyzeNewsRequest;
 import com.economicbriefing.analyzer.dto.AnalyzeNewsResult;
 import com.economicbriefing.analyzer.openai.dto.ArticleAnalysisResponse;
-import com.economicbriefing.analyzer.openai.dto.RetrievalRouterResponse;
 import com.economicbriefing.domain.analysis.AnalyzedNews;
 import com.economicbriefing.domain.analysis.EconomicTerm;
 import com.economicbriefing.domain.analysis.NewsEvidenceStatus;
@@ -192,13 +191,8 @@ public class MockNewsAnalyzer implements NewsAnalyzer {
                                 List.of(article.summary() != null ? article.summary() : article.title()),
                                 List.of(), List.of(), List.of(), List.of()))))
                 .toList());
-        RetrievalRouterResponse routerResult = new RetrievalRouterResponse(articleAnalysis.articles().stream()
-                .map(article -> new RetrievalRouterResponse.ArticleRoute(article.articleId(), article.issues().stream()
-                        .map(issue -> new RetrievalRouterResponse.IssueRoute(issue.name(), false, List.of()))
-                        .toList()))
-                .toList());
         return new AnalyzeNewsResult(
-                briefing, rejectedArticleIds, List.of(), null, articleAnalysis, routerResult,
+                briefing, rejectedArticleIds, List.of(), null, articleAnalysis, null,
                 List.of(), List.of(), List.of(), "mock", "mock-article-analyzer-v1");
     }
 
