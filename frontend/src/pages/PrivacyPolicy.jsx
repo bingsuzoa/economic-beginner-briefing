@@ -25,9 +25,9 @@ export default function PrivacyPolicy() {
     const previousDescription = existingDescription?.getAttribute('content')
     const description = existingDescription || document.createElement('meta')
 
-    document.title = '개인정보처리방침 | 병아리 경제 뉴스'
+    document.title = '개인정보처리방침 | Thoth(토트)'
     description.setAttribute('name', 'description')
-    description.setAttribute('content', '병아리 경제 뉴스 서비스의 개인정보 수집, 이용 목적, 보유 기간, 이용자 권리 및 보호 조치를 안내합니다.')
+    description.setAttribute('content', 'Thoth(토트) 서비스의 개인정보 수집, 이용 목적, 보유 기간, 이용자 권리 및 보호 조치를 안내합니다.')
     if (!existingDescription) document.head.appendChild(description)
 
     return () => {
@@ -40,9 +40,9 @@ export default function PrivacyPolicy() {
   return (
     <div className={s.page}>
       <header className={s.header}>
-        <a className={s.brand} href="/" aria-label="병아리 경제 뉴스 홈으로 이동">
+        <a className={s.brand} href="/" aria-label="Thoth(토트) 홈으로 이동">
           <img src="/images/main-logo.png" alt="" />
-          <span>병아리 경제 뉴스</span>
+          <span>Thoth(토트)</span>
         </a>
       </header>
 
@@ -50,7 +50,7 @@ export default function PrivacyPolicy() {
         <section className={s.hero}>
           <span className={s.eyebrow}>PRIVACY POLICY</span>
           <h1>개인정보처리방침</h1>
-          <p>병아리 경제 뉴스는 이용자의 개인정보를 소중히 여기며 안전하게 보호하기 위해 노력합니다.</p>
+          <p>Thoth(토트)는 이용자의 개인정보를 소중히 여기며 안전하게 보호하기 위해 노력합니다.</p>
           <p className={s.updated}>시행일 및 최종 수정일: 2026년 8월 6일</p>
         </section>
 
@@ -65,7 +65,7 @@ export default function PrivacyPolicy() {
           <article className={s.policy}>
             <section id="overview">
               <h2>1. 총칙</h2>
-              <p>병아리 경제 뉴스(이하 “서비스”)는 경제 뉴스 조회와 AI 기반 뉴스 요약을 제공하는 서비스입니다. 서비스 운영자는 「개인정보 보호법」 등 관계 법령을 준수하며, 이 방침을 통해 개인정보가 어떤 목적으로 수집·이용되고 어떻게 보호되는지 안내합니다.</p>
+              <p>Thoth(토트, 이하 “서비스”)는 경제 뉴스 조회와 AI 기반 뉴스 요약을 제공하는 서비스입니다. 서비스 운영자는 「개인정보 보호법」 등 관계 법령을 준수하며, 이 방침을 통해 개인정보가 어떤 목적으로 수집·이용되고 어떻게 보호되는지 안내합니다.</p>
             </section>
 
             <section id="collection">
@@ -87,7 +87,7 @@ export default function PrivacyPolicy() {
             <section id="purpose">
               <h2>3. 개인정보의 이용 목적</h2>
               <ul>
-                <li>회원가입 의사 확인, 회원 식별, 로그인 및 이메일을 이용한 비밀번호 재설정 제공</li>
+                <li>회원가입 의사 확인, 회원 식별 및 로그인 제공</li>
                 <li>경제 뉴스, AI 뉴스 요약 및 회원 맞춤 기능 제공</li>
                 <li>부정 이용 방지, 서비스 안정성 확보 및 오류 분석</li>
                 <li>문의·민원 처리와 처리 결과 안내</li>

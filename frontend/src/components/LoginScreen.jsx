@@ -122,7 +122,7 @@ export default function LoginScreen({ onLoginSuccess }) {
           <div className={`${s.stepArea} ${s.complete}`}>
             <div className={s.completeIcon}>✓</div>
             <h2 className={s.question}>가입이 완료됐어요!</h2>
-            <p className={s.description}>{createdUser.nickname}님, 병아리 경제 뉴스와 함께 시작해요.</p>
+            <p className={s.description}>{createdUser.nickname}님, Thoth(토트)와 함께 시작해요.</p>
             <button className={`${s.btn} ${s.primary} ${s.fixedBtn}`} onClick={() => onLoginSuccess(createdUser)}>시작하기</button>
           </div>
         </div>

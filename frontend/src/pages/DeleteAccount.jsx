@@ -32,7 +32,7 @@ export default function DeleteAccount() {
         <section className={s.hero}>
           <span>ACCOUNT DELETION</span>
           <h1>계정 삭제 요청</h1>
-          <p>Thoth(토트), 병아리 경제 뉴스의 계정과 연결된 개인정보를 삭제할 수 있어요.</p>
+          <p>Thoth(토트) 계정과 연결된 개인정보를 삭제할 수 있어요.</p>
         </section>
 
         {complete ? <section className={`${s.card} ${s.complete}`}>
@@ -63,7 +63,7 @@ export default function DeleteAccount() {
         <section className={s.card}>
           <h2>처리 절차와 문의</h2>
           <p>아이디와 비밀번호 확인 후 즉시 삭제됩니다. 비밀번호를 잊었다면 등록한 이메일 주소에서 아래 문의처로 아이디와 삭제 요청을 보내주세요. 본인 확인 후 지체 없이 처리합니다.</p>
-          <dl><div><dt>서비스</dt><dd>Thoth(토트) · 병아리 경제 뉴스</dd></div><div><dt>운영자</dt><dd>권미경</dd></div><div><dt>문의</dt><dd><a href="mailto:zxc_777@naver.com?subject=Thoth 계정 삭제 요청">zxc_777@naver.com</a></dd></div></dl>
+          <dl><div><dt>서비스</dt><dd>Thoth(토트)</dd></div><div><dt>운영자</dt><dd>권미경</dd></div><div><dt>문의</dt><dd><a href="mailto:zxc_777@naver.com?subject=Thoth 계정 삭제 요청">zxc_777@naver.com</a></dd></div></dl>
           <p>로그인할 수 있다면 앱 내부의 <strong>계정 관리 → 계정 삭제</strong>에서도 같은 절차를 이용할 수 있습니다.</p>
         </section>
       </main>

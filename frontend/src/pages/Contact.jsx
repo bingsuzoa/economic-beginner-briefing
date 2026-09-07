@@ -5,16 +5,16 @@ import s from './PrivacyPolicy.module.css'
 export default function Contact() {
   useEffect(() => {
     const previousTitle = document.title
-    document.title = '문의 및 운영자 정보 | 병아리 경제 뉴스'
+    document.title = '문의 및 운영자 정보 | Thoth(토트)'
     return () => { document.title = previousTitle }
   }, [])
 
   return (
     <div className={s.page}>
       <header className={s.header}>
-        <a className={s.brand} href="/" aria-label="병아리 경제 뉴스 홈으로 이동">
+        <a className={s.brand} href="/" aria-label="Thoth(토트) 홈으로 이동">
           <img src="/images/main-logo.png" alt="" />
-          <span>병아리 경제 뉴스</span>
+          <span>Thoth(토트)</span>
         </a>
       </header>
 
@@ -31,7 +31,7 @@ export default function Contact() {
             <p>서비스 이용, 콘텐츠 및 개인정보 처리에 관한 문의는 아래 이메일로 보내주세요.</p>
             <div className={s.contactBox}>
               <strong>서비스명</strong>
-              <span>Thoth(토트) · 병아리 경제 뉴스</span>
+              <span>Thoth(토트)</span>
               <strong>운영자</strong>
               <span>권미경</span>
               <strong>문의 이메일</strong>
