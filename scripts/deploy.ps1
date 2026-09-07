@@ -136,7 +136,7 @@ try {
     # ------------------------------------------------------------------------------- test
     if ($Test) {
         Step "Running tests"
-        & (Join-Path $RepoRoot 'gradlew.bat') test --console=plain
+        & (Join-Path $RepoRoot 'gradlew.bat') -p $RepoRoot test --console=plain
         if ($LASTEXITCODE -ne 0) { Fail "tests failed; service untouched." }
     }
 
@@ -145,7 +145,7 @@ try {
     if ($InPlace) { Step "Stopping service (in-place build locks the JAR)"; Stop-App; $stopped = $true }
 
     Step "Building JAR"
-    & (Join-Path $RepoRoot 'gradlew.bat') clean bootJar --console=plain
+    & (Join-Path $RepoRoot 'gradlew.bat') -p $RepoRoot clean bootJar --console=plain
     if ($LASTEXITCODE -ne 0) { Fail "build failed." }
 
     $newJar = Get-BootJar (Join-Path $RepoRoot 'build\libs')
