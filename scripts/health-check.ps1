@@ -9,8 +9,8 @@
 #
 # Why a 503 is not automatically a failure: /api/health/briefing answers "are briefings still
 # being produced?", so it reports DOWN once the last successful pipeline run is older than
-# briefing.health.max-success-age (3h). Restarting the service does not run the pipeline - it
-# waits for the next hour tick - so a deploy more than 3h after the last run gets a legitimate
+# briefing.health.max-success-age (30h). Restarting the service does not run the pipeline - it
+# waits for the next daily tick - so a first deploy before any daily run can get a legitimate
 # 503 from a perfectly healthy app. That one reason is tolerated. Anything else (database
 # unreachable, invalid cron) still fails. Pass -Strict to demand a literal 200.
 
@@ -75,7 +75,7 @@ while ($true) {
                 -not ($json.reasons | Where-Object { $_ -notmatch $StaleReason })) {
                 Write-Host "HEALTHY (503, stale-run only - app and DB are up)" -ForegroundColor Yellow
                 Write-Host "  reasons: $($json.reasons -join '; ')"
-                Write-Host "  The pipeline runs on the next hour tick; this is expected right after a deploy."
+                Write-Host "  The pipeline runs at the next daily tick; this is expected right after a deploy."
                 exit 0
             }
         }

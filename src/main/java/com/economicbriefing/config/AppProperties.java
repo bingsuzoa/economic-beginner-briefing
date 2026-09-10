@@ -1,81 +1,34 @@
 package com.economicbriefing.config;
 
 import java.time.Duration;
-import java.util.List;
-
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.scheduling.support.CronExpression;
 
 @ConfigurationProperties(prefix = "briefing")
 public record AppProperties(
-    boolean dryRun,
-    TimeoutProperties timeouts,
-    RetryProperties retry,
-    DiversityProperties diversity,
-    AudienceProperties audience,
-    SchedulerProperties scheduler,
-    TeacherProperties teacher,
-    EmbeddingProperties embedding
+        TimeoutProperties timeouts,
+        SchedulerProperties scheduler,
+        BudgetProperties budget
 ) {
-    public record TimeoutProperties(
-        Duration rssHttp,
-        Duration aiApi
-    ) {}
+    public record TimeoutProperties(Duration rssHttp) {}
 
-    public record RetryProperties(
-        int maxAttempts,
-        Duration initialDelay,
-        Duration nextDelay
-    ) {}
-
-    public record DiversityProperties(
-        int maxArticlesPerSource,
-        int maxArticlesPerCategory,
-        int minPersonalFinanceRelevance,
-        int softMaxOverrideScore
-    ) {}
-
-    public record AudienceProperties(
-        String economicKnowledgeLevel,
-        List<String> interests,
-        List<String> contextNotes
-    ) {}
-
-    public record SchedulerProperties(
-        boolean enabled,
-        String cron
-    ) {
-        /**
-         * A bad cron must not take the whole service down — the public briefing API has
-         * nothing to do with scheduling. Callers use this to skip registering the task
-         * and report the misconfiguration instead.
-         */
-        public boolean cronValid() {
-            return cron != null && CronExpression.isValidExpression(cron);
-        }
-
-        /** True only when the hourly trigger can actually be armed. */
-        public boolean active() {
-            return enabled && cronValid();
-        }
-
-        /** ENABLED / DISABLED / MISCONFIGURED — what operators see at boot and on /status. */
+    public record SchedulerProperties(boolean enabled, String collectCron, String dailyCron) {
+        public boolean collectCronValid() { return valid(collectCron); }
+        public boolean dailyCronValid() { return valid(dailyCron); }
+        public boolean valid() { return collectCronValid() && dailyCronValid(); }
         public String state() {
             if (!enabled) return "DISABLED";
-            return cronValid() ? "ENABLED" : "MISCONFIGURED";
+            return valid() ? "ENABLED" : "MISCONFIGURED";
+        }
+        private static boolean valid(String value) {
+            return value != null && CronExpression.isValidExpression(value);
         }
     }
 
-    public record TeacherProperties(
-        boolean enabled,
-        String promptVersion,
-        String model,
-        int concurrency
-    ) {}
-
-    public record EmbeddingProperties(
-        boolean enabled,
-        String model,
-        int dimensions
+    public record BudgetProperties(
+            int screeningInputTokens,
+            int extractionInputTokens,
+            int synthesisInputTokens,
+            double dailyCostUsd
     ) {}
 }

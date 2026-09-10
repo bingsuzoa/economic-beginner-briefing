@@ -13,14 +13,6 @@ import org.springframework.scheduling.config.CronTask;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.scheduling.support.CronTrigger;
 
-/**
- * Registers the hourly trigger programmatically instead of with {@code @Scheduled}.
- *
- * <p>{@code @Scheduled(cron = "...")} parses the expression while the bean is created, so a
- * typo in {@code briefing.scheduler.cron} aborted the whole application context — taking the
- * public briefing API and the reader-facing site down with it. Parsing here lets a bad cron
- * disable only the scheduler.
- */
 @Configuration
 @EnableScheduling
 @ConditionalOnProperty(name = "briefing.scheduler.enabled", havingValue = "true")
@@ -42,17 +34,15 @@ public class SchedulingConfig implements SchedulingConfigurer {
     public void configureTasks(ScheduledTaskRegistrar registrar) {
         AppProperties.SchedulerProperties props = appProperties.scheduler();
 
-        if (!props.cronValid()) {
-            // ASCII only: operational logs get read on consoles that mangle non-ASCII.
-            log.error("[Scheduler] MISCONFIGURED cron='{}' - hourly briefings will NOT run. "
-                            + "Expected 6 fields (sec min hour day month weekday), e.g. '0 0 * * * *'. "
-                            + "The application keeps serving; fix briefing.scheduler.cron and restart.",
-                    props.cron());
-            return;
+        if (props.collectCronValid()) {
+            registrar.addCronTask(new CronTask(scheduler::collect, new CronTrigger(props.collectCron(), ZONE)));
+        } else {
+            log.error("[Scheduler] invalid collect-cron='{}'; collection disabled", props.collectCron());
         }
-
-        registrar.addCronTask(new CronTask(
-                scheduler::runHourlyBriefing,
-                new CronTrigger(props.cron(), ZONE)));
+        if (props.dailyCronValid()) {
+            registrar.addCronTask(new CronTask(scheduler::publishDaily, new CronTrigger(props.dailyCron(), ZONE)));
+        } else {
+            log.error("[Scheduler] invalid daily-cron='{}'; daily briefing disabled", props.dailyCron());
+        }
     }
 }

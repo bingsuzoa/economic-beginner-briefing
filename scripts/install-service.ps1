@@ -57,8 +57,7 @@ $pairs = Get-Content $EnvFile |
 if (-not $pairs) { Fail "No KEY=VALUE lines parsed from $EnvFile" }
 
 $names    = $pairs | ForEach-Object { ($_ -split '=', 2)[0] }
-$dryRun   = $pairs | Where-Object { $_ -match '^DRY_RUN\s*=\s*true$' }
-$required = @('OPENAI_API_KEY', 'AUTH_EMAIL_ENCRYPTION_KEY', 'AUTH_EMAIL_HASH_KEY') + $(if (-not $dryRun) { 'ADMIN_TOKEN' })
+$required = @('OPENAI_API_KEY', 'ADMIN_TOKEN', 'AUTH_EMAIL_ENCRYPTION_KEY', 'AUTH_EMAIL_HASH_KEY')
 $missing  = $required | Where-Object { $names -notcontains $_ }
 if ($missing) {
     Fail ("$EnvFile is missing required key(s): $($missing -join ', '). Parsed only: $($names -join ', '). " +

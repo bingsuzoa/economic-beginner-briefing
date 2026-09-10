@@ -1,7 +1,9 @@
 briefing:
-  dry-run: true
   scheduler:
     enabled: false
+
+openai:
+  api-key: test-openai-key
 
 spring:
   datasource:

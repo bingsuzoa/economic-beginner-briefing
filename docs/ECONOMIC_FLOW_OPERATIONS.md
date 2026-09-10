@@ -1,0 +1,312 @@
+# Thoth 경제흐름 운영·개선 가이드
+
+- 최종 갱신: 2026-09-11
+- 대상: 운영 서버에서 이 저장소를 이어서 관리하는 Codex와 운영자
+- 구현 버전: `daily-flow-v1`, Flyway V25
+- 상세 설계: [ECONOMIC_FLOW_DAILY_BRIEFING_FINAL_DESIGN_V1.md](ECONOMIC_FLOW_DAILY_BRIEFING_FINAL_DESIGN_V1.md)
+- 프롬프트 계약: [ECONOMIC_FLOW_LLM_PROMPT_DESIGN_V1.md](ECONOMIC_FLOW_LLM_PROMPT_DESIGN_V1.md)
+
+## 1. 서비스가 달성해야 하는 것
+
+이 서비스는 “기사 몇 개를 쉽게 요약하는 서비스”가 아니다. 매일 직전 24시간의 전체 뉴스에서 경제적으로 중요한 관측을 찾아 다음을 하나의 흐름으로 설명해야 한다.
+
+- 세계 각국과 기업·가계가 어떤 상황에 놓였는가
+- 각 주체가 무엇을 얻으려 하고 무엇에 제약받는가
+- 주체들이 협력·경쟁·대립하면서 비용과 이익을 어떻게 주고받는가
+- 충격과 결정이 에너지·공급망·무역·투자·물가·금리·환율·고용으로 어떻게 번지는가
+- 다음에 어떤 지표나 사건을 보면 흐름의 강화·약화·반전을 확인할 수 있는가
+
+흐름 개수는 정하지 않는다. 독립적인 경제 동인의 개수가 결과 개수를 결정한다. 같은 상류 충격을 국가별 기사로 쪼개거나 같은 AI 수요를 반도체·전력·자금조달 기사별로 나누면 실패다. 반대로 현재 근거에 공통 원인이 없는데 억지로 합치는 것도 실패다.
+
+## 2. 운영 시간의 의미
+
+모든 시간은 `Asia/Seoul` 기준이다.
+
+```text
+매시 05분  연합뉴스 RSS 전체 스트림 최근 2시간 수집
+매일 05:10 전날 05:00 이상 ~ 당일 05:00 미만 기사 분석
+```
+
+예를 들어 `target_date=2026-09-11`은 `2026-09-10 05:00:00` 이상, `2026-09-11 05:00:00` 미만을 뜻한다. 05:10 실행으로 05:05 수집 완료 여유를 둔다. 시간별 수집은 AI를 호출하지 않는다.
+
+설정:
+
+```yaml
+briefing.scheduler.collect-cron: 0 5 * * * *
+briefing.scheduler.daily-cron: 0 10 5 * * *
+```
+
+잘못된 cron 하나는 그 작업만 비활성화하고 웹 서버를 내리지 않는다.
+
+## 3. 현재 데이터 흐름
+
+```text
+연합뉴스 7개 RSS
+  → 코드: 원기사 키 기준 최신판 유지, 얇은 속보 제외
+  → Luna: 6시간 창별 제목 사전선별, 필요 시 일일 80개 병합
+  → Luna: 제목+RSS 요약 정밀선별, 최대 20개
+  → 선택 기사만 원문 수집
+  → Luna: 기사별 관측 0~3개와 직접 근거 문단 ID 추출
+  → 코드: ID·문단·숫자 검증, 관측 저장 및 임베딩
+  → PostgreSQL: 과거 관측과 경제원리 검색
+  → 코드: 기사쌍별 최고 유사 관측쌍을 연결 후보로 계산
+  → Terra: 관측 묶음과 경제 연결 논리만 설계
+  → Luna: 확정된 설계를 초보자용 설명으로 편집
+  → 코드: coverage·허용 ID·순서·숫자 검증
+  → 기사 URL과 원문 근거 문단을 결합해 공개
+```
+
+### 모델별 책임
+
+| 단계 | 모델 | 책임 | 하지 않는 일 |
+|---|---|---|---|
+| 제목 사전선별 | Luna `low` | 원문을 확인할 가능성 높은 후보를 넉넉히 회수 | 원문 판단, 최종 중요도 판단 |
+| 제목·요약 정밀선별 | Luna `low` | 최종 흐름에 독립적으로 필요하거나 다른 기사의 원인·반응·제약을 보태는 기사 확정 | 원문에 없는 사실 추정 |
+| 관측 추출 | Luna `none` | 원문에서 사실·수치·주체·주장 강도와 최소 문단 ID 추출 | 경제원리 추가, 기사 간 연결 |
+| 흐름 설계 | Terra `medium` | 현재·과거 관측과 원리 중 필요한 것 선택, 구조적 흐름으로 묶기 | 최종 제목·장문 작성 |
+| 독자용 편집 | Luna `none` | Terra 설계의 순서와 개수를 유지해 쉬운 설명 작성 | 근거 재선택, 흐름 합치기·나누기 |
+
+Terra 하나에 선별·검증·장문 작성까지 다시 맡기지 않는다. 별도 검증 LLM도 추가하지 않는다. 구조 검증은 코드가 한다.
+
+## 4. 임베딩과 검색
+
+현재 관측마다 `text-embedding-3-large`, 1,536차원 벡터를 한 번 만든다. 같은 벡터를 세 곳에서 재사용한다.
+
+1. 과거 `article_observations` 상위 5개 검색
+2. `economic_principle_chunk` 상위 2개 검색
+3. 서로 다른 기사 관측 간 cosine 계산
+
+과거 후보는 과거 기사 중복을 제거하고 현재 기사 하나에 최대 2개, 전체 최대 12개로 제한한다. runtime에서 반드시 “어느 현재 관측이 이 과거 관측을 검색했는지” 쌍을 보존한다. DB에는 그 임시 관계를 영구 저장하지 않고 `daily_briefings.trace_json.historyCandidatePairs`에 실행 추적만 남긴다.
+
+기사 간 연결은 서로 다른 기사쌍마다 유사도가 가장 높은 관측 한 쌍만 남기고 cosine 0.30 이상인 상위 20쌍만 보낸다. 이는 Terra가 먼저 볼 후보이지 인과 근거가 아니다. 유사도만으로 경제적으로 연결됐다고 확정하지 않는다.
+
+경제원리는 cosine 0.42 이상, 최대 4개, 본문 합계 4,000자까지 전달한다. 관련 원리가 없거나 기사 자체가 전달 경로를 설명하면 원리 0개가 정상이다. 과거 관측도 없으면 현재 관측만으로 정상 실행한다.
+
+과거 검색에는 이전 `daily_briefings.result_json` 문장을 절대 넣지 않는다. 누적되는 기억은 원문 문단으로 추적 가능한 `article_observations`뿐이다.
+
+## 5. DB 구조
+
+경제흐름 핵심 테이블은 네 개다.
+
+| 테이블 | 역할 |
+|---|---|
+| `articles` | RSS 메타데이터와 선택 기사 원문 |
+| `article_observations` | 원문 근거 문단 ID가 붙은 관측과 임베딩 |
+| `economic_principle_chunk` | 별도 빌더가 적재하는 경제원리와 임베딩 |
+| `daily_briefings` | 날짜별 revision, 상태, 모델, usage, trace, 공개 결과 |
+
+인증·환율 기능 때문에 `users`, `password_reset_tokens`, `exchange_rates`, `current_exchange_rates`는 유지한다. Flyway 이력을 포함한 정상 public 테이블은 총 9개다.
+
+V24는 구 분석·그래프·파이프라인 테이블 21개를 제거했다. V25는 입력 기사 0건을 `SUCCESS`로 오해하지 않도록 `NO_DATA` 상태를 추가했다. 적용된 Flyway 파일은 수정하거나 삭제하지 말고 항상 다음 번호의 새 migration을 만든다.
+
+상태 의미:
+
+- `RUNNING`: 실행 중
+- `SUCCESS`: 검증을 통과해 공개 가능한 결과. 흐름 0개도 가능하다.
+- `FAILED`: API·예산·구조 검증 실패. 이전 성공 revision을 계속 공개한다.
+- `NO_DATA`: 분석창에 기사 자체가 0건. 공개 대상으로 사용하지 않는다.
+
+## 6. 핵심 코드 위치
+
+| 위치 | 책임 |
+|---|---|
+| `article/YonhapArticleService.java` | 시간별 RSS 수집·안정 ID·개정판 갱신 |
+| `article/YonhapBodyFetcher.java` | 선택 기사 본문 수집 |
+| `article/ParagraphSplitter.java` | 결정적 `P001` 문단 ID 생성·근거 가능 문단 판단 |
+| `briefing/EconomicFlowLlm.java` | 네 LLM 프롬프트와 Structured Output 계약 |
+| `briefing/DailyBriefingService.java` | 일일 오케스트레이션, 검색 packing, 검증, 결과 조립 |
+| `briefing/ObservationStore.java` | 관측 저장·재사용·과거 vector 검색 |
+| `briefing/PrincipleStore.java` | 경제원리 vector 검색 |
+| `scheduler/*` | 수집과 일일 분석 시간만 결정 |
+| `api/DailyBriefingController.java` | 최신·날짜별 공개 JSON |
+| `admin/controller/DailyBriefingAdminController.java` | revision 조회·수동 날짜 재실행 |
+
+삭제된 `analyzer`, `classifier`, `pipeline`, `economicflow` 패키지를 복원하거나 새 단계로 감싸지 않는다.
+
+## 7. API
+
+공개:
+
+```text
+GET /api/briefings/latest
+GET /api/briefings/{yyyy-MM-dd}
+GET /api/health/briefing
+```
+
+관리자 Bearer token 필요:
+
+```text
+GET  /api/admin/briefings/runs?page=0&size=20&status=FAILED
+GET  /api/admin/briefings/runs/{runId}
+POST /api/admin/briefings/{yyyy-MM-dd}/run
+```
+
+수동 실행은 비동기이며 HTTP 202를 반환한다. 같은 프로세스에서 이미 실행 중이면 409다. 같은 날짜를 다시 돌리면 이전 행을 덮어쓰지 않고 revision을 올린다.
+
+## 8. 비용·입력 안전장치
+
+초기 운영 상한:
+
+| 항목 | 상한 |
+|---|---:|
+| 제목 사전선별 추정 입력 | 50,000 tokens |
+| 원문 관측 추출 추정 입력 | 100,000 tokens |
+| Terra 입력 | 15,000 tokens |
+| 전체 예상 일일 비용 | USD 0.14 |
+
+기사 ID는 LLM 호출마다 `A001` 같은 짧은 별칭으로 바꾸고, 시각도 `HH:mm`만 보낸다. 제목 사전선별은 같은 6시간 안에서도 시간대별 기사를 교차 배열해 목록 위치 편향을 줄인다. 원문은 선택된 기사의 관측 추출에만 한 번 보낸다. 동일 모델·프롬프트로 이미 저장된 관측과 임베딩은 revision 재실행에서 재사용한다.
+
+API가 반환한 정확한 usage와 현재 가격표 기반 추정 비용은 `daily_briefings.usage_json`에 기록한다. 가격이 바뀌면 계산식을 갱신하되 과거 usage 원본은 지우지 않는다.
+
+## 9. 2026-09-11 기준선
+
+실제 Java 운영 경로로 `2026-09-10 05:00~2026-09-11 05:00 KST`를 실행했다.
+
+| 지표 | 결과 |
+|---|---:|
+| 수집 평가 원본 | 1,166 기사 |
+| 원기사·얇은 속보 정리 후 | 1,091 기사 |
+| 제목 사전 후보 | 84 기사 |
+| 정밀선별 | 15 기사 |
+| 유효 관측 | 43개 |
+| 최종 구조적 흐름 | 4개 |
+| 최종 실행 비용 | USD 0.06685016 |
+| 코드 검증 오류 | 0 |
+
+최종 흐름은 다음 네 축이었다.
+
+1. 중동 충돌과 해협 차단 → 사우디 수출·우회 운송 → 유가 → 미국·유럽·한국 물가·금리·환율
+2. AI 수요 → TSMC 생산능력 → 외부자금 → 텍사스 전력망 병목
+3. 한국 금리 판단 → 주택·가계대출과 예금으로의 자금 이동
+4. 메모리 원가 상승 → 스마트폰 가격 전가 → 소비자의 교체 지연·저용량·중고 선택
+
+이 숫자를 매일 억지로 맞추지 않는다. 기준선은 파이프라인이 갑자기 1,000개 제목에서 10개만 남기거나 기사마다 흐름 하나를 만드는 식으로 무너졌는지 알아보는 비교점이다.
+
+## 10. 매일 확인할 것
+
+먼저 실행 상태와 usage·trace를 본다.
+
+```sql
+SELECT target_date, revision, status, started_at, finished_at,
+       usage_json, trace_json, error_message
+FROM daily_briefings
+ORDER BY started_at DESC
+LIMIT 7;
+```
+
+그다음 최신 결과를 실제 독자 관점으로 읽는다.
+
+- 중요한 거시·시장·공급망·주요국 정책 기사가 선별에서 빠지지 않았는가
+- 상품 홍보·인사·행사·개별 사건이 최종 흐름을 차지하지 않았는가
+- 한 상류 충격이나 최종 수요가 기사별 요약으로 쪼개지지 않았는가
+- 서로 근거가 없는 기사를 그럴듯하게 합치지 않았는가
+- 주체의 주장·전망·계획을 이미 일어난 사실로 바꾸지 않았는가
+- 서로 다른 관측을 연결한 추론은 “가능성·압력·조건”으로 표현했는가
+- 국가와 기업의 목표·제약·상대 관계가 드러나는가
+- 출처를 열었을 때 모든 관측에 직접 근거 문단이 있는가
+- 과거 관측은 같은 지표의 변화·반전·반복·상충을 실제로 더했는가
+- 경제원리는 사건 근거가 아니라 전달 경로 설명으로만 쓰였는가
+
+## 11. 오류를 어느 단계에서 고칠지
+
+| 증상 | 먼저 볼 값 | 소유 단계 |
+|---|---|---|
+| 기사 자체가 없음 | window count, RSS 로그 | 수집·시간창 |
+| 중요한 제목이 사전 후보에 없음 | `prefilteredArticleIds` | Luna 제목 사전선별 입력·프롬프트 |
+| 후보에는 있는데 최종 기사에서 빠짐 | `selectedArticleIds` | Luna 정밀선별 |
+| 선택됐지만 관측이 없음 | `observationIds`, 기사 본문·span | 본문 파서·Luna 추출·코드 검증 |
+| 근거는 좋은데 흐름이 기사별로 분절 | 최종 sources 묶음 | Terra planner |
+| 서로 무관한 기사가 합쳐짐 | `connectionCandidates`, 관측문 | Terra planner·후보 packing |
+| 흐름 구조는 맞고 문장만 어렵거나 강도가 틀림 | Terra connection과 최종 설명 | Luna writer |
+| 관련 없는 과거가 사용됨 | `historyCandidatePairs`, `usedHistoryObservationIds` | 검색 packing·Terra planner |
+| 원리가 억지로 붙음 | `principleChunkIds`, `usedPrincipleIds` | 원리 임베딩·하한·Terra planner |
+| 토큰 급증 | stage별 usage와 기사/관측 수 | 해당 단계 입력 packing |
+
+한 오류를 고치려고 모든 프롬프트를 동시에 바꾸지 않는다. 고정 날짜의 동일 입력으로 소유 단계만 바꾸고 이전 revision과 비교한다. 제목 누락을 Terra 프롬프트로 고칠 수 없고, 좋은 Terra 설계를 Luna가 어렵게 쓴 문제를 검색 구조로 고치면 안 된다.
+
+## 12. 반복 개선 절차
+
+1. 문제를 한 문장으로 정의하고 해당 날짜의 run ID와 실패 예시를 남긴다.
+2. `trace_json`으로 최초로 잘못된 단계가 어디인지 찾는다.
+3. 가능하면 저장된 기사·관측을 재사용해 그 단계 이후만 비교한다.
+4. 같은 고정 입력에서 변경 전후의 누락, 거짓 인과, coverage, 비용을 함께 측정한다.
+5. 한 날짜에서 좋아져도 다른 고정일 2개 이상에서 회귀가 없는지 본다.
+6. 성공 기준을 통과한 뒤에만 운영 기본값을 바꾸고 prompt/pipeline version을 올린다.
+7. 7일 usage 중앙값과 상위값으로 비용 상한을 조정한다.
+
+과거 관측과 경제원리는 데이터가 쌓이면서 매일 별도로 평가한다. “사용 횟수가 늘었다”는 성공이 아니다. 과거는 현재만으로 알 수 없던 변화 방향을 정확히 보탰을 때, 원리는 기사 사이의 작동 경로를 정확히 설명했을 때만 성공이다.
+
+## 13. 하지 말아야 할 것
+
+- 흐름을 0~3개, 5개 같은 고정 개수로 제한하지 않는다.
+- `statementKind`, `role`, `confidence`, `importance` 필드를 다시 만들지 않는다.
+- source span을 의미 검증한다는 명목으로 별도 LLM validator를 붙이지 않는다.
+- 모든 단계에 원문 전체를 다시 보내지 않는다.
+- 모든 수집 기사 본문을 먼저 긁거나 모두 임베딩하지 않는다.
+- 과거 최종 설명을 다음 날 사실 근거로 넣지 않는다.
+- 경제원리 사용량을 높이려고 관련 없는 청크를 강제하지 않는다.
+- 품질이 한 번 흔들렸다는 이유만으로 Luna 단계를 Terra로 올리지 않는다.
+- 실패한 revision 때문에 이전 성공 결과를 삭제하거나 덮어쓰지 않는다.
+- 운영 중인 Flyway migration의 checksum을 바꾸지 않는다.
+
+## 14. 테스트 명령
+
+```bash
+./gradlew clean test
+cd frontend
+npm run build
+node ../scripts/check-mock-data.mjs
+```
+
+실제 날짜 재실행:
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  http://127.0.0.1:3000/api/admin/briefings/2026-09-11/run
+```
+
+운영 로그에 API key, 관리자 token, 전체 프롬프트, 원문 전체를 남기지 않는다. OpenAI 로그는 모델명과 usage만 기록한다.
+
+## 15. 배포 현실과 확인
+
+현재 `.github/workflows/deploy.yml`은 이름과 주석 그대로 **DEV만** 자동 배포한다.
+
+```text
+main push
+  → Windows self-hosted runner
+  → backend test + bootJar
+  → DEV DB economic_briefing_dev migration
+  → DEV :8081 재시작
+  → /api/health/briefing 확인
+```
+
+PROD `:3000`과 운영 DB는 이 workflow가 건드리지 않는다. GitHub Actions가 성공했다고 “운영 배포 완료”라고 보고하면 안 된다.
+
+운영 배포는 Windows 운영 디렉터리의 관리자 PowerShell에서 별도로 실행한다.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\deploy.ps1 -Test
+```
+
+이 스크립트는 기존 JAR과 `frontend/dist`를 백업하고, 테스트·빌드·서비스 재등록·health check를 수행하며 실패하면 이전 산출물로 롤백한다. V24는 구 테이블을 삭제하는 DB 변경이므로 운영 최초 적용 직전에는 별도 `pg_dump`도 반드시 만든다. 애플리케이션 산출물 롤백만으로 삭제된 테이블이 복구되지는 않는다.
+
+배포 후 확인:
+
+1. 프로세스와 `/api/health/briefing`이 정상인가
+2. Flyway가 V25까지 적용됐는가
+3. `/api/briefings/latest`가 최신 SUCCESS만 반환하는가
+4. 관리자 run 목록에서 usage와 trace가 보이는가
+5. 웹의 “오늘의 경제흐름”에서 흐름·출처·원문 근거가 표시되는가
+6. 다음 매시 05분 수집과 다음날 05:10 분석이 실제로 실행됐는가
+
+## 16. 백업과 롤백
+
+로컬 전환 전 백업은 다음 위치에 만들었다.
+
+```text
+/Users/mikyeong/project/economic-beginner-briefing-backups/
+economic_briefing_pre_daily_flow_20260911_0450.dump
+```
+
+이 파일은 로컬 검증용이며 운영 Windows DB 백업을 대신하지 않는다. 운영에서는 배포 직전 새 dump를 만들고 복원 명령과 PostgreSQL 버전을 함께 기록한다. V24 이전으로 되돌려야 하면 서비스를 먼저 중지하고 DB dump 전체를 복원한 뒤 이전 JAR과 frontend를 배포한다.

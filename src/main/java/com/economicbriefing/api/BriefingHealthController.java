@@ -5,8 +5,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.economicbriefing.admin.entity.PipelineRunEntity;
-import com.economicbriefing.admin.repository.PipelineRunRepository;
+import com.economicbriefing.briefing.DailyBriefingRepository;
 import com.economicbriefing.config.AppProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  * produced?
  *
  * <p>Watching the scheduler's configured state alone only catches a bad cron. The symptom that
- * actually matters — no fresh briefings — also comes from a pipeline failing every hour, an
+ * actually matters — no fresh briefings — also comes from the daily pipeline failing, an
  * expired OpenAI key, or every RSS source going down. Staleness of the last successful run
  * covers all of those, so it is the primary signal here.
  */
@@ -32,15 +31,15 @@ public class BriefingHealthController {
 
     private static final Logger log = LoggerFactory.getLogger(BriefingHealthController.class);
 
-    private final PipelineRunRepository runRepo;
+    private final DailyBriefingRepository briefingRepository;
     private final AppProperties appProperties;
     private final Duration maxSuccessAge;
 
     public BriefingHealthController(
-            PipelineRunRepository runRepo,
+            DailyBriefingRepository briefingRepository,
             AppProperties appProperties,
-            @Value("${briefing.health.max-success-age:3h}") Duration maxSuccessAge) {
-        this.runRepo = runRepo;
+            @Value("${briefing.health.max-success-age:30h}") Duration maxSuccessAge) {
+        this.briefingRepository = briefingRepository;
         this.appProperties = appProperties;
         this.maxSuccessAge = maxSuccessAge;
     }
@@ -53,8 +52,8 @@ public class BriefingHealthController {
         boolean dbConnected = true;
         OffsetDateTime lastSuccessAt = null;
         try {
-            lastSuccessAt = runRepo.findFirstByStatusOrderByStartedAtDesc("SUCCESS")
-                    .map(BriefingHealthController::completionTime)
+            lastSuccessAt = briefingRepository.findFirstByStatusOrderByFinishedAtDesc("SUCCESS")
+                    .map(run -> run.getFinishedAt() != null ? run.getFinishedAt() : run.getStartedAt())
                     .orElse(null);
         } catch (Exception e) {
             dbConnected = false;
@@ -63,7 +62,7 @@ public class BriefingHealthController {
         }
 
         if ("MISCONFIGURED".equals(scheduler.state())) {
-            reasons.add("scheduler cron is invalid: '" + scheduler.cron() + "'");
+            reasons.add("one or more scheduler cron expressions are invalid");
         }
 
         Long ageMinutes = lastSuccessAt != null
@@ -85,7 +84,8 @@ public class BriefingHealthController {
         BriefingHealthResponse body = new BriefingHealthResponse(
                 up ? "UP" : "DOWN",
                 scheduler.state(),
-                scheduler.cron(),
+                scheduler.collectCron(),
+                scheduler.dailyCron(),
                 dbConnected,
                 lastSuccessAt != null ? lastSuccessAt.toString() : null,
                 ageMinutes,
@@ -96,10 +96,5 @@ public class BriefingHealthController {
         }
 
         return ResponseEntity.status(up ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE).body(body);
-    }
-
-    /** A run that never recorded a finish time still started, so fall back to that. */
-    private static OffsetDateTime completionTime(PipelineRunEntity run) {
-        return run.getFinishedAt() != null ? run.getFinishedAt() : run.getStartedAt();
     }
 }

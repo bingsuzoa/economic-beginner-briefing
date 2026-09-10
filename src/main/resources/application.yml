@@ -39,80 +39,28 @@ server:
       timeout: 7d
 
 briefing:
-  # false = real RSS + real OpenAI. When true, every external call is mocked.
-  dry-run: ${DRY_RUN:false}
-
   timeouts:
     rss-http: 10s
-    ai-api: 60s
-
-  retry:
-    # 3 attempts: a TPM-limit 429 needs the rate window to roll over, one retry is not enough
-    max-attempts: 3
-    initial-delay: 1s
-    next-delay: 2s
-
-  diversity:
-    max-articles-per-source: 3
-    max-articles-per-category: 3
-    min-personal-finance-relevance: 3
-    soft-max-override-score: 5
-
-  audience:
-    economic-knowledge-level: beginner
-    interests:
-      - interest_rate
-      - loan
-      - housing
-      - jeonse_monthly_rent
-      - deposit_saving
-      - government_support
-    context-notes:
-      - "\uC2E0\uD63C\uBD80\uBD80"
-      - "\uC8FC\uD0DD \uAD6C\uC785\uACFC \uCD9C\uC0B0 \uC900\uBE44"
-      - "\uACBD\uC81C\uC6A9\uC5B4 \uC124\uBA85 \uD544\uC694"
-
-  cli:
-    enabled: ${BRIEFING_CLI_ENABLED:false}
-
   scheduler:
-    # On by default: this file is the operating configuration, no profile required.
-    # Set SCHEDULER_ENABLED=false to run without the hourly trigger (tests, one-shot CLI).
     enabled: ${SCHEDULER_ENABLED:true}
-    # 6 fields (sec min hour day month weekday). Evaluated in Asia/Seoul.
-    cron: ${SCHEDULER_CRON:0 0 * * * *}
-
+    collect-cron: ${COLLECT_CRON:0 5 * * * *}
+    daily-cron: ${DAILY_CRON:0 10 5 * * *}
+  budget:
+    screening-input-tokens: ${SCREENING_INPUT_TOKENS:50000}
+    extraction-input-tokens: ${EXTRACTION_INPUT_TOKENS:100000}
+    synthesis-input-tokens: ${SYNTHESIS_INPUT_TOKENS:15000}
+    daily-cost-usd: ${DAILY_COST_USD:0.14}
   health:
-    # GET /api/health/briefing reports DOWN past this age. Hourly cron, so this tolerates
-    # two missed ticks before paging. Only enforced while the scheduler is enabled.
-    max-success-age: ${HEALTH_MAX_SUCCESS_AGE:3h}
-
-  teacher:
-    enabled: ${TEACHER_ENABLED:false}
-    prompt-version: "teacher-v1"
-    # Cheap model on purpose: one call per article, so this stage would otherwise drain
-    # the main model's tokens-per-minute budget before the analysis call runs.
-    model: ${TEACHER_MODEL:gpt-4o-mini}
-    concurrency: ${TEACHER_CONCURRENCY:6}
-
-  embedding:
-    enabled: ${EMBEDDING_ENABLED:false}
-    model: text-embedding-3-small
-    dimensions: 1536
+    max-success-age: ${HEALTH_MAX_SUCCESS_AGE:30h}
 
 openai:
   api-key: ${OPENAI_API_KEY}
-  model: ${OPENAI_MODEL:gpt-4o}
-  temperature: 0.3
-  timeout: 60s
-  max-selected-news: 15
-  economic-flow-comparison-model: ${ECONOMIC_FLOW_COMPARISON_MODEL:gpt-4o-mini}
-  economic-flow-traversal-model: ${ECONOMIC_FLOW_TRAVERSAL_MODEL:gpt-4o-mini}
-  rate-limit:
-    # The account permits 30,000 TPM for gpt-4o. Reserve headroom for token-estimation error
-    # and other account activity, then pace every model independently in a rolling minute.
-    safe-tokens-per-minute: ${OPENAI_SAFE_TOKENS_PER_MINUTE:24000}
-    window: 60s
+  timeout: 300s
+  screening-model: ${OPENAI_SCREENING_MODEL:gpt-5.6-luna}
+  extraction-model: ${OPENAI_EXTRACTION_MODEL:gpt-5.6-luna}
+  synthesis-model: ${OPENAI_SYNTHESIS_MODEL:gpt-5.6-terra}
+  writing-model: ${OPENAI_WRITING_MODEL:gpt-5.6-luna}
+  embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-large}
 
 auth:
   require-https: ${AUTH_REQUIRE_HTTPS:true}

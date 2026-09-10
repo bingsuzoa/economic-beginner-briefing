@@ -26,14 +26,11 @@ repositories {
 dependencies {
     // Spring Boot
     implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-security")
 
     // Database
     runtimeOnly("org.postgresql:postgresql")
-    implementation("com.pgvector:pgvector:0.1.6")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
 
@@ -43,49 +40,17 @@ dependencies {
     // Jackson
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
 
-    // Retry
-    implementation("org.springframework.retry:spring-retry")
-    implementation("org.springframework:spring-aspects")
-
-    // Lombok
-    compileOnly("org.projectlombok:lombok")
-    annotationProcessor("org.projectlombok:lombok")
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
     // Test
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
-    testImplementation("io.projectreactor:reactor-test")
     testRuntimeOnly("com.h2database:h2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.withType<Test> {
     useJUnitPlatform()
-}
-
-tasks.register<Test>("manualEconomicFlowDebug") {
-    group = "verification"
-    description = "Runs only the articles listed in a manual Economic Flow debug manifest"
-    useJUnitPlatform()
-    filter { includeTestsMatching("com.economicbriefing.analyzer.openai.ManualEconomicFlowDebugTest") }
-
-    val input = providers.gradleProperty("input").orNull
-    systemProperty("manual.flow.input", input?.let { rootProject.file(it).absolutePath } ?: "")
-    systemProperty("manual.flow.analysisRepeat", providers.gradleProperty("analysis-repeat").orNull ?: "1")
-    doFirst {
-        require(input != null) { "-Pinput=<manifest.json> is required" }
-    }
-
-    val envFile = rootProject.file(".env")
-    if (envFile.exists()) {
-        envFile.readLines()
-            .filter { it.isNotBlank() && !it.startsWith("#") && '=' in it }
-            .forEach { line ->
-                val (key, value) = line.split("=", limit = 2)
-                if (System.getenv(key.trim()) == null) environment(key.trim(), value.trim())
-            }
-    }
 }
 
 // 운영(Windows)은 NSSM 서비스가 bootJar 산출물을 java -jar로 띄웁니다.

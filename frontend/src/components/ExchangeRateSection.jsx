@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import s from './ExchangeRateSection.module.css'
 import { EXCHANGE_RATE_PERIODS, fetchCurrentExchangeRate, fetchExchangeRateBriefing, fetchExchangeRateHistory } from '../data/exchangeRate'
-import { formatRelativeTime } from './NewsCard'
+
+const formatRelativeTime = (value) => {
+  const hours = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 3_600_000))
+  return hours < 1 ? '방금 전' : hours < 24 ? `${hours}시간 전` : `${Math.floor(hours / 24)}일 전`
+}
 
 const formatRate = (value) => value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const formatPercent = (value) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`

@@ -1,41 +1,43 @@
 package com.economicbriefing.scheduler;
 
-import com.economicbriefing.pipeline.PipelineExecutionService;
-import com.economicbriefing.pipeline.PipelineOptions;
+import com.economicbriefing.article.YonhapArticleService;
+import com.economicbriefing.briefing.DailyBriefingService;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/**
- * Hourly trigger. All execution logic lives in {@link PipelineExecutionService}, which the
- * admin API calls too — this class only decides <em>when</em>.
- */
 @Component
 @ConditionalOnProperty(name = "briefing.scheduler.enabled", havingValue = "true")
 public class BriefingScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(BriefingScheduler.class);
 
-    private final PipelineExecutionService executionService;
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private final YonhapArticleService articleService;
+    private final DailyBriefingService briefingService;
 
-    public BriefingScheduler(PipelineExecutionService executionService) {
-        this.executionService = executionService;
+    public BriefingScheduler(YonhapArticleService articleService, DailyBriefingService briefingService) {
+        this.articleService = articleService;
+        this.briefingService = briefingService;
     }
 
-    /**
-     * Invoked by the cron task {@link SchedulingConfig} registers — deliberately not annotated
-     * with {@code @Scheduled}, so an invalid cron cannot abort application startup.
-     *
-     * <p>Runs on the scheduler thread so an overrun shows up as a skipped next tick rather than
-     * as silent overlap. Never throws: an escaping exception would be logged by Spring as an
-     * unhandled scheduling error, and this keeps the guarantee explicit instead of inherited.
-     */
-    public void runHourlyBriefing() {
+    public void collect() {
         try {
-            executionService.tryRun(PipelineOptions.hourly());
+            int saved = articleService.collectRecent();
+            log.info("[Scheduler] Yonhap collection completed: saved={}", saved);
         } catch (Exception e) {
-            log.error("[Scheduler] Tick failed; the next tick will still run", e);
+            log.error("[Scheduler] Yonhap collection failed; next tick remains armed", e);
+        }
+    }
+
+    public void publishDaily() {
+        try {
+            briefingService.run(LocalDate.now(KST), "SCHEDULED", false);
+        } catch (Exception e) {
+            log.error("[Scheduler] Daily economic flow failed; next day remains armed", e);
         }
     }
 }

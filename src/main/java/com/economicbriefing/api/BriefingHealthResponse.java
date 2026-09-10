@@ -10,7 +10,8 @@ import java.util.List;
 public record BriefingHealthResponse(
     String status,
     String scheduler,
-    String cron,
+    String collectCron,
+    String dailyCron,
     boolean dbConnected,
     String lastSuccessAt,
     Long lastSuccessAgeMinutes,

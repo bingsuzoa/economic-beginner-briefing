@@ -88,7 +88,7 @@ for (const v of violations) {
   console.error(`  ${v.file}:${v.line}  [${v.label}]`)
   console.error(`      ${v.text}`)
 }
-console.error('\nProduction must render data from /api/briefing, not from a bundled fixture.')
+console.error('\nProduction must render data from /api/briefings, not from a bundled fixture.')
 console.error('Restore the real API call and delete the fixture before merging.')
 console.error('If this is a false positive, adjust PATTERNS in scripts/check-mock-data.mjs.')
 process.exit(1)

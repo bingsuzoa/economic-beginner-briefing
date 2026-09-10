@@ -1,5 +1,4 @@
 briefing:
-  dry-run: false
   scheduler:
     enabled: true
 

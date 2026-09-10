@@ -34,3 +34,7 @@ tools/
 
 # Previous releases kept by scripts/deploy.ps1 for rollback
 backup/
+
+# Local copyrighted/derived RAG inputs and generated vectors
+/rag-data-builder/input/*.pdf
+/rag-data-builder/output/

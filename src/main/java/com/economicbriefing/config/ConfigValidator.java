@@ -29,21 +29,16 @@ public class ConfigValidator {
     public void validate() {
         logSchedulerState();
 
-        if (appProperties.dryRun()) {
-            log.info("Dry-run mode: skipping external API config validation");
-            return;
-        }
-
         if (isBlank(openAiProperties.apiKey())) {
             throw new BriefingException(ErrorCode.SYSTEM_CONFIG_ERROR, "system",
-                    "OPENAI_API_KEY is required when dry-run is disabled");
+                    "OPENAI_API_KEY is required");
         }
 
         // The admin API can trigger pipeline runs and expose run history. Starting without
         // a token would leave it open, so refuse to start rather than silently allow all.
         if (isBlank(adminProperties.token())) {
             throw new BriefingException(ErrorCode.SYSTEM_CONFIG_ERROR, "system",
-                    "ADMIN_TOKEN is required when dry-run is disabled");
+                    "ADMIN_TOKEN is required");
         }
 
         log.info("Configuration validated: OpenAI API key and admin token present");
@@ -55,11 +50,12 @@ public class ConfigValidator {
         AppProperties.SchedulerProperties scheduler = appProperties.scheduler();
         if (scheduler == null || !scheduler.enabled()) {
             log.info("[Scheduler] DISABLED (briefing.scheduler.enabled=false)");
-        } else if (scheduler.cronValid()) {
-            log.info("[Scheduler] ENABLED cron='{}' zone=Asia/Seoul", scheduler.cron());
+        } else if (scheduler.valid()) {
+            log.info("[Scheduler] ENABLED collectCron='{}', dailyCron='{}', zone=Asia/Seoul",
+                    scheduler.collectCron(), scheduler.dailyCron());
         } else {
-            log.error("[Scheduler] MISCONFIGURED cron='{}' - hourly briefings will NOT run",
-                    scheduler.cron());
+            log.error("[Scheduler] MISCONFIGURED collectCron='{}', dailyCron='{}' - scheduled work will NOT run",
+                    scheduler.collectCron(), scheduler.dailyCron());
         }
     }
 
