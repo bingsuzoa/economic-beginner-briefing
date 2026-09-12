@@ -6,6 +6,7 @@ import com.economicbriefing.config.OpenAiProperties;
 import com.economicbriefing.llm.OpenAiClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -58,6 +59,7 @@ public class EconomicFlowLlm {
             """;
     private static final String WRITER_PROMPT = """
             경제 초보자를 위한 아침 브리핑을 쓴다. 흐름의 묶음·순서·개수를 유지하고 flowId마다 결과 하나를 쓴다. 제목은 짧고 구체적으로, explanation은 변화와 근거 있는 전달 과정을 쉬운 ~요체로 설명한다. 문단 사이에는 빈 줄을 넣는다. 용어는 처음 나올 때 풀어 쓴다. 앞으로 확인할 항목은 만들지 않는다.
+            첫 흐름만 작성하고 끝내지 않는다. 모든 F 태그와 그 안의 모든 Q 태그를 순서대로 작성한다. 숫자는 해당 본문·답변이 인용하는 근거에 있는 표기를 그대로 사용한다. 단위를 환산하거나 새로운 수치 예시를 계산해 추가하지 않는다. 일반 원리도 새 숫자 예시 없이 설명하며, 숫자를 한글로 바꾸어 이 제한을 피하지 않는다.
             각 questions 항목에 questionId와 answer 하나를 작성한다. 질문에 먼저 직접 답하고 필요한 중간 과정을 풀어 쓴다. Q&A에서 선택하는 evidenceIds와 principleIds는 해당 질문의 허용 목록 안에서 실제 답을 지지하는 것만 반환한다. 질문을 합치거나 삭제하지 않는다. 본문을 그대로 반복하지 않는다.
             독자는 경제의 기초 관계도 모른다. '기대에 못 미쳐서', '매도세 때문에', '수요가 줄어서', '두 지표는 반대로 움직여서'라는 말로 설명을 끝내지 않는다. 누가 어떤 이익이나 결과를 기대했는지, 무엇이 달라져 행동을 바꾸는지, 그 행동이 거래 상대와 가격에 어떤 변화를 만드는지 순서대로 풀어 쓴다. 일반 원리로 풀어낸 행동 동기는 실제 개별 투자자의 속마음을 확인한 사실처럼 쓰지 않는다.
             두 지표의 관계를 설명할 때는 무엇이 변하고 무엇이 그대로인지, 거래하는 사람이 무엇을 비교하는지까지 설명한다. 용어로 용어를 설명하지 않는다. 유동성·수익률 같은 말은 돈을 받고 팔 수 있는지, 산 값에 비해 얻는 돈이 얼마인지처럼 일상의 뜻으로 풀고, 계약으로 약속한 지급액과 시장에서 움직이는 가격·지표를 혼동하지 않는다. 원문에 기대나 결정의 배경이 있으면 함께 풀어 쓰되 기대 수치의 정확한 산출 근거까지 확인되지 않으면 그 한계를 구분한다. 짧게 요약하느라 중간 설명을 빼지 말고 필요한 경우 문단을 나눈다.
@@ -176,9 +178,12 @@ public class EconomicFlowLlm {
         return new Call<>(List.copyOf(flows), result.usage(), result.value());
     }
 
-    public Call<Writing> write(String input) {
+    public Call<Writing> write(String input, int flowCount) {
+        JsonNode writingSchema = schema(WRITING_SCHEMA);
+        ((ObjectNode) writingSchema.path("properties").path("flows"))
+                .put("minItems", flowCount).put("maxItems", flowCount);
         var result = client.complete(properties.writingModel(), WRITER_PROMPT, input, "none", "medium",
-                "economic_flow_writing", schema(WRITING_SCHEMA), WRITE_MAX_OUTPUT_TOKENS);
+                "economic_flow_writing", writingSchema, WRITE_MAX_OUTPUT_TOKENS);
         List<WrittenFlow> flows = new ArrayList<>();
         for (JsonNode item : result.value().path("flows")) {
             List<Answer> answers = new ArrayList<>();

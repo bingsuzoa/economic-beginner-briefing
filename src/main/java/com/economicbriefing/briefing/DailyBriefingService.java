@@ -180,7 +180,7 @@ public class DailyBriefingService {
             String writerInput = writerInput(planned.value(), context, questions);
             ensureInputBudget("writer", writerInput, appProperties.budget().synthesisInputTokens());
             ensureCost(usage, writerInput, false, EconomicFlowLlm.WRITE_MAX_OUTPUT_TOKENS, 0);
-            Call<Writing> written = llm.write(writerInput);
+            Call<Writing> written = llm.write(writerInput, planned.value().size());
             usage.luna("writer", written.usage());
             trace.writing = written.raw();
             List<String> writingErrors = validateWriting(written.value(), planned.value(), context, questions);

@@ -114,6 +114,8 @@ V26은 `article_observations.memory_eligible`(기본 false)과 `source_snapshot`
 
 V24는 구 분석·그래프·파이프라인 테이블 21개를 제거했다. V25는 입력 기사 0건을 `SUCCESS`로 오해하지 않도록 `NO_DATA` 상태를 추가했다. 적용된 Flyway 파일은 수정하거나 삭제하지 말고 항상 다음 번호의 새 migration을 만든다.
 
+편집 응답의 flows 배열 길이는 해당 실행에서 Terra가 설계한 길이를 JSON Schema로 강제한다. 날짜별 흐름 개수를 미리 정하지 않는다. 본문·답변의 수치와 질문별 근거 ID 검증은 유지하며 편집기가 새 수치 예시·단위 환산을 추가하지 않도록 지시한다.
+
 상태 의미:
 
 - `RUNNING`: 실행 중

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 
 import com.economicbriefing.article.ParagraphSplitter;
 import com.economicbriefing.briefing.DailyBriefingService.Context;
@@ -32,6 +33,21 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class EconomicFlowValidationTest {
+    @Test
+    void writerSchemaPreservesTheVariableNumberOfPlannedFlows() {
+        var json = new ObjectMapper();
+        var client = mock(OpenAiClient.class);
+        when(client.complete(any(), any(), any(), any(), any(), any(), any(), anyInt())).thenAnswer(call -> {
+            int expected = Integer.parseInt(call.getArgument(2, String.class));
+            var flows = call.getArgument(6, com.fasterxml.jackson.databind.JsonNode.class).path("properties").path("flows");
+            assertEquals(expected, flows.path("minItems").asInt());
+            assertEquals(expected, flows.path("maxItems").asInt());
+            return new OpenAiClient.LlmResult(json.createObjectNode(), new OpenAiClient.Usage(0, 0, 0, 0));
+        });
+        var llm = new EconomicFlowLlm(client, mock(OpenAiProperties.class), json, new ParagraphSplitter());
+        for (int count : List.of(1, 5)) llm.write(Integer.toString(count), count);
+    }
+
     @Test
     void plannerSeesSourceActionsOmittedByCompressedObservationsOnlyOnce() {
         ArticleEntity article = new ArticleEntity(); article.setId("a"); article.setBodyStatus("FULL_TEXT");
