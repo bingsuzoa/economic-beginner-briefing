@@ -1,23 +1,26 @@
 import s from './DailyBriefing.module.css'
 
 const dateLabel = (value) => new Intl.DateTimeFormat('ko-KR', {
-  timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric', weekday: 'short',
+  timeZone: 'Asia/Seoul', month: 'long', day: 'numeric',
 }).format(new Date(`${value}T12:00:00+09:00`))
 
-export default function DailyBriefing({ briefing }) {
+export default function DailyBriefing({ briefing, onPrevious, previousLoading, previousError }) {
   const flows = briefing.flows || []
   return (
     <section className={s.page} aria-labelledby="daily-briefing-title">
+      <button className={s.previous} onClick={onPrevious} disabled={previousLoading}>
+        ← {previousLoading ? '토트를 불러오는 중이에요' : '어제 토트'}
+      </button>
       <header className={s.header}>
-        <p>🐥 토트의 아침 경제 지도</p>
-        <h1 id="daily-briefing-title">{briefing.title || '오늘의 경제흐름'}</h1>
-        <span>{dateLabel(briefing.targetDate)} · 오전 5시까지의 뉴스</span>
+        <p><img src="/images/news-icon.png" alt="" /> 데일리</p>
+        <h1 id="daily-briefing-title">{dateLabel(briefing.targetDate)} 토트</h1>
       </header>
 
+      {previousError && <p className={s.previousError}>{previousError}</p>}
       {flows.length === 0 && <p className={s.empty}>오늘은 하나의 흐름으로 묶을 만한 경제 변화가 확인되지 않았어요.</p>}
       <div className={s.flows}>
         {flows.map((flow, index) => <article className={s.flow} key={flow.id || index}>
-          <p className={s.number}>흐름 {index + 1}</p>
+          <p className={s.number}>토트 {index + 1}</p>
           <h2>{flow.title}</h2>
           <p className={s.explanation}>{flow.explanation}</p>
 

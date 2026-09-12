@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import s from './App.module.css'
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
@@ -25,26 +25,27 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const titles = { home: 'Thoth - 홈', news: 'Thoth - 오늘의 경제흐름' }
+    const titles = { home: 'Thoth - 홈', news: 'Thoth - 데일리' }
     document.title = titles[activeMenu] || 'Thoth'
   }, [activeMenu])
 
-  useEffect(() => {
-    if (user === undefined || user === null) return
-    apiFetch('/api/briefings/latest')
+  const loadBriefing = useCallback((path) => {
+    setLoading(true)
+    setError(null)
+    return apiFetch(path)
       .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        if (!res.ok) throw new Error(res.status === 404 ? '아직 토트를 찾지 못했어요.' : `HTTP ${res.status}`)
         return res.json()
       })
-      .then((body) => {
-        setBriefing(body)
-        setLoading(false)
-      })
-      .catch((err) => {
-        setError(err.message)
-        setLoading(false)
-      })
-  }, [user])
+      .then(setBriefing)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (user === undefined || user === null) return
+    loadBriefing('/api/briefings/latest')
+  }, [user, loadBriefing])
 
   // loading auth state
   if (user === undefined) return null
@@ -54,6 +55,13 @@ export default function App() {
 
   const selectMenu = (menu) => {
     setActiveMenu(menu)
+  }
+
+  const showPreviousBriefing = () => {
+    if (!briefing || loading) return
+    const date = new Date(`${briefing.targetDate}T12:00:00+09:00`)
+    date.setUTCDate(date.getUTCDate() - 1)
+    loadBriefing(`/api/briefings/${date.toISOString().slice(0, 10)}`)
   }
 
   return (
@@ -66,23 +74,24 @@ export default function App() {
           {activeMenu === 'home' && <ExchangeRateSection />}
           {activeMenu === 'news' && (
             <>
-              {loading && (
+              {loading && !briefing && (
                 <div className={s.status}>
                   <span className={s.chick}>🐥</span>
                   토트가 경제 뉴스를 공부하고 있어요...
                 </div>
               )}
-              {error && (
+              {error && !briefing && (
                 <div className={s.status}>
                   뉴스를 불러오지 못했어요.<br />잠시 후 다시 시도해주세요.
                 </div>
               )}
               {!loading && !error && !briefing && (
                 <div className={s.status}>
-                  오늘의 경제흐름을 준비하고 있어요.
+                  오늘의 토트를 준비하고 있어요.
                 </div>
               )}
-              {!loading && !error && briefing && <DailyBriefing briefing={briefing} />}
+              {briefing && <DailyBriefing briefing={briefing} onPrevious={showPreviousBriefing}
+                previousLoading={loading} previousError={error} />}
             </>
           )}
         </main>
