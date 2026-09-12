@@ -18,6 +18,7 @@ export default function App() {
   const [previousAvailable, setPreviousAvailable] = useState(true)
   const [nextAvailable, setNextAvailable] = useState(false)
   const [latestDate, setLatestDate] = useState(null)
+  const [selectedFlowIndex, setSelectedFlowIndex] = useState(null)
   const [activeMenu, setActiveMenu] = useState('home')
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export default function App() {
       .then((body) => {
         if (!body) return
         setBriefing(body)
+        setSelectedFlowIndex(null)
         onSuccess?.(body)
       })
       .catch((err) => setError(err.message))
@@ -64,14 +66,40 @@ export default function App() {
     })
   }, [user, loadBriefing])
 
+  useEffect(() => {
+    const showHistoryView = (event) => {
+      setSelectedFlowIndex(Number.isInteger(event.state?.dailyFlowIndex) ? event.state.dailyFlowIndex : null)
+    }
+    window.addEventListener('popstate', showHistoryView)
+    return () => window.removeEventListener('popstate', showHistoryView)
+  }, [])
+
   // loading auth state
   if (user === undefined) return null
 
   // not logged in → login screen
   if (user === null) return <LoginScreen onLoginSuccess={setUser} />
 
+  const returnToFlowList = () => {
+    if (window.history.state?.dailyFlowIndex === selectedFlowIndex) {
+      window.history.back()
+      return
+    }
+    setSelectedFlowIndex(null)
+  }
+
   const selectMenu = (menu) => {
+    if (menu === 'news' && selectedFlowIndex !== null) {
+      returnToFlowList()
+      return
+    }
     setActiveMenu(menu)
+    if (menu !== 'news') setSelectedFlowIndex(null)
+  }
+
+  const openFlow = (index) => {
+    window.history.pushState({ ...(window.history.state || {}), dailyFlowIndex: index }, '')
+    setSelectedFlowIndex(index)
   }
 
   const showPreviousBriefing = () => {
@@ -102,7 +130,9 @@ export default function App() {
 
   return (
     <div className={s.page}>
-      <Navbar user={user} onLogout={() => setUser(null)} onAccountClick={() => selectMenu('account')} />
+      <Navbar user={user} onLogout={() => setUser(null)} onAccountClick={() => selectMenu('account')}
+        onLogoClick={() => selectedFlowIndex !== null ? returnToFlowList() : selectMenu('home')}
+        logoLabel={selectedFlowIndex !== null ? '토트 목록으로 돌아가기' : '홈으로 이동'} />
       <div className={s.layout}>
         <Sidebar activeMenu={activeMenu} onMenuChange={selectMenu} onAccountClick={() => selectMenu('account')} />
         <main className={s.main}>
@@ -127,6 +157,7 @@ export default function App() {
                 </div>
               )}
               {briefing && <DailyBriefing briefing={briefing} onPrevious={showPreviousBriefing} onNext={showNextBriefing}
+                onSelectFlow={openFlow} onReturnToList={returnToFlowList} selectedFlowIndex={selectedFlowIndex}
                 navigationLoading={loading} previousAvailable={previousAvailable} nextAvailable={nextAvailable} previousError={error} />}
             </>
           )}

@@ -1,15 +1,19 @@
 .page { max-width: 920px; margin: 0 auto; }
 .navigation { display: flex; justify-content: space-between; align-items: center; margin: 4px 0 2px; }
-.previous, .next { padding: 8px 0; border: 0; background: transparent; color: #6f5238; font: inherit; font-weight: 750; cursor: pointer; }
-.previous:hover:not(:disabled), .next:hover:not(:disabled) { color: #a36a34; }
+.previous, .next, .back { padding: 8px 0; border: 0; background: transparent; color: #6f5238; font: inherit; font-weight: 750; cursor: pointer; }
+.previous:hover:not(:disabled), .next:hover:not(:disabled), .back:hover { color: #a36a34; }
 .previous:disabled, .next:disabled { cursor: default; color: var(--color-text-secondary); }
 .header { padding: 28px 4px 24px; border-bottom: 1px solid #eee8dc; }
 .header p { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; color: #8b5e34; font-weight: 800; }
 .header p img { width: 30px; height: 30px; object-fit: contain; border-radius: 50%; }
 .header h1 { margin: 0 0 8px; font-size: clamp(1.8rem, 5vw, 2.7rem); line-height: 1.2; }
 .header span, .meta { color: var(--color-text-secondary); font-size: .88rem; }
-.flows { display: grid; gap: 20px; margin: 24px 0; }
-.flow { padding: clamp(20px, 4vw, 32px); border: 1px solid #eee8dc; border-radius: 18px; background: #fffdf8; box-shadow: var(--shadow); }
+.flowList { display: grid; gap: 10px; margin: 24px 0; }
+.flowRow { width: 100%; min-height: 88px; padding: 18px 20px; border: 1px solid #eee8dc; border-radius: 14px; background: #fff; color: var(--color-text); cursor: pointer; text-align: left; box-shadow: var(--shadow); }
+.flowRow:hover { transform: translateY(-1px); }
+.flowRow:focus-visible { outline: 3px solid #228be6; outline-offset: 2px; }
+.flowRow strong { display: block; font-size: clamp(1.1rem, 3vw, 1.35rem); line-height: 1.4; }
+.flow { margin: 24px 0; padding: clamp(20px, 4vw, 32px); border: 1px solid #f1ead1; border-radius: 18px; background: #fff8e1; box-shadow: var(--shadow); }
 .number { margin: 0 0 6px; color: #a36a34; font-size: .82rem; font-weight: 800; }
 .flow h2 { margin: 0 0 16px; font-size: clamp(1.25rem, 3vw, 1.65rem); line-height: 1.35; }
 .explanation { margin: 0; font-size: 1.02rem; line-height: 1.85; white-space: pre-line; }
@@ -23,6 +27,7 @@
 .previousError { margin: 16px 0 0; color: #8b5e34; font-size: .92rem; }
 @media (max-width: 700px) {
   .header { padding-top: 12px; }
+  .flowRow { min-height: 78px; padding: 16px; }
   .flow { padding: 20px; border-radius: 14px; }
   .flow h2 { margin-bottom: 12px; }
   .explanation { font-size: 1rem; line-height: 1.65; }

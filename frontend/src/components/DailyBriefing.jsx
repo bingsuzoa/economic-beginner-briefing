@@ -4,32 +4,29 @@ const dateLabel = (value) => new Intl.DateTimeFormat('ko-KR', {
   timeZone: 'Asia/Seoul', month: 'long', day: 'numeric',
 }).format(new Date(`${value}T12:00:00+09:00`))
 
-export default function DailyBriefing({ briefing, onPrevious, onNext, navigationLoading, previousAvailable, nextAvailable, previousError }) {
+export default function DailyBriefing({ briefing, onPrevious, onNext, onSelectFlow, onReturnToList, selectedFlowIndex, navigationLoading, previousAvailable, nextAvailable, previousError }) {
   const flows = briefing.flows || []
+  const selectedFlow = selectedFlowIndex === null ? null : flows[selectedFlowIndex]
+  const heading = (
+    <header className={s.header}>
+      <p><img src="/images/news-icon.png" alt="" /> 데일리</p>
+      <h1 id="daily-briefing-title">{dateLabel(briefing.targetDate)} 토트</h1>
+    </header>
+  )
+
   return (
     <section className={s.page} aria-labelledby="daily-briefing-title">
-      <nav className={s.navigation} aria-label="토트 날짜 이동">
-        <button className={s.previous} onClick={onPrevious} disabled={navigationLoading || !previousAvailable}>
-          {navigationLoading ? '토트를 불러오는 중이에요' : previousAvailable ? '이전 토트' : '이전 토트가 없어요'}
-        </button>
-        <button className={s.next} onClick={onNext} disabled={navigationLoading || !nextAvailable}>
-          {navigationLoading ? '토트를 불러오는 중이에요' : nextAvailable ? '다음 토트' : '다음 토트가 없어요'}
-        </button>
-      </nav>
-      <header className={s.header}>
-        <p><img src="/images/news-icon.png" alt="" /> 데일리</p>
-        <h1 id="daily-briefing-title">{dateLabel(briefing.targetDate)} 토트</h1>
-      </header>
+      {selectedFlow ? <>
+        <nav className={s.navigation} aria-label="토트 목록 이동">
+          <button className={s.back} onClick={onReturnToList}>목록으로 돌아가기</button>
+        </nav>
+        {heading}
+        <article className={s.flow}>
+          <p className={s.number}>토트 {selectedFlowIndex + 1}</p>
+          <h2>{selectedFlow.title}</h2>
+          <p className={s.explanation}>{selectedFlow.explanation}</p>
 
-      {previousError && <p className={s.previousError}>{previousError}</p>}
-      {flows.length === 0 && <p className={s.empty}>오늘은 하나의 흐름으로 묶을 만한 경제 변화가 확인되지 않았어요.</p>}
-      <div className={s.flows}>
-        {flows.map((flow, index) => <article className={s.flow} key={flow.id || index}>
-          <p className={s.number}>토트 {index + 1}</p>
-          <h2>{flow.title}</h2>
-          <p className={s.explanation}>{flow.explanation}</p>
-
-          {(flow.questions || []).map((item, questionIndex) => <section className={s.question} key={item.id || questionIndex}>
+          {(selectedFlow.questions || []).map((item, questionIndex) => <section className={s.question} key={item.id || questionIndex}>
             <h3>{item.question}</h3>
             <p className={s.explanation}>{item.answer}</p>
             {(item.sources?.length > 0 || item.principles?.length > 0) && <details className={s.answerSources}>
@@ -45,8 +42,8 @@ export default function DailyBriefing({ briefing, onPrevious, onNext, navigation
           </section>)}
 
           <details className={s.sources}>
-            <summary>근거 기사와 원문 보기 ({flow.sources?.length || 0})</summary>
-            {(flow.sources || []).map((source, sourceIndex) => <div className={s.source} key={`${source.articleId}-${sourceIndex}`}>
+            <summary>근거 기사와 원문 보기 ({selectedFlow.sources?.length || 0})</summary>
+            {(selectedFlow.sources || []).map((source, sourceIndex) => <div className={s.source} key={`${source.articleId}-${sourceIndex}`}>
               <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a>
               <p className={s.meta}>{source.source} · {source.publishedAt && new Date(source.publishedAt).toLocaleString('ko-KR')}</p>
               {(source.observations || []).map((observation, observationIndex) => <div key={observationIndex}>
@@ -55,8 +52,27 @@ export default function DailyBriefing({ briefing, onPrevious, onNext, navigation
               </div>)}
             </div>)}
           </details>
-        </article>)}
-      </div>
+        </article>
+      </> : <>
+        <nav className={s.navigation} aria-label="토트 날짜 이동">
+          <button className={s.previous} onClick={onPrevious} disabled={navigationLoading || !previousAvailable}>
+            {navigationLoading ? '토트를 불러오는 중이에요' : previousAvailable ? '이전 토트' : '이전 토트가 없어요'}
+          </button>
+          <button className={s.next} onClick={onNext} disabled={navigationLoading || !nextAvailable}>
+            {navigationLoading ? '토트를 불러오는 중이에요' : nextAvailable ? '다음 토트' : '다음 토트가 없어요'}
+          </button>
+        </nav>
+        {heading}
+        {previousError && <p className={s.previousError}>{previousError}</p>}
+        {flows.length === 0 && <p className={s.empty}>오늘은 하나의 흐름으로 묶을 만한 경제 변화가 확인되지 않았어요.</p>}
+        <div className={s.flowList}>
+          {flows.map((flow, index) => <button className={s.flowRow} type="button" key={flow.id || index}
+            onClick={() => onSelectFlow(index)} aria-label={`토트 ${index + 1}: ${flow.title} 본문 보기`}>
+            <span className={s.number}>토트 {index + 1}</span>
+            <strong>{flow.title}</strong>
+          </button>)}
+        </div>
+      </>}
     </section>
   )
 }
