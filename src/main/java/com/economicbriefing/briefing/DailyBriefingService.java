@@ -48,6 +48,7 @@ import org.springframework.stereotype.Service;
 public class DailyBriefingService {
     static final ZoneId KST = ZoneId.of("Asia/Seoul");
     static final String PIPELINE_VERSION = "daily-flow-v2.1";
+    private static final int PLANNER_SUPPLEMENTAL_CHARS = 2500;
     private static final Logger log = LoggerFactory.getLogger(DailyBriefingService.class);
     private static final Pattern THIN_BULLETIN = Pattern.compile("^\\[(?:속보|\\d+보)]");
     private static final Pattern HARD_SIGNAL = Pattern.compile(
@@ -387,7 +388,7 @@ public class DailyBriefingService {
             });
         });
         int supplementalChars = 0;
-        // ponytail: one neighbor on either side, 3,000 chars total; evaluate distant omissions before widening.
+        // ponytail: one neighbor on either side, 2,500 chars total; evaluate distant omissions before widening.
         for (ArticleEntity article : articles) {
             if (!"FULL_TEXT".equals(article.getBodyStatus()) || article.getBody() == null) continue;
             String bodyHash = ObservationStore.bodyHash(article.getBody());
@@ -406,7 +407,7 @@ public class DailyBriefingService {
                 if (!neighbor || seenSpans.contains(key) || !splitter.usableEvidence(paragraph.getValue())) continue;
                 String line = article.getId() + "\t" + paragraph.getKey() + "\t"
                         + EconomicFlowLlm.clean(paragraph.getValue()) + "\n";
-                if (supplementalChars + line.length() > 3000) continue;
+                if (supplementalChars + line.length() > PLANNER_SUPPLEMENTAL_CHARS) continue;
                 seenSpans.add(key); supplementalChars += line.length(); value.append(line);
             }
         }
