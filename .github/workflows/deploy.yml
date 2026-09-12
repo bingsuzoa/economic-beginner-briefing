@@ -34,6 +34,19 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
       - name: Test and build boot JAR
         run: .\gradlew.bat test bootJar --console=plain
 
@@ -50,8 +63,11 @@ jobs:
           $start = Join-Path $root 'start-dev.ps1'
           $stop = Join-Path $root 'stop-dev.ps1'
           $target = Join-Path $root 'deploy\dev\economic-briefing.jar'
+          $frontendTarget = Join-Path $root 'frontend\dist'
+          $frontendSource = Join-Path $env:GITHUB_WORKSPACE 'frontend\dist'
           $taskName = 'Economic Briefing DEV'
           foreach ($path in @($start, $stop)) { if (-not (Test-Path $path)) { throw "Missing DEV script: $path" } }
+          if (-not (Test-Path $frontendSource)) { throw "Missing built frontend: $frontendSource" }
 
           $startText = Get-Content $start -Raw
           if ($startText -notmatch '(?i)(spring\.profiles\.active|spring_profiles_active).*dev') { throw 'start-dev.ps1 does not force profile=dev.' }
@@ -85,6 +101,8 @@ jobs:
             Copy-Item $target $backup -Force
           }
           Copy-Item $env:BOOT_JAR $target -Force
+          New-Item -ItemType Directory -Force $frontendTarget | Out-Null
+          Copy-Item (Join-Path $frontendSource '*') $frontendTarget -Recurse -Force
 
           # Task Scheduler owns the JVM, so it survives GitHub Actions job cleanup.
           & schtasks.exe /Run /TN $taskName
