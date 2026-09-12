@@ -17,6 +17,8 @@
 .number { margin: 0 0 6px; color: #a36a34; font-size: .82rem; font-weight: 800; }
 .flow h2 { margin: 0 0 16px; font-size: clamp(1.25rem, 3vw, 1.65rem); line-height: 1.35; }
 .explanation { margin: 0; font-size: 1.02rem; line-height: 1.85; white-space: pre-line; }
+.explanation > p { margin: 0; }
+.explanation > p + p { margin-top: 1em; }
 .sources { margin-top: 20px; border-top: 1px solid #e7dfd2; padding-top: 16px; }
 .sources summary { cursor: pointer; font-weight: 750; color: #6f5238; }
 .source { margin-top: 16px; padding-top: 16px; border-top: 1px dashed #ddd2c3; }

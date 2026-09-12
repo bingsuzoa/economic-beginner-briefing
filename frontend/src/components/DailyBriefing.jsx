@@ -4,6 +4,11 @@ const dateLabel = (value) => new Intl.DateTimeFormat('ko-KR', {
   timeZone: 'Asia/Seoul', month: 'long', day: 'numeric',
 }).format(new Date(`${value}T12:00:00+09:00`))
 
+function Explanation({ text }) {
+  const paragraphs = (text || '').replace(/\r\n?/g, '\n').split(/\n\s*\n/).map(value => value.trim()).filter(Boolean)
+  return <div className={s.explanation}>{paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
+}
+
 export default function DailyBriefing({ briefing, onPrevious, onNext, onSelectFlow, onReturnToList, selectedFlowIndex, navigationLoading, previousAvailable, nextAvailable, previousError }) {
   const flows = briefing.flows || []
   const selectedFlow = selectedFlowIndex === null ? null : flows[selectedFlowIndex]
@@ -24,11 +29,11 @@ export default function DailyBriefing({ briefing, onPrevious, onNext, onSelectFl
         <article className={s.flow}>
           <p className={s.number}>토트 {selectedFlowIndex + 1}</p>
           <h2>{selectedFlow.title}</h2>
-          <p className={s.explanation}>{selectedFlow.explanation}</p>
+          <Explanation text={selectedFlow.explanation} />
 
           {(selectedFlow.questions || []).map((item, questionIndex) => <section className={s.question} key={item.id || questionIndex}>
             <h3>{item.question}</h3>
-            <p className={s.explanation}>{item.answer}</p>
+            <Explanation text={item.answer} />
             {(item.sources?.length > 0 || item.principles?.length > 0) && <details className={s.answerSources}>
               <summary>이 설명의 근거 보기</summary>
               {(item.sources || []).map((source, sourceIndex) => <div className={s.source} key={`${source.articleId}-${sourceIndex}`}>

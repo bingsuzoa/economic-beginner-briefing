@@ -2,7 +2,7 @@
 
 - 최종 갱신: 2026-09-12
 - 대상: 운영 서버에서 이 저장소를 이어서 관리하는 Codex와 운영자
-- DEV 배포 대상: `daily-flow-v2.1`, Flyway V26. V26은 격리 평가 DB에서 검증했고 DEV 시작 시 Flyway로 적용한다. PROD 반영과 기존 공개 결과 갱신은 별도다. 아래 V1 기준선은 이전 실행 결과다.
+- DEV 배포 대상: `daily-flow-v2.2`, Flyway V26. V26은 격리 평가 DB에서 검증했고 DEV 시작 시 Flyway로 적용한다. PROD 반영과 기존 공개 결과 갱신은 별도다. 아래 V1 기준선은 이전 실행 결과다.
 - 관측 추출 지침: `observation-memory-v3`. 제안과 원문이 밝힌 구체적인 필요성을 같은 기억에 남기는 기준을 로컬 평가 중이다.
 - 상세 설계: [ECONOMIC_FLOW_DAILY_BRIEFING_FINAL_DESIGN_V1.md](ECONOMIC_FLOW_DAILY_BRIEFING_FINAL_DESIGN_V1.md)
 - 프롬프트 계약: [ECONOMIC_FLOW_LLM_PROMPT_DESIGN_V1.md](ECONOMIC_FLOW_LLM_PROMPT_DESIGN_V1.md)
@@ -70,6 +70,8 @@ briefing.scheduler.daily-cron: 0 10 5 * * *
 | 독자용 편집 | Luna `none` | 쉬운 ~요체 본문·Q&A, 질문별 허용 후보에서 근거 선택 | 흐름 합치기·나누기, 없는 사건 원인 창작 |
 
 Terra 하나에 선별·검증·장문 작성까지 다시 맡기지 않는다. 별도 검증 LLM도 추가하지 않는다. 구조 검증은 코드가 한다.
+
+V2.2의 독자용 편집은 본문 `explanation`과 각 `answer`를 의미 단위로 나눈다. 주제나 설명의 역할이 바뀔 때 기존 문자열 안에 빈 줄(`\n\n`)을 넣고, 같은 흐름은 보통 1~3문장으로 묶는다. 문단 수를 채우기 위한 내용·소제목을 추가하지 않는다. 화면은 빈 줄을 실제 문단과 여백으로 표시하며, 문단 모양 때문에 재호출하거나 문장 수만으로 자동 분할하지 않는다. 호출 수·응답 스키마·비용 상한은 유지한다. 이번 사용자 지정 검증과 기존 결과 편집 범위는 2026-09-12 토트뿐이다.
 
 ## 4. 임베딩과 검색
 
