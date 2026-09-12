@@ -1,0 +1,108 @@
+name: Deploy Economic Briefing DEV
+
+# This job runs only on the home desktop's self-hosted runner. It deploys the DEV service
+# on :8081; PROD :3000 and its database are intentionally outside this workflow.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Deploys change files and restarts a process. Queue a newer revision rather than cancelling an
+# in-progress restart, which could leave DEV stopped halfway through a deployment.
+concurrency:
+  group: economic-briefing-dev
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-dev:
+    runs-on: [self-hosted, Windows, X64, economic-briefing]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; . '{0}'; exit $LASTEXITCODE"
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Test and build boot JAR
+        run: .\gradlew.bat test bootJar --console=plain
+
+      - name: Locate boot JAR
+        run: |
+          $jars = @(Get-ChildItem build\libs -File -Filter '*.jar' |
+            Where-Object { $_.Name -notlike '*-plain.jar' -and $_.Name -notlike '*-tests.jar' })
+          if ($jars.Count -ne 1) { throw "Expected one boot JAR, found $($jars.Count)." }
+          "BOOT_JAR=$($jars[0].FullName)" | Add-Content $env:GITHUB_ENV
+
+      - name: Deploy DEV backend
+        run: |
+          $root = 'C:\economic-beginner-briefing'
+          $start = Join-Path $root 'start-dev.ps1'
+          $stop = Join-Path $root 'stop-dev.ps1'
+          $target = Join-Path $root 'deploy\dev\economic-briefing.jar'
+          $taskName = 'Economic Briefing DEV'
+          foreach ($path in @($start, $stop)) { if (-not (Test-Path $path)) { throw "Missing DEV script: $path" } }
+
+          $startText = Get-Content $start -Raw
+          if ($startText -notmatch '(?i)(spring\.profiles\.active|spring_profiles_active).*dev') { throw 'start-dev.ps1 does not force profile=dev.' }
+          if ($startText -notmatch '8081') { throw 'start-dev.ps1 does not target port 8081.' }
+          if ($startText -notmatch 'economic_briefing_dev') { throw 'start-dev.ps1 does not target economic_briefing_dev.' }
+
+          function ListenerPids([int]$port) {
+            @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue |
+              Select-Object -ExpandProperty OwningProcess -Unique)
+          }
+          $prodBefore = (ListenerPids 3000) -join ','
+
+          $taskQuery = & schtasks.exe /Query /TN $taskName 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            if (($taskQuery -join "`n") -match 'Access is denied') {
+              Write-Warning 'Cannot query the DEV scheduled task with this runner account; /Run will be checked after JAR replacement.'
+            } else {
+              throw "DEV scheduled task is unavailable: $($taskQuery -join ' ')"
+            }
+          }
+
+          # DEV scripts throw on real failure; LASTEXITCODE may belong to a process they stopped.
+          & $stop
+          for ($i = 0; $i -lt 30 -and (ListenerPids 8081); $i++) { Start-Sleep -Seconds 1 }
+          if (ListenerPids 8081) { throw 'DEV safety check failed: port 8081 is still listening.' }
+          if (((ListenerPids 3000) -join ',') -ne $prodBefore) { throw 'PROD safety check failed: port 3000 changed during DEV stop.' }
+
+          if (Test-Path $target) {
+            $backup = Join-Path (Split-Path $target -Parent) 'backup\economic-briefing.jar.prev'
+            New-Item -ItemType Directory -Force (Split-Path $backup -Parent) | Out-Null
+            Copy-Item $target $backup -Force
+          }
+          Copy-Item $env:BOOT_JAR $target -Force
+
+          # Task Scheduler owns the JVM, so it survives GitHub Actions job cleanup.
+          & schtasks.exe /Run /TN $taskName
+          if ($LASTEXITCODE -ne 0) { throw "Failed to start DEV scheduled task: $taskName" }
+          # A stale pipeline result is not a startup failure: health-check validates that
+          # the server and DEV database are ready while tolerating that one condition.
+          & .\scripts\health-check.ps1 -Url 'http://127.0.0.1:8081/api/health/briefing' -TimeoutSec 60 -IntervalSec 5
+          if ($LASTEXITCODE -ne 0) { throw 'DEV health check failed.' }
+          Start-Sleep -Seconds 3
+          if (-not (ListenerPids 8081)) { throw 'DEV process disappeared after successful health check.' }
+          if (((ListenerPids 3000) -join ',') -ne $prodBefore) { throw 'PROD safety check failed: port 3000 changed during DEV deployment.' }
+
+      - name: DEV diagnostics on failure
+        if: failure()
+        run: |
+          Get-NetTCPConnection -State Listen -LocalPort 8081,3000 -ErrorAction SilentlyContinue |
+            Format-Table LocalPort, OwningProcess, State
+          Write-Host '--- dev-server.stdout.log (tail) ---'
+          Get-Content C:\economic-beginner-briefing\logs\dev-server.stdout.log -Tail 120 -ErrorAction SilentlyContinue
+          Write-Host '--- dev-server.stderr.log (tail) ---'
+          Get-Content C:\economic-beginner-briefing\logs\dev-server.stderr.log -Tail 120 -ErrorAction SilentlyContinue

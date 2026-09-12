@@ -1,0 +1,15 @@
+{
+  "articles": [
+    {
+      "label": "selected-url-1",
+      "url": "https://www.yna.co.kr/view/AKR_REPLACE_ME"
+    },
+    {
+      "label": "pasted-article-2",
+      "articleId": "MANUAL_REPLACE_ME",
+      "title": "기사 제목",
+      "publishedAt": "2026-08-26T12:00:00+09:00",
+      "body": "사용자가 선택한 기사 본문"
+    }
+  ]
+}

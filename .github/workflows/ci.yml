@@ -1,0 +1,60 @@
+name: CI
+
+# Pull requests only. This never deploys and never touches the production machine - that is
+# deploy.yml's job, and it stays on the push-to-main trigger.
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Pushing more commits to a PR supersedes the previous run. Safe to cancel here precisely
+# because nothing is deployed; deploy.yml deliberately does the opposite.
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # The job name is what Branch Protection lists under "Require status checks to pass before
+  # merging". Renaming it silently detaches the rule, and the Merge button goes green again.
+  verify:
+    name: verify
+    # ubuntu-latest on purpose, never self-hosted. This repository is public, so a fork's PR
+    # would otherwise run arbitrary code as SYSTEM on the home desktop that hosts production.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # First, because it is the cheapest and the failure this whole workflow exists for.
+      - name: Check for mock data
+        run: node scripts/check-mock-data.mjs
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      # Tests use H2 in-memory, so no PostgreSQL service is needed here.
+      - name: Backend tests
+        run: ./gradlew test --console=plain

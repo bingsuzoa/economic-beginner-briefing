@@ -1,202 +1,115 @@
-# Economic Beginner Briefing
+# Economic Beginner Briefing (Thoth)
 
-경제를 전혀 모르는 사용자를 위해, 전날의 경제·재테크·부동산 뉴스를 수집하고 중요한 뉴스를 선별한 뒤 쉬운 말로 설명하여 Notion에 저장하는 자동화 프로젝트입니다.
+연합뉴스 전체 스트림에서 매일의 경제 관측을 골라 세계의 상황, 주체의 이해관계, 국가 간 관계와 시장 전달 경로를 초보자에게 설명하는 Spring Boot + React 서비스입니다.
 
-## 프로젝트 목표
+운영 구조와 개선 원칙은 [docs/ECONOMIC_FLOW_OPERATIONS.md](docs/ECONOMIC_FLOW_OPERATIONS.md)를 먼저 읽으세요. 상세 설계는 [docs/ECONOMIC_FLOW_DAILY_BRIEFING_FINAL_DESIGN_V1.md](docs/ECONOMIC_FLOW_DAILY_BRIEFING_FINAL_DESIGN_V1.md), 프롬프트 계약은 [docs/ECONOMIC_FLOW_LLM_PROMPT_DESIGN_V1.md](docs/ECONOMIC_FLOW_LLM_PROMPT_DESIGN_V1.md)에 있습니다.
 
-단순한 뉴스 요약이 아니라, 사용자가 다음 질문에 답을 얻도록 합니다.
+[V2 질문·기억 설계](docs/ECONOMIC_FLOW_BEGINNER_MEMORY_DESIGN_V2.md)를 구현하고 [기사별 사용자 평가](docs/ECONOMIC_FLOW_BEGINNER_MEMORY_REVIEW.md)를 진행하고 있습니다. V2.1과 Flyway V26은 DEV 배포 대상이며, PROD 반영과 기존 공개 결과 갱신은 별도입니다.
 
-- 무슨 일이 발생했는가?
-- 기존에는 어떤 상황이었는가?
-- 무엇이 달라졌는가?
-- 왜 이런 변화가 생겼는가?
-- 일반 가정과 신혼부부에게 어떤 영향이 있는가?
-- 앞으로 어떤 일이 발생할 가능성이 있는가?
-- 지금 확인하거나 행동할 것이 있는가?
-- 기사에 나온 경제용어는 무슨 뜻인가?
-
-## 전체 구조
+## 현재 구조
 
 ```text
-src/
-├─ app/                     # 파이프라인 오케스트레이션
-│  ├─ createApplication.ts  # DI 컨테이너
-│  ├─ createDefaultApplication.ts  # 실제/Mock 자동 선택
-│  ├─ runDailyBriefing.ts   # Collect → Analyze → Publish 순차 실행
-│  ├─ ExecutionTracker.ts   # 중복 실행 방지
-│  └─ validatePipelineData.ts  # 단계 간 데이터 검증
-├─ cli/                     # CLI 진입점
-│  └─ runDailyBriefingCli.ts
-├─ scheduler/               # 스케줄 옵션 파싱
-│  └─ schedulerOptions.ts
-├─ collectors/              # 뉴스 수집
-│  ├─ RealNewsCollector.ts  # RSS 기반 수집
-│  ├─ sources/              # 언론사별 RSS 어댑터
-│  ├─ filters/              # 날짜/품질/중복/카테고리 필터
-│  ├─ parsers/              # RSS 파싱, 기사 정규화
-│  └─ mock/                 # Mock 수집기
-├─ analyzers/               # AI 분석
-│  ├─ openai/               # OpenAI 기반 분석기
-│  │  ├─ OpenAIClient.ts
-│  │  ├─ OpenAINewsAnalyzer.ts
-│  │  ├─ prompts/           # 시스템 프롬프트, 응답 스키마
-│  │  └─ utils/             # 브리핑 변환, 재시도
-│  └─ mock/                 # Mock 분석기
-├─ publishers/              # 결과 발행
-│  ├─ notion/               # Notion 저장
-│  │  ├─ NotionBriefingPublisher.ts
-│  │  ├─ NotionClientAdapter.ts
-│  │  └─ buildNotionPage.ts
-│  └─ mock/                 # Mock 발행기
-├─ domain/                  # 공통 타입
-├─ config/                  # 환경변수, 상수
-├─ errors/                  # 에러 타입
-└─ utils/                   # 날짜, Result 유틸
+매시 05분 연합뉴스 RSS 수집
+→ 매일 05:10 직전 24시간 제목 사전선별(Luna)
+→ 오늘 브리핑·기억용 기사 정밀선별(Luna)
+→ 원문 관측·기억 여부·근거 스냅샷(Luna+코드)
+→ 과거 관측·경제원리 검색(PostgreSQL/pgvector)
+→ 흐름·초보자 질문·검색 요청 설계(Terra)
+→ 질문별 과거 기사·경제원리 검색(코드)
+→ 쉬운 본문과 질문·답변 편집(Luna)
+→ 코드 검증 후 날짜별 revision 저장·공개
 ```
 
-## 실행 흐름
+경제흐름 핵심 테이블은 `articles`, `article_observations`, `economic_principle_chunk`, `daily_briefings` 네 개입니다. 인증과 환율 테이블은 별도 기능으로 유지합니다.
 
-```text
-CLI / GitHub Actions
-  → schedulerOptions 파싱 (날짜, 모드)
-  → createDefaultApplication (환경 기반 구현체 선택)
-  → runDailyBriefing:
-      1. 중복 실행 확인 (ExecutionTracker)
-      2. 뉴스 수집 (RealNewsCollector → RSS → 필터링)
-      3. 수집 결과 검증 (validateCollectResult)
-      4. AI 분석 (OpenAINewsAnalyzer → Briefing 생성)
-      5. 분석 결과 검증 (validateAnalyzeResult)
-      6. Notion 저장 (NotionBriefingPublisher)
-      7. ExecutionLog 반환
-  → JSON 결과 출력 + exit code
+## 요구사항
+
+- Java 21
+- PostgreSQL 14+와 pgvector
+- Node.js/npm
+- OpenAI API key
+
+## 필수 환경변수
+
+```dotenv
+OPENAI_API_KEY=
+ADMIN_TOKEN=
+SPRING_DATASOURCE_USERNAME=
+SPRING_DATASOURCE_PASSWORD=
+AUTH_EMAIL_ENCRYPTION_KEY=
+AUTH_EMAIL_HASH_KEY=
 ```
 
-## 설치
+주요 선택 설정:
+
+```dotenv
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/economic_briefing?stringtype=unspecified
+SCHEDULER_ENABLED=true
+COLLECT_CRON=0 5 * * * *
+DAILY_CRON=0 10 5 * * *
+OPENAI_SCREENING_MODEL=gpt-5.6-luna
+OPENAI_EXTRACTION_MODEL=gpt-5.6-luna
+OPENAI_SYNTHESIS_MODEL=gpt-5.6-terra
+OPENAI_WRITING_MODEL=gpt-5.6-luna
+OPENAI_EMBEDDING_MODEL=text-embedding-3-large
+DAILY_COST_USD=0.14
+```
+
+## 실행과 테스트
 
 ```bash
-git clone <repository-url>
-cd economic-beginner-briefing
+./gradlew clean test
+cd frontend
 npm install
+npm run build
+node ../scripts/check-mock-data.mjs
+cd ..
+./gradlew bootRun
 ```
 
-## 환경변수
+Flyway는 애플리케이션 시작 때 자동 실행됩니다. 적용된 migration 파일을 수정하지 말고 새 번호를 추가하세요.
 
-`.env.example`을 복사하여 `.env`를 만드세요.
+## API
 
-```bash
-cp .env.example .env
+공개:
+
+```text
+GET /api/briefings/latest
+GET /api/briefings/{yyyy-MM-dd}
+GET /api/health/briefing
+GET /api/exchange-rate/**
+POST /api/auth/**
 ```
 
-| 변수 | 필수 | 설명 |
-|------|------|------|
-| `NODE_ENV` | 기본값: development | 실행 환경 |
-| `TZ` | 기본값: Asia/Seoul | 타임존 |
-| `DRY_RUN` | 기본값: true | true면 외부 API 호출 없이 Mock 실행 |
-| `LOG_LEVEL` | 기본값: info | 로그 레벨 (debug, info, warn, error) |
-| `OPENAI_API_KEY` | 실제 분석 시 필수 | OpenAI API 키 |
-| `NOTION_API_KEY` | Notion 저장 시 필수 | Notion Integration 토큰 |
-| `NOTION_DATABASE_ID` | Notion 저장 시 필수 | Notion 데이터베이스 ID |
+관리자 Bearer token 필요:
 
-API 키 없이도 `DRY_RUN=true`로 Mock 파이프라인을 실행할 수 있습니다.
-
-## 로컬 테스트
-
-```bash
-npm run typecheck    # TypeScript 타입 검사
-npm run lint         # ESLint 검사
-npm test             # Vitest 단위/통합 테스트
-npm run build        # TypeScript 빌드
+```text
+GET  /api/admin/briefings/runs
+GET  /api/admin/briefings/runs/{id}
+POST /api/admin/briefings/{yyyy-MM-dd}/run
 ```
 
-모든 테스트는 Mock을 사용하므로 외부 API 키가 필요하지 않습니다.
+수동 실행은 날짜 전체를 새 revision으로 비동기 실행합니다. 실패 revision은 공개하지 않고 이전 SUCCESS를 유지합니다.
 
-## 수동 실행
+## 배포
 
-### Mock (DRY_RUN) 실행
+`main` push는 GitHub Actions와 Windows self-hosted runner를 통해 **DEV :8081 / economic_briefing_dev만** 자동 배포합니다. PROD :3000은 자동 workflow 범위가 아닙니다.
 
-```bash
-DRY_RUN=true npm run briefing:run
+운영 배포는 Windows 관리자 PowerShell에서 실행합니다.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\deploy.ps1 -Test
 ```
 
-### 특정 날짜 지정 실행
+스크립트는 JAR과 `frontend/dist`를 백업하고 테스트·빌드·재시작·health check를 수행합니다. V24 같은 DB 파괴적 migration 전에는 애플리케이션 백업과 별개로 PostgreSQL dump를 만드세요.
 
-```bash
-npm run briefing:run -- --target-date 2026-07-16
-```
+## 품질 기준
 
-### 실제 API 연동 실행
-
-```bash
-DRY_RUN=false \
-OPENAI_API_KEY=your-key \
-NOTION_API_KEY=your-key \
-NOTION_DATABASE_ID=your-db-id \
-npm run briefing:run
-```
-
-실행 결과는 JSON으로 stdout에 출력되며, exit code 0이면 성공, 1이면 실패입니다.
-
-## GitHub Actions
-
-`.github/workflows/weekly-briefing.yml`로 자동 실행됩니다.
-
-- **주기**: 매주 월요일 04:30 KST (일요일 19:30 UTC)
-- **수동 실행**: Actions 탭에서 workflow_dispatch로 실행 가능
-- **필요 Secrets**: `OPENAI_API_KEY`, `NOTION_API_KEY`, `NOTION_DATABASE_ID`
-- **중복 실행 방지**: concurrency group 설정
-
-매일 실행이 필요하면 cron을 `30 19 * * *`로 변경하세요.
-
-## Notion 연동
-
-1. [Notion Integrations](https://www.notion.so/my-integrations)에서 Integration을 생성합니다.
-2. 브리핑을 저장할 데이터베이스를 만들고, 다음 속성을 추가합니다:
-   - `Name` (title)
-   - `Briefing ID` (rich_text)
-   - `Target Date` (date)
-   - `Generated At` (date)
-   - `News Count` (number)
-3. 데이터베이스에 Integration을 연결합니다.
-4. `NOTION_API_KEY`와 `NOTION_DATABASE_ID`를 환경변수에 설정합니다.
-
-## 장애 확인
-
-파이프라인 실행 결과 JSON의 `execution` 필드를 확인합니다.
-
-```json
-{
-  "execution": {
-    "status": "failed",
-    "errors": [
-      {
-        "stage": "collect",
-        "code": "COLLECT_SOURCE_TIMEOUT",
-        "message": "RSS feed timeout",
-        "retryable": true
-      }
-    ]
-  }
-}
-```
-
-- `stage`: 실패 단계 (collect, analyze, publish, system)
-- `code`: 에러 코드 (errorCodes.ts 참조)
-- `retryable`: 재시도 가능 여부
-
-GitHub Actions에서는 Actions 탭의 workflow run 로그에서 확인합니다.
-
-## 미구현 기능
-
-- **Email Publisher**: `feature/email-publisher` 브랜치에서 구현 예정
-- **영구 실행 이력 저장**: 현재 MockExecutionTracker (인메모리)만 사용. 프로세스 재시작 시 초기화됨.
-
-## 기술 스택
-
-- Runtime: Node.js 20+
-- Language: TypeScript (strict mode)
-- Test: Vitest
-- Validation: Zod
-- AI: OpenAI API (gpt-4o)
-- Storage: Notion API
-- Scheduler: GitHub Actions
-- Package manager: npm
+- 전망·주장·계획을 사실로 바꾸지 않는다.
+- 원문 근거 문단 없는 관측은 사용하지 않는다.
+- 같은 상류 충격이나 최종 수요를 기사별 흐름으로 쪼개지 않는다.
+- 직접 근거 없는 인과는 가능성·압력·조건으로 표현한다.
+- 과거 생성 설명이 아니라 과거 원문 관측만 검색한다.
+- 흐름 수를 고정하지 않는다.
+- 검증 LLM과 메타 JSON 필드를 늘리지 않는다.
+- 일일 usage와 비용을 `daily_briefings`에서 확인한다.

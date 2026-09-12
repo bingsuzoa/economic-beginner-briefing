@@ -1,0 +1,95 @@
+spring:
+  application:
+    name: economic-briefing
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/economic_briefing?stringtype=unspecified}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    # 엔티티에 지연 로딩 연관관계가 없어 뷰 렌더링 중 세션이 필요하지 않습니다.
+    # 켜두면 응답을 쓰는 동안 커넥션을 계속 붙잡고, 기본값 경고도 매 부팅 출력됩니다.
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 1
+
+  # 빌드된 프론트엔드를 같은 프로세스에서 서빙합니다. 별도 정적 서버가 필요 없어
+  # 상시 구동해야 할 프로세스가 하나로 줄어듭니다.
+  # 프론트를 수정했다면: cd frontend && npm run build
+  web:
+    resources:
+      static-locations: "classpath:/static/,file:${FRONTEND_DIST:C:/economic-beginner-briefing/frontend/dist}/"
+
+server:
+  port: ${ADMIN_PORT:3000}
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        same-site: ${SESSION_COOKIE_SAME_SITE:lax}
+        secure: ${AUTH_SECURE_COOKIE:true}
+        http-only: true
+      timeout: 7d
+
+briefing:
+  timeouts:
+    rss-http: 10s
+  scheduler:
+    enabled: ${SCHEDULER_ENABLED:true}
+    collect-cron: ${COLLECT_CRON:0 5 * * * *}
+    daily-cron: ${DAILY_CRON:0 10 5 * * *}
+  budget:
+    screening-input-tokens: ${SCREENING_INPUT_TOKENS:50000}
+    extraction-input-tokens: ${EXTRACTION_INPUT_TOKENS:100000}
+    synthesis-input-tokens: ${SYNTHESIS_INPUT_TOKENS:15000}
+    daily-cost-usd: ${DAILY_COST_USD:0.14}
+  health:
+    max-success-age: ${HEALTH_MAX_SUCCESS_AGE:30h}
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+  timeout: 300s
+  screening-model: ${OPENAI_SCREENING_MODEL:gpt-5.6-luna}
+  extraction-model: ${OPENAI_EXTRACTION_MODEL:gpt-5.6-luna}
+  synthesis-model: ${OPENAI_SYNTHESIS_MODEL:gpt-5.6-terra}
+  writing-model: ${OPENAI_WRITING_MODEL:gpt-5.6-luna}
+  embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-large}
+
+auth:
+  require-https: ${AUTH_REQUIRE_HTTPS:true}
+  email-encryption-key: ${AUTH_EMAIL_ENCRYPTION_KEY}
+  email-hash-key: ${AUTH_EMAIL_HASH_KEY}
+
+admin:
+  # No default: a blank token is rejected at startup and by the admin filter.
+  token: ${ADMIN_TOKEN:}
+  default-page-size: 20
+
+exchange-rate:
+  fixer:
+    api-key: ${FIXER_API_KEY:}
+    api-url: http://data.fixer.io/api/latest
+    timeout: 15s
+    scheduler-enabled: ${EXCHANGE_RATE_SCHEDULER_ENABLED:true}
+    scheduler-cron: ${FIXER_SCHEDULER_CRON:0 0 9,18 * * *}
+  ecos:
+    api-key: ${ECOS_API_KEY:}
+    api-url: https://ecos.bok.or.kr/api
+    timeout: 30s
+    scheduler-enabled: ${EXCHANGE_RATE_SCHEDULER_ENABLED:true}
+    # Daily series is available after the business-day fixing; seven-day lookback repairs gaps.
+    scheduler-cron: ${ECOS_SCHEDULER_CRON:0 30 18 * * *}
+
+logging:
+  level:
+    root: INFO
+    com.economicbriefing: ${LOG_LEVEL:INFO}
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

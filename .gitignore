@@ -1,7 +1,40 @@
-node_modules/
-dist/
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
+
+# Environment
 .env
 .env.local
 .env.*.local
+
+# Logs
 *.log
-.DS_Store
+/pipeline-debug/*
+!/pipeline-debug/manual-articles.example.json
+
+# Frontend
+node_modules/
+frontend/dist/
+/dist/
+/local.properties
+
+# Server logs (NSSM AppStdout/AppStderr)
+logs/
+
+# Vendored NSSM binary (fetched by docs/OPERATIONS setup step)
+tools/
+
+# Previous releases kept by scripts/deploy.ps1 for rollback
+backup/
+
+# Local copyrighted/derived RAG inputs and generated vectors
+/rag-data-builder/input/*.pdf
+/rag-data-builder/output/

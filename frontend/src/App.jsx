@@ -1,0 +1,170 @@
+import { useState, useEffect, useCallback } from 'react'
+import s from './App.module.css'
+import Navbar from './components/Navbar'
+import Sidebar from './components/Sidebar'
+import DailyBriefing from './components/DailyBriefing'
+import ExchangeRateSection from './components/ExchangeRateSection'
+import Footer from './components/Footer'
+import BottomNav from './components/BottomNav'
+import LoginScreen from './components/LoginScreen'
+import AccountManagement from './components/AccountManagement'
+import { apiFetch } from './api'
+
+export default function App() {
+  const [user, setUser] = useState(undefined) // undefined = loading, null = not logged in
+  const [briefing, setBriefing] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [previousAvailable, setPreviousAvailable] = useState(true)
+  const [nextAvailable, setNextAvailable] = useState(false)
+  const [latestDate, setLatestDate] = useState(null)
+  const [selectedFlowIndex, setSelectedFlowIndex] = useState(null)
+  const [activeMenu, setActiveMenu] = useState('home')
+
+  useEffect(() => {
+    apiFetch('/api/auth/me')
+      .then(r => r.ok ? r.json() : null)
+      .then(setUser)
+      .catch(() => setUser(null))
+  }, [])
+
+  useEffect(() => {
+    const titles = { home: 'Thoth - 홈', news: 'Thoth - 데일리' }
+    document.title = titles[activeMenu] || 'Thoth'
+  }, [activeMenu])
+
+  const loadBriefing = useCallback((path, { onNotFound, onSuccess } = {}) => {
+    setLoading(true)
+    setError(null)
+    return apiFetch(path)
+      .then((res) => {
+        if (res.status === 404 && onNotFound) {
+          onNotFound()
+          return null
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((body) => {
+        if (!body) return
+        setBriefing(body)
+        setSelectedFlowIndex(null)
+        onSuccess?.(body)
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (user === undefined || user === null) return
+    loadBriefing('/api/briefings/latest', {
+      onSuccess: (body) => {
+        setLatestDate(body.targetDate)
+        setPreviousAvailable(true)
+        setNextAvailable(false)
+      },
+    })
+  }, [user, loadBriefing])
+
+  useEffect(() => {
+    const showHistoryView = (event) => {
+      setSelectedFlowIndex(Number.isInteger(event.state?.dailyFlowIndex) ? event.state.dailyFlowIndex : null)
+    }
+    window.addEventListener('popstate', showHistoryView)
+    return () => window.removeEventListener('popstate', showHistoryView)
+  }, [])
+
+  // loading auth state
+  if (user === undefined) return null
+
+  // not logged in → login screen
+  if (user === null) return <LoginScreen onLoginSuccess={setUser} />
+
+  const returnToFlowList = () => {
+    if (window.history.state?.dailyFlowIndex === selectedFlowIndex) {
+      window.history.back()
+      return
+    }
+    setSelectedFlowIndex(null)
+  }
+
+  const selectMenu = (menu) => {
+    if (menu === 'news' && selectedFlowIndex !== null) {
+      returnToFlowList()
+      return
+    }
+    setActiveMenu(menu)
+    if (menu !== 'news') setSelectedFlowIndex(null)
+  }
+
+  const openFlow = (index) => {
+    window.history.pushState({ ...(window.history.state || {}), dailyFlowIndex: index }, '')
+    setSelectedFlowIndex(index)
+  }
+
+  const showPreviousBriefing = () => {
+    if (!briefing || loading) return
+    const date = new Date(`${briefing.targetDate}T12:00:00+09:00`)
+    date.setUTCDate(date.getUTCDate() - 1)
+    loadBriefing(`/api/briefings/${date.toISOString().slice(0, 10)}`, {
+      onNotFound: () => setPreviousAvailable(false),
+      onSuccess: () => {
+        setPreviousAvailable(true)
+        setNextAvailable(true)
+      },
+    })
+  }
+
+  const showNextBriefing = () => {
+    if (!briefing || loading) return
+    const date = new Date(`${briefing.targetDate}T12:00:00+09:00`)
+    date.setUTCDate(date.getUTCDate() + 1)
+    loadBriefing(`/api/briefings/${date.toISOString().slice(0, 10)}`, {
+      onNotFound: () => setNextAvailable(false),
+      onSuccess: (body) => {
+        setPreviousAvailable(true)
+        setNextAvailable(body.targetDate !== latestDate)
+      },
+    })
+  }
+
+  return (
+    <div className={s.page}>
+      <Navbar user={user} onLogout={() => setUser(null)} onAccountClick={() => selectMenu('account')}
+        onLogoClick={() => selectedFlowIndex !== null ? returnToFlowList() : selectMenu('home')}
+        logoLabel={selectedFlowIndex !== null ? '토트 목록으로 돌아가기' : '홈으로 이동'} />
+      <div className={s.layout}>
+        <Sidebar activeMenu={activeMenu} onMenuChange={selectMenu} onAccountClick={() => selectMenu('account')} />
+        <main className={s.main}>
+          {activeMenu === 'account' && <AccountManagement user={user} onDeleted={() => setUser(null)} />}
+          {activeMenu === 'home' && <ExchangeRateSection />}
+          {activeMenu === 'news' && (
+            <>
+              {loading && !briefing && (
+                <div className={s.status}>
+                  <span className={s.chick}>🐥</span>
+                  토트가 경제 뉴스를 공부하고 있어요...
+                </div>
+              )}
+              {error && !briefing && (
+                <div className={s.status}>
+                  뉴스를 불러오지 못했어요.<br />잠시 후 다시 시도해주세요.
+                </div>
+              )}
+              {!loading && !error && !briefing && (
+                <div className={s.status}>
+                  오늘의 토트를 준비하고 있어요.
+                </div>
+              )}
+              {briefing && <DailyBriefing briefing={briefing} onPrevious={showPreviousBriefing} onNext={showNextBriefing}
+                onSelectFlow={openFlow} onReturnToList={returnToFlowList} selectedFlowIndex={selectedFlowIndex}
+                navigationLoading={loading} previousAvailable={previousAvailable} nextAvailable={nextAvailable} previousError={error} />}
+            </>
+          )}
+        </main>
+      </div>
+      <Footer />
+      <BottomNav activeMenu={activeMenu} onMenuChange={selectMenu} />
+    </div>
+  )
+}
