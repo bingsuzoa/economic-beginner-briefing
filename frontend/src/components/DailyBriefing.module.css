@@ -1,7 +1,8 @@
 .page { max-width: 920px; margin: 0 auto; }
-.previous { margin: 4px 0 2px; padding: 8px 0; border: 0; background: transparent; color: #6f5238; font: inherit; font-weight: 750; cursor: pointer; }
-.previous:hover { color: #a36a34; }
-.previous:disabled { cursor: wait; color: var(--color-text-secondary); }
+.navigation { display: flex; justify-content: space-between; align-items: center; margin: 4px 0 2px; }
+.previous, .next { padding: 8px 0; border: 0; background: transparent; color: #6f5238; font: inherit; font-weight: 750; cursor: pointer; }
+.previous:hover:not(:disabled), .next:hover:not(:disabled) { color: #a36a34; }
+.previous:disabled, .next:disabled { cursor: default; color: var(--color-text-secondary); }
 .header { padding: 28px 4px 24px; border-bottom: 1px solid #eee8dc; }
 .header p { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; color: #8b5e34; font-weight: 800; }
 .header p img { width: 30px; height: 30px; object-fit: contain; border-radius: 50%; }

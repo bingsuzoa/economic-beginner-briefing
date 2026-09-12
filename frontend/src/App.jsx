@@ -16,6 +16,8 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [previousAvailable, setPreviousAvailable] = useState(true)
+  const [nextAvailable, setNextAvailable] = useState(false)
+  const [latestDate, setLatestDate] = useState(null)
   const [activeMenu, setActiveMenu] = useState('home')
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export default function App() {
     document.title = titles[activeMenu] || 'Thoth'
   }, [activeMenu])
 
-  const loadBriefing = useCallback((path, onNotFound) => {
+  const loadBriefing = useCallback((path, { onNotFound, onSuccess } = {}) => {
     setLoading(true)
     setError(null)
     return apiFetch(path)
@@ -45,7 +47,7 @@ export default function App() {
       .then((body) => {
         if (!body) return
         setBriefing(body)
-        setPreviousAvailable(true)
+        onSuccess?.(body)
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
@@ -53,7 +55,13 @@ export default function App() {
 
   useEffect(() => {
     if (user === undefined || user === null) return
-    loadBriefing('/api/briefings/latest')
+    loadBriefing('/api/briefings/latest', {
+      onSuccess: (body) => {
+        setLatestDate(body.targetDate)
+        setPreviousAvailable(true)
+        setNextAvailable(false)
+      },
+    })
   }, [user, loadBriefing])
 
   // loading auth state
@@ -70,7 +78,26 @@ export default function App() {
     if (!briefing || loading) return
     const date = new Date(`${briefing.targetDate}T12:00:00+09:00`)
     date.setUTCDate(date.getUTCDate() - 1)
-    loadBriefing(`/api/briefings/${date.toISOString().slice(0, 10)}`, () => setPreviousAvailable(false))
+    loadBriefing(`/api/briefings/${date.toISOString().slice(0, 10)}`, {
+      onNotFound: () => setPreviousAvailable(false),
+      onSuccess: () => {
+        setPreviousAvailable(true)
+        setNextAvailable(true)
+      },
+    })
+  }
+
+  const showNextBriefing = () => {
+    if (!briefing || loading) return
+    const date = new Date(`${briefing.targetDate}T12:00:00+09:00`)
+    date.setUTCDate(date.getUTCDate() + 1)
+    loadBriefing(`/api/briefings/${date.toISOString().slice(0, 10)}`, {
+      onNotFound: () => setNextAvailable(false),
+      onSuccess: (body) => {
+        setPreviousAvailable(true)
+        setNextAvailable(body.targetDate !== latestDate)
+      },
+    })
   }
 
   return (
@@ -99,8 +126,8 @@ export default function App() {
                   오늘의 토트를 준비하고 있어요.
                 </div>
               )}
-              {briefing && <DailyBriefing briefing={briefing} onPrevious={showPreviousBriefing}
-                previousLoading={loading} previousAvailable={previousAvailable} previousError={error} />}
+              {briefing && <DailyBriefing briefing={briefing} onPrevious={showPreviousBriefing} onNext={showNextBriefing}
+                navigationLoading={loading} previousAvailable={previousAvailable} nextAvailable={nextAvailable} previousError={error} />}
             </>
           )}
         </main>

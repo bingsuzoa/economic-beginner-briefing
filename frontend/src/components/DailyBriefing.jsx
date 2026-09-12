@@ -4,13 +4,18 @@ const dateLabel = (value) => new Intl.DateTimeFormat('ko-KR', {
   timeZone: 'Asia/Seoul', month: 'long', day: 'numeric',
 }).format(new Date(`${value}T12:00:00+09:00`))
 
-export default function DailyBriefing({ briefing, onPrevious, previousLoading, previousAvailable, previousError }) {
+export default function DailyBriefing({ briefing, onPrevious, onNext, navigationLoading, previousAvailable, nextAvailable, previousError }) {
   const flows = briefing.flows || []
   return (
     <section className={s.page} aria-labelledby="daily-briefing-title">
-      <button className={s.previous} onClick={onPrevious} disabled={previousLoading || !previousAvailable}>
-        {previousAvailable && '← '}{previousLoading ? '토트를 불러오는 중이에요' : previousAvailable ? '어제 토트' : '이전 토트가 없어요'}
-      </button>
+      <nav className={s.navigation} aria-label="토트 날짜 이동">
+        <button className={s.previous} onClick={onPrevious} disabled={navigationLoading || !previousAvailable}>
+          {navigationLoading ? '토트를 불러오는 중이에요' : previousAvailable ? '이전 토트' : '이전 토트가 없어요'}
+        </button>
+        <button className={s.next} onClick={onNext} disabled={navigationLoading || !nextAvailable}>
+          {navigationLoading ? '토트를 불러오는 중이에요' : nextAvailable ? '다음 토트' : '다음 토트가 없어요'}
+        </button>
+      </nav>
       <header className={s.header}>
         <p><img src="/images/news-icon.png" alt="" /> 데일리</p>
         <h1 id="daily-briefing-title">{dateLabel(briefing.targetDate)} 토트</h1>
