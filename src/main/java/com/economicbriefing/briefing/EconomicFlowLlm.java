@@ -187,7 +187,7 @@ public class EconomicFlowLlm {
         List<WrittenFlow> flows = new ArrayList<>();
         for (JsonNode item : result.value().path("flows")) {
             List<Answer> answers = new ArrayList<>();
-            for (JsonNode q : item.path("questions")) answers.add(new Answer(q.path("questionId").asText(),
+            for (JsonNode q : item.path("questions")) answers.add(new Answer(localQuestionId(q.path("questionId").asText()),
                     q.path("answer").asText().strip(), strings(q.path("evidenceIds")), strings(q.path("principleIds"))));
             flows.add(new WrittenFlow(item.path("flowId").asText(), clean(item.path("title").asText()),
                     item.path("explanation").asText().strip(), List.copyOf(answers)));
@@ -224,6 +224,10 @@ public class EconomicFlowLlm {
         List<String> result = new ArrayList<>();
         if (values.isArray()) for (JsonNode value : values) if (!value.asText().isBlank()) result.add(value.asText());
         return List.copyOf(result);
+    }
+    static String localQuestionId(String value) {
+        int separator = value.lastIndexOf(':');
+        return separator < 0 ? value : value.substring(separator + 1);
     }
     static String clean(String value) { return value == null ? "" : value.replaceAll("[\\t\\r\\n]+", " ").replaceAll(" +", " ").strip(); }
     private static String limit(String value, int max) { return value.length() <= max ? value : value.substring(0, max); }

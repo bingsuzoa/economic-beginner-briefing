@@ -34,6 +34,12 @@ import org.junit.jupiter.api.Test;
 
 class EconomicFlowValidationTest {
     @Test
+    void writerAcceptsLocalAndFlowQualifiedQuestionIds() {
+        assertEquals("Q03", EconomicFlowLlm.localQuestionId("Q03"));
+        assertEquals("Q03", EconomicFlowLlm.localQuestionId("F02:Q03"));
+    }
+
+    @Test
     void writerSchemaPreservesTheVariableNumberOfPlannedFlows() {
         var json = new ObjectMapper();
         var client = mock(OpenAiClient.class);
