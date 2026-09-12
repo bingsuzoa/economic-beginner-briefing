@@ -4,12 +4,12 @@ const dateLabel = (value) => new Intl.DateTimeFormat('ko-KR', {
   timeZone: 'Asia/Seoul', month: 'long', day: 'numeric',
 }).format(new Date(`${value}T12:00:00+09:00`))
 
-export default function DailyBriefing({ briefing, onPrevious, previousLoading, previousError }) {
+export default function DailyBriefing({ briefing, onPrevious, previousLoading, previousAvailable, previousError }) {
   const flows = briefing.flows || []
   return (
     <section className={s.page} aria-labelledby="daily-briefing-title">
-      <button className={s.previous} onClick={onPrevious} disabled={previousLoading}>
-        ← {previousLoading ? '토트를 불러오는 중이에요' : '어제 토트'}
+      <button className={s.previous} onClick={onPrevious} disabled={previousLoading || !previousAvailable}>
+        {previousAvailable && '← '}{previousLoading ? '토트를 불러오는 중이에요' : previousAvailable ? '어제 토트' : '이전 토트가 없어요'}
       </button>
       <header className={s.header}>
         <p><img src="/images/news-icon.png" alt="" /> 데일리</p>

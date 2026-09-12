@@ -15,6 +15,7 @@ export default function App() {
   const [briefing, setBriefing] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [previousAvailable, setPreviousAvailable] = useState(true)
   const [activeMenu, setActiveMenu] = useState('home')
 
   useEffect(() => {
@@ -29,15 +30,23 @@ export default function App() {
     document.title = titles[activeMenu] || 'Thoth'
   }, [activeMenu])
 
-  const loadBriefing = useCallback((path) => {
+  const loadBriefing = useCallback((path, onNotFound) => {
     setLoading(true)
     setError(null)
     return apiFetch(path)
       .then((res) => {
-        if (!res.ok) throw new Error(res.status === 404 ? '아직 토트를 찾지 못했어요.' : `HTTP ${res.status}`)
+        if (res.status === 404 && onNotFound) {
+          onNotFound()
+          return null
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
       })
-      .then(setBriefing)
+      .then((body) => {
+        if (!body) return
+        setBriefing(body)
+        setPreviousAvailable(true)
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
@@ -61,7 +70,7 @@ export default function App() {
     if (!briefing || loading) return
     const date = new Date(`${briefing.targetDate}T12:00:00+09:00`)
     date.setUTCDate(date.getUTCDate() - 1)
-    loadBriefing(`/api/briefings/${date.toISOString().slice(0, 10)}`)
+    loadBriefing(`/api/briefings/${date.toISOString().slice(0, 10)}`, () => setPreviousAvailable(false))
   }
 
   return (
@@ -91,7 +100,7 @@ export default function App() {
                 </div>
               )}
               {briefing && <DailyBriefing briefing={briefing} onPrevious={showPreviousBriefing}
-                previousLoading={loading} previousError={error} />}
+                previousLoading={loading} previousAvailable={previousAvailable} previousError={error} />}
             </>
           )}
         </main>
