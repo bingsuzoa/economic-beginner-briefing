@@ -179,7 +179,7 @@ public class DailyBriefingService {
             Map<String, QuestionContext> questions = retrieveQuestions(planned.value(), context, windowStart, windowEnd, usage, trace);
             String writerInput = writerInput(planned.value(), context, questions);
             ensureInputBudget("writer", writerInput, appProperties.budget().synthesisInputTokens());
-            ensureCost(usage, writerInput, false, 6000, 0);
+            ensureCost(usage, writerInput, false, EconomicFlowLlm.WRITE_MAX_OUTPUT_TOKENS, 0);
             Call<Writing> written = llm.write(writerInput);
             usage.luna("writer", written.usage());
             trace.writing = written.raw();
@@ -591,7 +591,6 @@ public class DailyBriefingService {
                 String qid = "Q%02d".formatted(q + 1);
                 QuestionContext sources = questions.get(flowId + ":" + qid);
                 value.append('<').append(qid).append(">\nquestion\t").append(flow.questions().get(q).question())
-                        .append("\nquestionId\t").append(qid)
                         .append("\nsearchStatus\t").append(sources.status)
                         .append("\nquestionEvidence\t").append(String.join(",", sources.evidence.keySet()))
                         .append("\nquestionPrinciples\t").append(String.join(",", sources.principles.keySet()))

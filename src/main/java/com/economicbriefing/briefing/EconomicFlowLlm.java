@@ -21,6 +21,7 @@ import org.springframework.stereotype.Component;
 public class EconomicFlowLlm {
     static final String EXTRACTION_PROMPT_VERSION = "observation-memory-v3";
     static final int PLAN_MAX_OUTPUT_TOKENS = 6000;
+    static final int WRITE_MAX_OUTPUT_TOKENS = 12000;
     private static final Pattern NUMBER = Pattern.compile("\\d[\\d,.]*(?:%|％)?");
     private static final String PREFILTER_PROMPT = """
             역할: 제목만 보고 경제흐름 기사 원문 확인 후보를 넉넉하게 남긴다.
@@ -177,7 +178,7 @@ public class EconomicFlowLlm {
 
     public Call<Writing> write(String input) {
         var result = client.complete(properties.writingModel(), WRITER_PROMPT, input, "none", "medium",
-                "economic_flow_writing", schema(WRITING_SCHEMA), 6000);
+                "economic_flow_writing", schema(WRITING_SCHEMA), WRITE_MAX_OUTPUT_TOKENS);
         List<WrittenFlow> flows = new ArrayList<>();
         for (JsonNode item : result.value().path("flows")) {
             List<Answer> answers = new ArrayList<>();
