@@ -59,7 +59,7 @@ export default function DailyBriefing({ briefing, onPrevious, onNext, onSelectFl
         {questions.length > 0 && <>
           <aside className={s.studyInvite} aria-labelledby="study-invite-title">
             <div className={s.studyImageWrap}>
-              <img src="/images/daily-study-toth.png" alt="토트와 친구가 펼친 책으로 경제를 공부하는 모습" className={s.studyImage} />
+              <img src="/images/daily-study-toth-v2.png" alt="토트와 친구가 펼친 책으로 경제를 공부하는 모습" className={s.studyImage} />
             </div>
             <div className={s.studyCopy}>
               <p className={s.studyEyebrow}>DAILY STUDY</p>
