@@ -12,6 +12,7 @@ function Explanation({ text }) {
 export default function DailyBriefing({ briefing, onPrevious, onNext, onSelectFlow, onReturnToList, selectedFlowIndex, navigationLoading, previousAvailable, nextAvailable, previousError }) {
   const flows = briefing.flows || []
   const selectedFlow = selectedFlowIndex === null ? null : flows[selectedFlowIndex]
+  const questions = selectedFlow?.questions || []
   const heading = (
     <header className={s.header}>
       <p><img src="/images/news-icon.png" alt="" /> 데일리</p>
@@ -30,22 +31,52 @@ export default function DailyBriefing({ briefing, onPrevious, onNext, onSelectFl
           <p className={s.number}>토트 {selectedFlowIndex + 1}</p>
           <h2>{selectedFlow.title}</h2>
           <Explanation text={selectedFlow.explanation} />
+        </article>
 
-          {(selectedFlow.questions || []).map((item, questionIndex) => <section className={s.question} key={item.id || questionIndex}>
-            <h3>{item.question}</h3>
-            <Explanation text={item.answer} />
-            {(item.sources?.length > 0 || item.principles?.length > 0) && <details className={s.answerSources}>
-              <summary>이 설명의 근거 보기</summary>
-              {(item.sources || []).map((source, sourceIndex) => <div className={s.source} key={`${source.articleId}-${sourceIndex}`}>
-                <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a>
-                <p className={s.meta}>{source.publishedAt && new Date(source.publishedAt).toLocaleString('ko-KR')}</p>
-                {(source.observations || []).flatMap(observation => observation.evidence || []).map((span, spanIndex) =>
-                  <blockquote key={`${span.spanId}-${spanIndex}`}>{span.text}</blockquote>)}
-              </div>)}
-              {(item.principles || []).map(principle => <p key={principle.chunkId}>{principle.source} · {principle.section}</p>)}
-            </details>}
-          </section>)}
+        {questions.length > 0 && <>
+          <aside className={s.studyInvite} aria-labelledby="study-invite-title">
+            <div className={s.studyImageWrap}>
+              <img src="/images/daily-study-toth.png" alt="토트와 친구가 펼친 책으로 경제를 공부하는 모습" className={s.studyImage} />
+            </div>
+            <div className={s.studyCopy}>
+              <p className={s.studyEyebrow}>DAILY STUDY</p>
+              <h2 id="study-invite-title">토트와 함께 더 자세히 공부하기</h2>
+              <p>뉴스 뒤에 숨은 이유를 질문으로 하나씩 짚어봐요.</p>
+              <a className={s.studyCta} href="#daily-questions">질문으로 시작하기 <span aria-hidden="true">↓</span></a>
+            </div>
+          </aside>
 
+          <section id="daily-questions" className={s.questions} aria-labelledby="daily-questions-title">
+            <header className={s.questionsHeader}>
+              <p>토트의 경제 공부</p>
+              <h2 id="daily-questions-title">궁금했던 질문부터 살펴봐요</h2>
+            </header>
+            <div className={s.questionList}>
+              {questions.map((item, questionIndex) => <article className={s.questionCard} key={item.id || questionIndex}>
+                <div className={s.questionHeading}>
+                  <span className={s.questionNumber}>Q{questionIndex + 1}</span>
+                  <h3>{item.question}</h3>
+                </div>
+                <div className={s.answer}>
+                  <p className={s.answerLabel}>토트의 답</p>
+                  <Explanation text={item.answer} />
+                </div>
+                {(item.sources?.length > 0 || item.principles?.length > 0) && <details className={s.answerSources}>
+                  <summary>이 설명의 근거 보기</summary>
+                  {(item.sources || []).map((source, sourceIndex) => <div className={s.source} key={`${source.articleId}-${sourceIndex}`}>
+                    <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a>
+                    <p className={s.meta}>{source.publishedAt && new Date(source.publishedAt).toLocaleString('ko-KR')}</p>
+                    {(source.observations || []).flatMap(observation => observation.evidence || []).map((span, spanIndex) =>
+                      <blockquote key={`${span.spanId}-${spanIndex}`}>{span.text}</blockquote>)}
+                  </div>)}
+                  {(item.principles || []).map(principle => <p key={principle.chunkId}>{principle.source} · {principle.section}</p>)}
+                </details>}
+              </article>)}
+            </div>
+          </section>
+        </>}
+
+        <section className={s.referenceCard}>
           <details className={s.sources}>
             <summary>근거 기사와 원문 보기 ({selectedFlow.sources?.length || 0})</summary>
             {(selectedFlow.sources || []).map((source, sourceIndex) => <div className={s.source} key={`${source.articleId}-${sourceIndex}`}>
@@ -57,7 +88,7 @@ export default function DailyBriefing({ briefing, onPrevious, onNext, onSelectFl
               </div>)}
             </div>)}
           </details>
-        </article>
+        </section>
       </> : <>
         <nav className={s.navigation} aria-label="토트 날짜 이동">
           <button className={s.previous} onClick={onPrevious} disabled={navigationLoading || !previousAvailable}>
