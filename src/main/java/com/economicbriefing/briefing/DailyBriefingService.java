@@ -169,7 +169,7 @@ public class DailyBriefingService {
                     .map(item -> item.principle.chunkId()).toList());
             String plannerInput = plannerInput(context, selection.briefingArticles().stream().map(SelectedArticle::article).toList(), splitter);
             ensureInputBudget("Terra", plannerInput, appProperties.budget().synthesisInputTokens());
-            ensureCost(usage, plannerInput, true, 4000, .015);
+            ensureCost(usage, plannerInput, true, EconomicFlowLlm.PLAN_MAX_OUTPUT_TOKENS, .015);
             Call<List<PlanFlow>> planned = llm.plan(plannerInput);
             usage.terra("planner", planned.usage());
             trace.plan(planned.value(), json);
