@@ -8,6 +8,9 @@ import com.economicbriefing.briefing.EconomicFlowLlm.Call;
 import com.economicbriefing.briefing.EconomicFlowLlm.PlanFlow;
 import com.economicbriefing.briefing.EconomicFlowLlm.SelectedArticle;
 import com.economicbriefing.briefing.EconomicFlowLlm.WrittenFlow;
+import com.economicbriefing.briefing.EconomicFlowLlm.Selection;
+import com.economicbriefing.briefing.EconomicFlowLlm.Question;
+import com.economicbriefing.briefing.EconomicFlowLlm.Writing;
 import com.economicbriefing.briefing.ObservationStore.Observation;
 import com.economicbriefing.briefing.PrincipleStore.Principle;
 import com.economicbriefing.config.AppProperties;
@@ -43,7 +46,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class DailyBriefingService {
     static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    static final String PIPELINE_VERSION = "daily-flow-v1";
+    static final String PIPELINE_VERSION = "daily-flow-v2.1";
     private static final Logger log = LoggerFactory.getLogger(DailyBriefingService.class);
     private static final Pattern THIN_BULLETIN = Pattern.compile("^\\[(?:속보|\\d+보)]");
     private static final Pattern HARD_SIGNAL = Pattern.compile(
@@ -100,6 +103,21 @@ public class DailyBriefingService {
     public boolean isRunning() { return running.get(); }
 
     private DailyBriefingEntity runLocked(LocalDate targetDate, String triggerType, boolean force) {
+        return runLocked(targetDate, triggerType, force, null);
+    }
+
+    // Package-private: the opt-in replay test calls the real pipeline against an isolated database.
+    DailyBriefingEntity review(LocalDate date, ArticleEntity article) {
+        return review(date, article, false);
+    }
+
+    DailyBriefingEntity review(LocalDate date, ArticleEntity article, boolean selectedByUser) {
+        if (!running.compareAndSet(false, true)) throw new IllegalStateException("already running");
+        try { return runLocked(date, selectedByUser ? "USER_SELECTED_REVIEW" : "USER_REVIEW", true, List.of(article)); }
+        finally { running.set(false); }
+    }
+
+    private DailyBriefingEntity runLocked(LocalDate targetDate, String triggerType, boolean force, List<ArticleEntity> reviewWindow) {
         if (!force) {
             Optional<DailyBriefingEntity> existing = briefings.findFirstByTargetDateAndStatusOrderByRevisionDesc(targetDate, "SUCCESS");
             if (existing.isPresent()) return existing.get();
@@ -110,24 +128,38 @@ public class DailyBriefingService {
         try {
             OffsetDateTime windowStart = targetDate.minusDays(1).atTime(5, 0).atZone(KST).toOffsetDateTime();
             OffsetDateTime windowEnd = targetDate.atTime(5, 0).atZone(KST).toOffsetDateTime();
-            List<ArticleEntity> window = canonical(articles
-                    .findByPublishedAtGreaterThanEqualAndPublishedAtLessThanOrderByPublishedAtAsc(windowStart, windowEnd));
+            List<ArticleEntity> window = reviewWindow == null ? canonical(articles
+                    .findByPublishedAtGreaterThanEqualAndPublishedAtLessThanOrderByPublishedAtAsc(windowStart, windowEnd)) : reviewWindow;
+            if (window.stream().anyMatch(a -> a.getPublishedAt().isBefore(windowStart) || !a.getPublishedAt().isBefore(windowEnd)))
+                throw new IllegalArgumentException("article outside briefing window");
             trace.windowArticleCount = window.size();
             run.setInputHash(hash(window));
             if (window.isEmpty()) return noData(run, targetDate, trace, usage);
 
-            List<ArticleEntity> prefiltered = prefilter(targetDate, windowStart, window, usage);
+            List<ArticleEntity> prefiltered = reviewWindow == null ? prefilter(targetDate, windowStart, window, usage) : window;
             trace.prefilteredArticleIds.addAll(prefiltered.stream().map(ArticleEntity::getId).toList());
             if (prefiltered.isEmpty()) return succeed(run, emptyResult(targetDate), trace, usage);
 
-            Call<List<SelectedArticle>> selection = llm.select(targetDate, prefiltered);
-            usage.luna("articleSelection", selection.usage());
-            trace.selectedArticleIds.addAll(selection.value().stream().map(item -> item.article().getId()).toList());
-            if (selection.value().isEmpty()) return succeed(run, emptyResult(targetDate), trace, usage);
+            Selection selection;
+            if (reviewWindow != null && "USER_SELECTED_REVIEW".equals(triggerType)) {
+                selection = new Selection(List.of(new SelectedArticle(reviewWindow.getFirst(),
+                        "사용자가 지정한 기사. 원문에 근거한 경제 관측을 검토한다.")), List.of());
+                trace.selection = json.createObjectNode().put("mode", "USER_SELECTED_FOR_REVIEW");
+            } else {
+                ensureCost(usage, windowText(prefiltered), false, 2500, .09);
+                Call<Selection> call = llm.select(targetDate, prefiltered);
+                selection = call.value();
+                usage.luna("articleSelection", call.usage());
+                trace.selection = call.raw();
+            }
+            trace.selectedArticleIds.addAll(selection.briefingArticles().stream().map(item -> item.article().getId()).toList());
+            trace.memoryArticleIds.addAll(selection.memoryArticles().stream().map(item -> item.article().getId()).toList());
+            if (selection.all().isEmpty()) return succeed(run, emptyResult(targetDate), trace, usage);
 
-            List<Observation> current = extract(selection.value(), usage, trace);
+            List<Observation> extracted = extract(selection.all(), usage, trace, .09);
+            List<Observation> embedded = embed(extracted.stream().filter(o -> o.remember() || trace.selectedArticleIds.contains(o.articleId())).toList(), usage);
+            List<Observation> current = embedded.stream().filter(o -> trace.selectedArticleIds.contains(o.articleId())).toList();
             if (current.isEmpty()) return succeed(run, emptyResult(targetDate), trace, usage);
-            current = embed(current, usage);
 
             Context context = context(current, windowStart);
             trace.historyCandidateIds.addAll(context.history.stream().map(item -> item.observation.id()).toList());
@@ -135,26 +167,26 @@ public class DailyBriefingService {
                     .map(item -> item.currentAlias() + "->" + item.observation().id()).toList());
             trace.principleChunkIds.addAll(context.principleAliases.values().stream()
                     .map(item -> item.principle.chunkId()).toList());
-            String plannerInput = plannerInput(context);
+            String plannerInput = plannerInput(context, selection.briefingArticles().stream().map(SelectedArticle::article).toList(), splitter);
             ensureInputBudget("Terra", plannerInput, appProperties.budget().synthesisInputTokens());
-            double projected = usage.costUsd() + estimateTokens(plannerInput) * 2d / 1_000_000d
-                    + 4000d * 12d / 1_000_000d + 6000d * 1.2d / 1_000_000d;
-            if (projected > appProperties.budget().dailyCostUsd())
-                throw new IllegalStateException("daily cost ceiling would be exceeded: projectedUsd=" + projected);
-
+            ensureCost(usage, plannerInput, true, 4000, .015);
             Call<List<PlanFlow>> planned = llm.plan(plannerInput);
             usage.terra("planner", planned.usage());
             trace.plan(planned.value(), json);
             List<String> planErrors = validatePlan(planned.value(), context);
             if (!planErrors.isEmpty()) throw new IllegalStateException("invalid Terra plan: " + planErrors);
 
-            String writerInput = writerInput(planned.value(), context);
-            Call<List<WrittenFlow>> written = llm.write(writerInput);
+            Map<String, QuestionContext> questions = retrieveQuestions(planned.value(), context, windowStart, windowEnd, usage, trace);
+            String writerInput = writerInput(planned.value(), context, questions);
+            ensureInputBudget("writer", writerInput, appProperties.budget().synthesisInputTokens());
+            ensureCost(usage, writerInput, false, 6000, 0);
+            Call<Writing> written = llm.write(writerInput);
             usage.luna("writer", written.usage());
-            List<String> writingErrors = validateWriting(written.value(), planned.value(), writerInput);
+            trace.writing = written.raw();
+            List<String> writingErrors = validateWriting(written.value(), planned.value(), context, questions);
             if (!writingErrors.isEmpty()) throw new IllegalStateException("invalid Luna writing: " + writingErrors);
 
-            ObjectNode result = publicResult(run.getId(), targetDate, planned.value(), written.value(), context);
+            ObjectNode result = publicResult(run.getId(), targetDate, planned.value(), written.value().flows(), context, questions);
             trace.usedHistoryObservationIds.addAll(planned.value().stream().flatMap(flow -> flow.observationIds().stream())
                     .filter(id -> id.startsWith("H")).map(context.aliases::get).map(item -> item.observation.id()).distinct().toList());
             trace.usedPrincipleIds.addAll(planned.value().stream().flatMap(flow -> flow.principleIds().stream())
@@ -185,11 +217,13 @@ public class DailyBriefingService {
             estimated += estimateTokens(group.stream().map(ArticleEntity::getTitle).reduce("", (a, b) -> a + b));
             if (estimated > appProperties.budget().screeningInputTokens())
                 throw new IllegalStateException("screening input token ceiling exceeded");
+            ensureCost(usage, windowText(group), false, 2000, .09);
             Call<List<String>> call = llm.prefilter(date, group, 40);
             usage.luna("titlePrefilter", call.usage());
             ids.addAll(call.value());
         }
         if (ids.size() > 80) {
+            ensureCost(usage, windowText(ids.stream().map(byId::get).toList()), false, 2000, .09);
             Call<List<String>> call = llm.prefilter(date, ids.stream().map(byId::get).toList(), 80);
             usage.luna("titlePrefilter", call.usage());
             ids = new LinkedHashSet<>(call.value());
@@ -198,16 +232,15 @@ public class DailyBriefingService {
         return ids.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
     }
 
-    private List<Observation> extract(List<SelectedArticle> selected, UsageTracker usage, Trace trace) {
+    private List<Observation> extract(List<SelectedArticle> selected, UsageTracker usage, Trace trace, double reserved) {
         List<Observation> result = new ArrayList<>();
-        int estimated = 0;
         for (SelectedArticle item : selected) {
             ArticleEntity article = item.article();
             if ("FULL_TEXT".equals(article.getBodyStatus())) {
-                List<Observation> reusable = observations.findReusable(article.getId(),
+                List<Observation> reusable = observations.findReusable(article,
                         openAiProperties.extractionModel(), EconomicFlowLlm.EXTRACTION_PROMPT_VERSION);
                 if (!reusable.isEmpty()) {
-                    reusable.stream().map(value -> value.withPublishedAt(article.getPublishedAt())).forEach(result::add);
+                    result.addAll(reusable);
                     trace.observationIds.addAll(reusable.stream().map(Observation::id).toList());
                     continue;
                 }
@@ -225,16 +258,18 @@ public class DailyBriefingService {
                 }
             }
             Map<String, String> paragraphs = splitter.split(article.getBody());
-            estimated += estimateTokens(article.getBody());
-            if (estimated > appProperties.budget().extractionInputTokens()) {
-                log.warn("Extraction budget reached; remaining lower-priority articles are skipped");
-                break;
-            }
+            usage.extractionInput += estimateTokens(article.getBody());
+            if (usage.extractionInput > appProperties.budget().extractionInputTokens())
+                throw new IllegalStateException("extraction input ceiling exceeded");
+            ensureCost(usage, article.getBody(), false, 1600, reserved);
             Call<List<ObservationStore.Draft>> call = llm.extract(item, paragraphs);
             usage.luna("observationExtraction", call.usage());
-            List<Observation> saved = observations.replace(article.getId(), call.value(),
+            ObjectNode decision = trace.memoryDecisions.addObject();
+            decision.put("articleId", article.getId()); decision.set("raw", call.raw());
+            decision.set("accepted", json.valueToTree(call.value()));
+            List<Observation> saved = observations.replace(article, call.value(),
                     openAiProperties.extractionModel(), EconomicFlowLlm.EXTRACTION_PROMPT_VERSION);
-            for (Observation observation : saved) result.add(observation.withPublishedAt(article.getPublishedAt()));
+            result.addAll(saved);
             trace.observationIds.addAll(saved.stream().map(Observation::id).toList());
         }
         return List.copyOf(result);
@@ -243,6 +278,7 @@ public class DailyBriefingService {
     private List<Observation> embed(List<Observation> current, UsageTracker usage) {
         List<Observation> missing = current.stream().filter(item -> item.vector() == null).toList();
         if (missing.isEmpty()) return current;
+        ensureEmbeddingCost(usage, missing.stream().map(Observation::text).toList(), .09);
         try {
             var embedded = openAi.embed(missing.stream().map(Observation::text).toList());
             usage.embeddingTokens += embedded.inputTokens();
@@ -268,7 +304,7 @@ public class DailyBriefingService {
         for (var entry : currentAliases.entrySet()) {
             Observation item = entry.getValue().observation;
             if (item.vector() == null) continue;
-            for (var match : observations.findPast(item.vector(), windowStart, item.articleId(), entry.getKey(), 5)) {
+            for (var match : observations.findPast(item.vector(), windowStart, item.articleId(), entry.getKey(), openAiProperties.embeddingModel(), 5)) {
                 HistoryChoice choice = new HistoryChoice(match.currentObservationId(), match.observation(), match.similarity());
                 bestPastArticle.merge(match.observation().articleId(), choice,
                         (left, right) -> left.similarity >= right.similarity ? left : right);
@@ -331,14 +367,48 @@ public class DailyBriefingService {
         return best.values().stream().sorted(Comparator.comparingDouble(Relation::similarity).reversed()).toList();
     }
 
-    private String plannerInput(Context context) {
+    static String plannerInput(Context context, List<ArticleEntity> articles, ParagraphSplitter splitter) {
         StringBuilder value = new StringBuilder("<requiredArticles>\n");
         context.current.values().stream().map(item -> item.observation.articleId()).distinct()
                 .forEach(id -> value.append(id).append('\n'));
         value.append("</requiredArticles>\n<current>\n");
         context.current.forEach((id, item) -> value.append(id).append('\t').append(item.observation.articleId())
                 .append('\t').append(EconomicFlowLlm.clean(item.observation.text())).append('\n'));
-        value.append("</current>\n<history>\n");
+        value.append("</current>\n<currentEvidence>\n");
+        Set<String> seenSpans = new HashSet<>();
+        context.current.forEach((id, item) -> {
+            Observation o = item.observation;
+            if (o.snapshot() != null) o.snapshot().path("spans").fields().forEachRemaining(span -> {
+                String key = o.articleId() + ":" + o.snapshot().path("bodyHash").asText() + ":" + span.getKey();
+                if (seenSpans.add(key)) value.append(o.articleId()).append('\t').append(span.getKey()).append('\t')
+                        .append(EconomicFlowLlm.clean(span.getValue().asText())).append('\n');
+            });
+        });
+        int supplementalChars = 0;
+        // ponytail: one neighbor on either side, 3,000 chars total; evaluate distant omissions before widening.
+        for (ArticleEntity article : articles) {
+            if (!"FULL_TEXT".equals(article.getBodyStatus()) || article.getBody() == null) continue;
+            String bodyHash = ObservationStore.bodyHash(article.getBody());
+            Set<String> anchors = new HashSet<>();
+            context.current.values().stream().map(Evidence::observation)
+                    .filter(o -> o.articleId().equals(article.getId()) && o.snapshot() != null
+                            && bodyHash.equals(o.snapshot().path("bodyHash").asText()))
+                    .forEach(o -> anchors.addAll(o.spanIds()));
+            if (anchors.isEmpty()) continue;
+            var paragraphs = new ArrayList<>(splitter.split(article.getBody()).entrySet());
+            for (int i = 0; i < paragraphs.size(); i++) {
+                var paragraph = paragraphs.get(i);
+                String key = article.getId() + ":" + bodyHash + ":" + paragraph.getKey();
+                boolean neighbor = (i > 0 && anchors.contains(paragraphs.get(i - 1).getKey()))
+                        || (i + 1 < paragraphs.size() && anchors.contains(paragraphs.get(i + 1).getKey()));
+                if (!neighbor || seenSpans.contains(key) || !splitter.usableEvidence(paragraph.getValue())) continue;
+                String line = article.getId() + "\t" + paragraph.getKey() + "\t"
+                        + EconomicFlowLlm.clean(paragraph.getValue()) + "\n";
+                if (supplementalChars + line.length() > 3000) continue;
+                seenSpans.add(key); supplementalChars += line.length(); value.append(line);
+            }
+        }
+        value.append("</currentEvidence>\n<history>\n");
         context.aliases.forEach((id, item) -> {
             if (item.historical) value.append(id).append('\t').append(item.currentAlias).append('\t')
                     .append(item.observation.publishedAt().toLocalDate()).append('\t')
@@ -355,27 +425,193 @@ public class DailyBriefingService {
         return value.append("</principles>").toString();
     }
 
-    private String writerInput(List<PlanFlow> plan, Context context) {
-        StringBuilder value = new StringBuilder();
+    private Map<String, QuestionContext> retrieveQuestions(List<PlanFlow> plan, Context context,
+            OffsetDateTime windowStart, OffsetDateTime windowEnd, UsageTracker usage, Trace trace) {
+        Map<String, QuestionContext> result = new LinkedHashMap<>();
+        Map<String, Question> pending = new LinkedHashMap<>();
+        for (int f = 0; f < plan.size(); f++) for (int q = 0; q < plan.get(f).questions().size(); q++) {
+            Question question = plan.get(f).questions().get(q);
+            String id = "F%02d:Q%02d".formatted(f + 1, q + 1);
+            QuestionContext source = flowSources(plan.get(f), context);
+            result.put(id, source);
+            if (question.articleQuery().isBlank() && question.principleQuery().isBlank()) continue;
+            if (pending.size() >= 8) { source.status = "BUDGET_NOT_SEARCHED"; continue; }
+            pending.put(id, question);
+        }
+        List<String> queries = pending.values().stream()
+                .flatMap(q -> java.util.stream.Stream.of(q.articleQuery(), q.principleQuery()))
+                .filter(q -> !q.isBlank()).distinct().toList();
+        Map<String, float[]> vectors = new HashMap<>();
+        if (!queries.isEmpty()) {
+            try {
+                ensureEmbeddingCost(usage, queries, .015);
+                var embedded = openAi.embed(queries);
+                usage.embeddingTokens += embedded.inputTokens();
+                for (int i = 0; i < queries.size(); i++) vectors.put(queries.get(i), embedded.vectors().get(i));
+            } catch (RuntimeException e) {
+                trace.questionSearches.addObject().put("embeddingError", limit(e.getMessage(), 300));
+            }
+        }
+        Map<String, Evidence> additions = new LinkedHashMap<>();
+        Map<String, PrincipleChoice> newPrinciples = new LinkedHashMap<>();
+        plan.forEach(flow -> flow.principleIds().forEach(id -> newPrinciples.put(id, context.principleAliases.get(id))));
+        Set<String> rawArticles = new LinkedHashSet<>(), attempted = new HashSet<>();
+        int rawChars = 0;
+        for (var entry : pending.entrySet()) {
+            Question q = entry.getValue(); QuestionContext source = result.get(entry.getKey());
+            source.status = "SEARCHED";
+            ObjectNode search = trace.questionSearches.addObject().put("questionId", entry.getKey());
+            search.put("articleQuery", q.articleQuery()); search.put("principleQuery", q.principleQuery());
+            search.set("articleTerms", json.valueToTree(q.articleTerms()));
+            if (!q.principleQuery().isBlank() && vectors.containsKey(q.principleQuery())) {
+                List<Principle> candidates = principles.find(vectors.get(q.principleQuery()), openAiProperties.embeddingModel(), 2);
+                search.set("principleCandidates", json.valueToTree(candidates));
+                for (Principle principle : candidates) {
+                    String alias = newPrinciples.entrySet().stream().filter(e -> e.getValue().principle.chunkId().equals(principle.chunkId()))
+                            .map(Map.Entry::getKey).findFirst().orElse(null);
+                    if (alias == null && newPrinciples.size() < 4
+                            && newPrinciples.values().stream().mapToInt(p -> p.principle.text().length()).sum() + principle.text().length() <= 4000) {
+                        alias = "K%02d".formatted(context.principleAliases.size() + newPrinciples.size() + 1);
+                        newPrinciples.put(alias, new PrincipleChoice(principle, principle.similarity()));
+                    }
+                    if (alias != null) source.principles.put(alias, newPrinciples.get(alias));
+                }
+            }
+            if (!q.articleQuery().isBlank()) {
+                List<Observation> matches = new ArrayList<>(observations.findMatchingMemory(q.articleTerms(), windowStart, 6));
+                if (vectors.containsKey(q.articleQuery())) observations.findPast(vectors.get(q.articleQuery()), windowStart,
+                        "", entry.getKey(), openAiProperties.embeddingModel(), 6).forEach(m -> matches.add(m.observation()));
+                // A question about this article must still find its omitted paragraphs when title search misses.
+                List<String> articleIds = new ArrayList<>(q.observationIds().stream()
+                        .map(id -> context.current.get(id).observation.articleId()).distinct().toList());
+                for (String id : observations.findArticleIds(q.articleTerms(), windowEnd, 3))
+                    if (!articleIds.contains(id)) articleIds.add(id);
+                for (Observation match : matches) if (!articleIds.contains(match.articleId())) articleIds.add(match.articleId());
+                ArrayNode candidates = search.putArray("candidateArticleIds"); articleIds.forEach(candidates::add);
+                for (String articleId : articleIds.stream().limit(3).toList()) {
+                    // Retain several memories from the same article when one states the decision and another its reason.
+                    for (Observation match : matches.stream().filter(o -> o.articleId().equals(articleId)).distinct().toList()) {
+                        String alias = additions.entrySet().stream().filter(e -> e.getValue().observation.id().equals(match.id())
+                                && e.getValue().observation.snapshot().equals(match.snapshot())).map(Map.Entry::getKey).findFirst().orElse(null);
+                        int chars = match.text().length() + match.snapshot().path("spans").toString().length();
+                        if (alias == null && rawChars + chars <= 8000 && (rawArticles.contains(articleId) || rawArticles.size() < 8)) {
+                            alias = "R%03d".formatted(additions.size() + 1);
+                            additions.put(alias, new Evidence(match, true, null, 0)); rawChars += chars; rawArticles.add(articleId);
+                        }
+                        if (alias != null) source.evidence.put(alias, additions.get(alias));
+                    }
+                    ArticleEntity article = articles.findById(articleId).orElse(null);
+                    if (article == null || !article.getPublishedAt().isBefore(windowEnd)) continue;
+                    if (!"FULL_TEXT".equals(article.getBodyStatus()) || article.getBody() == null) {
+                        if (attempted.size() >= 3 || !attempted.add(articleId)) continue;
+                        // A historical replay must not silently use today's revised web page.
+                        if (windowEnd.toLocalDate().isBefore(LocalDate.now(KST))) { source.status = "HISTORICAL_BODY_UNAVAILABLE"; continue; }
+                        try {
+                            bodyFetcher.markSuccess(article, bodyFetcher.fetch(article.getUrl())); articles.save(article);
+                        } catch (RuntimeException e) { source.status = "BODY_UNAVAILABLE"; continue; }
+                    }
+                    if (!rawArticles.contains(articleId) && rawArticles.size() >= 8) { source.status = "BUDGET_NOT_SEARCHED"; continue; }
+                    Map<String, String> paragraphs = splitter.split(article.getBody());
+                    String bodyHash = ObservationStore.bodyHash(article.getBody());
+                    List<Map.Entry<String, String>> ranked = splitter.questionEvidence(paragraphs, q.articleTerms());
+                    for (var paragraph : ranked) {
+                        if (source.evidence.values().stream().anyMatch(e -> e.observation.articleId().equals(articleId)
+                                && e.observation.snapshot().path("bodyHash").asText().equals(bodyHash)
+                                && e.observation.snapshot().path("spans").path(paragraph.getKey()).asText().equals(paragraph.getValue()))) continue;
+                        String id = articleId + ":" + paragraph.getKey();
+                        String alias = additions.entrySet().stream().filter(e -> e.getValue().observation.id().equals(id))
+                                .map(Map.Entry::getKey).findFirst().orElse(null);
+                        if (alias == null && rawChars + paragraph.getValue().length() <= 8000) {
+                            var draft = new ObservationStore.Draft(paragraph.getValue(), List.of(paragraph.getKey()), false, "");
+                            Observation original = observations.fromDraft(article, 0, draft);
+                            Observation passage = new Observation(id, articleId, 0, original.text(), original.spanIds(),
+                                    original.publishedAt(), null, false, original.snapshot());
+                            alias = "R%03d".formatted(additions.size() + 1);
+                            additions.put(alias, new Evidence(passage, passage.publishedAt().isBefore(windowStart), null, 0));
+                            rawChars += paragraph.getValue().length(); rawArticles.add(articleId);
+                        }
+                        if (alias != null) source.evidence.put(alias, additions.get(alias));
+                    }
+                }
+            }
+            search.put("status", source.status);
+            search.set("evidence", json.valueToTree(source.evidence.entrySet().stream().map(e -> Map.of("id", e.getKey(),
+                    "articleId", e.getValue().observation.articleId(), "text", e.getValue().observation.text())).toList()));
+            search.set("principles", json.valueToTree(source.principles));
+        }
+        return result;
+    }
+
+    static final class QuestionContext {
+        final Map<String, Evidence> evidence = new LinkedHashMap<>();
+        final Map<String, PrincipleChoice> principles = new LinkedHashMap<>();
+        String status = "CURRENT_EVIDENCE_ONLY";
+    }
+
+    private static String windowText(List<ArticleEntity> articles) {
+        return articles.stream().map(a -> a.getTitle() + " " + a.getSummary()).collect(java.util.stream.Collectors.joining("\n"));
+    }
+
+    private void ensureCost(UsageTracker usage, String input, boolean terra, int outputTokens, double reserved) {
+        double projected = usage.costUsd() + ((estimateTokens(input) + 2500d) * (terra ? 2 : .2)
+                + outputTokens * (terra ? 12 : 1.2)) / 1_000_000d + reserved;
+        if (projected > appProperties.budget().dailyCostUsd())
+            throw new IllegalStateException("daily cost ceiling would be exceeded: projectedUsd=" + projected);
+    }
+
+    private void ensureEmbeddingCost(UsageTracker usage, List<String> input, double reserved) {
+        double projected = usage.costUsd() + estimateTokens(String.join("\n", input)) * .13 / 1_000_000d + reserved;
+        if (projected > appProperties.budget().dailyCostUsd()) throw new IllegalStateException("embedding cost ceiling exceeded");
+    }
+
+    private String writerInput(List<PlanFlow> plan, Context context, Map<String, QuestionContext> questions) {
+        Map<String, Evidence> evidence = new LinkedHashMap<>();
+        Map<String, PrincipleChoice> principleCatalog = new LinkedHashMap<>();
+        for (PlanFlow flow : plan) {
+            QuestionContext base = flowSources(flow, context);
+            evidence.putAll(base.evidence); principleCatalog.putAll(base.principles);
+        }
+        questions.values().forEach(q -> { evidence.putAll(q.evidence); principleCatalog.putAll(q.principles); });
+        StringBuilder value = new StringBuilder("<evidenceCatalog>\n");
+        evidence.forEach((id, item) -> {
+            value.append("allowedAnswers\t").append(questions.entrySet().stream().filter(q -> q.getValue().evidence.containsKey(id))
+                    .map(Map.Entry::getKey).collect(java.util.stream.Collectors.joining(","))).append('\n');
+            appendEvidence(value, id, item);
+        });
+        value.append("</evidenceCatalog>\n<principleCatalog>\n");
+        principleCatalog.forEach((id, item) -> appendPrinciple(value, id, item));
+        value.append("</principleCatalog>\n");
         for (int index = 0; index < plan.size(); index++) {
             String flowId = "F%02d".formatted(index + 1);
             PlanFlow flow = plan.get(index);
-            value.append('<').append(flowId).append(">\nconnection\t").append(flow.connection()).append("\n<evidence>\n");
-            for (String id : flow.observationIds()) {
-                Evidence item = context.aliases.get(id);
-                value.append(id).append('\t');
-                if (item.historical) value.append(item.observation.publishedAt().toLocalDate()).append('\t');
-                value.append(EconomicFlowLlm.clean(item.observation.text())).append('\n');
+            value.append('<').append(flowId).append(">\nconnection\t").append(flow.connection())
+                    .append("\nflowEvidence\t").append(String.join(",", flow.observationIds()))
+                    .append("\nflowPrinciples\t").append(String.join(",", flow.principleIds())).append("\n");
+            for (int q = 0; q < flow.questions().size(); q++) {
+                String qid = "Q%02d".formatted(q + 1);
+                QuestionContext sources = questions.get(flowId + ":" + qid);
+                value.append('<').append(qid).append(">\nquestion\t").append(flow.questions().get(q).question())
+                        .append("\nquestionId\t").append(qid)
+                        .append("\nsearchStatus\t").append(sources.status)
+                        .append("\nquestionEvidence\t").append(String.join(",", sources.evidence.keySet()))
+                        .append("\nquestionPrinciples\t").append(String.join(",", sources.principles.keySet()))
+                        .append("\n</").append(qid).append(">\n");
             }
-            value.append("</evidence>\n<principles>\n");
-            for (String id : flow.principleIds()) {
-                Principle principle = context.principleAliases.get(id).principle;
-                value.append(id).append('\t').append(EconomicFlowLlm.clean(principle.title())).append('\t')
-                        .append(EconomicFlowLlm.clean(principle.text())).append('\n');
-            }
-            value.append("</principles>\n</").append(flowId).append(">\n");
+            value.append("</").append(flowId).append(">\n");
         }
         return value.toString();
+    }
+
+    private static void appendEvidence(StringBuilder value, String id, Evidence evidence) {
+        Observation o = evidence.observation;
+        value.append(id).append('\t').append(o.publishedAt()).append('\t').append(EconomicFlowLlm.clean(o.text())).append('\n');
+        if (o.number() != 0 && o.snapshot() != null) o.snapshot().path("spans").fields().forEachRemaining(span ->
+                value.append("  ").append(span.getKey()).append('\t').append(EconomicFlowLlm.clean(span.getValue().asText())).append('\n'));
+    }
+
+    private static void appendPrinciple(StringBuilder value, String id, PrincipleChoice choice) {
+        value.append(id).append('\t').append(EconomicFlowLlm.clean(choice.principle.title())).append('\t')
+                .append(EconomicFlowLlm.clean(choice.principle.text())).append('\n');
     }
 
     static List<String> validatePlan(List<PlanFlow> plan, Context context) {
@@ -393,6 +629,13 @@ public class DailyBriefingService {
             if (usedCurrent.isEmpty()) errors.add("F" + index + ": no current observation");
             usedCurrent.forEach(id -> coveredArticles.add(context.current.get(id).observation.articleId()));
             if (!principleIds.containsAll(flow.principleIds())) errors.add("F" + index + ": unknown principle");
+            Set<String> seenQuestions = new HashSet<>();
+            for (Question q : flow.questions()) {
+                if (q.question().isBlank() || q.reason().isBlank() || !seenQuestions.add(q.question())) errors.add("invalid question text");
+                if (q.observationIds().isEmpty() || !usedCurrent.containsAll(q.observationIds())) errors.add("question outside flow evidence");
+                if (q.articleTerms().size() > 4 || q.articleTerms().stream().anyMatch(String::isBlank)) errors.add("invalid search terms");
+                if (!q.articleQuery().isBlank() && q.articleTerms().isEmpty()) errors.add("missing article search terms");
+            }
         }
         Set<String> required = new HashSet<>();
         context.current.values().forEach(item -> required.add(item.observation.articleId()));
@@ -400,70 +643,114 @@ public class DailyBriefingService {
         return errors;
     }
 
-    static List<String> validateWriting(List<WrittenFlow> writing, List<PlanFlow> plan, String source) {
+    static List<String> validateWriting(Writing writing, List<PlanFlow> plan, Context context,
+                                        Map<String, QuestionContext> questions) {
         List<String> errors = new ArrayList<>();
-        if (writing.size() != plan.size()) errors.add("flow count mismatch");
-        Set<String> allowedNumbers = numbers(source);
-        for (int index = 0; index < writing.size(); index++) {
-            WrittenFlow flow = writing.get(index);
-            if (!flow.flowId().equals("F%02d".formatted(index + 1))) errors.add("flow order mismatch");
-            if (flow.title().isBlank() || flow.explanation().isBlank()) errors.add(flow.flowId() + ": empty text");
-            Set<String> extra = numbers(flow.title() + " " + flow.explanation() + " " + String.join(" ", flow.watchPoints()));
-            extra.removeAll(allowedNumbers);
-            if (!extra.isEmpty()) errors.add(flow.flowId() + ": numbers outside evidence=" + extra);
+        if (!writing.conflicts().isEmpty()) errors.add("source conflicts: " + writing.conflicts());
+        if (writing.flows().size() != plan.size()) errors.add("flow count mismatch");
+        for (int index = 0; index < Math.min(writing.flows().size(), plan.size()); index++) {
+            WrittenFlow flow = writing.flows().get(index);
+            PlanFlow planned = plan.get(index);
+            String fid = "F%02d".formatted(index + 1);
+            if (!flow.flowId().equals(fid)) errors.add("flow order mismatch");
+            if (flow.title().isBlank() || flow.explanation().isBlank()) errors.add(fid + ": empty text");
+            QuestionContext base = flowSources(planned, context);
+            checkNumbers(fid, flow.title() + " " + flow.explanation(), base, errors);
+            if (flow.questions().size() != planned.questions().size()) errors.add(fid + ": question count mismatch");
+            for (int q = 0; q < Math.min(flow.questions().size(), planned.questions().size()); q++) {
+                String qid = "Q%02d".formatted(q + 1);
+                var answer = flow.questions().get(q);
+                QuestionContext source = questions.get(fid + ":" + qid);
+                if (!answer.questionId().equals(qid) || answer.answer().isBlank()) errors.add(fid + ": invalid answer order/text");
+                if (!source.evidence.keySet().containsAll(answer.evidenceIds())) errors.add(fid + ": unknown answer evidence");
+                if (!source.principles.keySet().containsAll(answer.principleIds())) errors.add(fid + ": unknown answer principle");
+                QuestionContext cited = new QuestionContext();
+                answer.evidenceIds().stream().filter(source.evidence::containsKey).forEach(id -> cited.evidence.put(id, source.evidence.get(id)));
+                answer.principleIds().stream().filter(source.principles::containsKey).forEach(id -> cited.principles.put(id, source.principles.get(id)));
+                checkNumbers(fid + ":" + qid, answer.answer(), cited, errors);
+            }
         }
         return errors;
     }
 
+    private static void checkNumbers(String id, String text, QuestionContext source, List<String> errors) {
+        StringBuilder allowed = new StringBuilder();
+        for (Evidence evidence : source.evidence.values()) {
+            Observation o = evidence.observation;
+            allowed.append(o.text()).append(' ').append(o.publishedAt()).append(' ');
+            if (o.snapshot() != null) o.snapshot().path("spans").forEach(span -> allowed.append(span.asText()).append(' '));
+        }
+        source.principles.values().forEach(p -> allowed.append(p.principle.title()).append(' ').append(p.principle.text()).append(' '));
+        Set<String> extra = numbers(text); extra.removeAll(numbers(allowed.toString()));
+        if (!extra.isEmpty()) errors.add(id + ": numbers outside evidence=" + extra);
+    }
+
+    private static QuestionContext flowSources(PlanFlow flow, Context context) {
+        QuestionContext result = new QuestionContext();
+        flow.observationIds().forEach(id -> result.evidence.put(id, context.aliases.get(id)));
+        flow.principleIds().forEach(id -> result.principles.put(id, context.principleAliases.get(id)));
+        return result;
+    }
+
     private ObjectNode publicResult(String runId, LocalDate date, List<PlanFlow> plan,
-            List<WrittenFlow> writing, Context context) {
+            List<WrittenFlow> writing, Context context, Map<String, QuestionContext> questions) {
         ObjectNode result = emptyResult(date);
-        result.put("generatedAt", OffsetDateTime.now(KST).toString());
         ArrayNode flows = (ArrayNode) result.get("flows");
-        Map<String, ArticleEntity> articleMap = new HashMap<>();
-        articles.findAllById(context.aliases.values().stream().map(item -> item.observation.articleId()).distinct().toList())
-                .forEach(item -> articleMap.put(item.getId(), item));
         for (int index = 0; index < writing.size(); index++) {
             WrittenFlow written = writing.get(index);
             PlanFlow planned = plan.get(index);
             ObjectNode flow = flows.addObject();
             flow.put("id", runId + ":F" + (index + 1));
-            flow.put("title", written.title());
-            flow.put("explanation", written.explanation());
-            ArrayNode watch = flow.putArray("watchPoints"); written.watchPoints().forEach(watch::add);
-            ArrayNode sources = flow.putArray("sources");
-            Map<String, ObjectNode> sourcesByArticle = new LinkedHashMap<>();
-            for (String alias : planned.observationIds()) {
-                Evidence evidence = context.aliases.get(alias);
-                ArticleEntity article = articleMap.get(evidence.observation.articleId());
-                if (article == null) continue;
-                ObjectNode source = sourcesByArticle.get(article.getId());
-                if (source == null) {
-                    source = sources.addObject();
-                    sourcesByArticle.put(article.getId(), source);
-                    source.put("articleId", article.getId());
-                    source.put("title", article.getTitle());
-                    source.put("source", article.getSource());
-                    source.put("url", article.getUrl());
-                    if (article.getPublishedAt() != null) source.put("publishedAt", article.getPublishedAt().toString());
-                    source.putArray("observations");
-                }
-                ObjectNode observation = ((ArrayNode) source.get("observations")).addObject();
-                observation.put("text", evidence.observation.text());
-                ArrayNode spans = observation.putArray("evidence");
-                Map<String, String> paragraphs = splitter.split(article.getBody());
-                for (String spanId : evidence.observation.spanIds()) {
-                    if (paragraphs.containsKey(spanId)) {
-                        ObjectNode span = spans.addObject(); span.put("spanId", spanId); span.put("text", paragraphs.get(spanId));
-                    }
-                }
+            flow.put("title", written.title()); flow.put("explanation", written.explanation());
+            QuestionContext base = flowSources(planned, context);
+            flow.set("sources", publicSources(base.evidence));
+            flow.set("principles", publicPrinciples(base.principles));
+            ArrayNode qa = flow.putArray("questions");
+            for (int q = 0; q < written.questions().size(); q++) {
+                var answer = written.questions().get(q);
+                QuestionContext source = questions.get("F%02d:Q%02d".formatted(index + 1, q + 1));
+                ObjectNode item = qa.addObject();
+                item.put("id", answer.questionId()); item.put("question", planned.questions().get(q).question());
+                item.put("answer", answer.answer());
+                Map<String, Evidence> cited = new LinkedHashMap<>();
+                answer.evidenceIds().forEach(id -> cited.put(id, source.evidence.get(id)));
+                item.set("sources", publicSources(cited));
+                Map<String, PrincipleChoice> citedPrinciples = new LinkedHashMap<>();
+                answer.principleIds().forEach(id -> citedPrinciples.put(id, source.principles.get(id)));
+                item.set("principles", publicPrinciples(citedPrinciples));
             }
-            ArrayNode principleArray = flow.putArray("principles");
-            for (String alias : planned.principleIds()) {
-                Principle principle = context.principleAliases.get(alias).principle;
-                ObjectNode item = principleArray.addObject();
-                item.put("chunkId", principle.chunkId()); item.put("source", principle.source()); item.put("section", principle.title());
+        }
+        return result;
+    }
+
+    private ArrayNode publicSources(Map<String, Evidence> evidence) {
+        ArrayNode result = json.createArrayNode();
+        Map<String, ObjectNode> sources = new LinkedHashMap<>();
+        for (Evidence item : evidence.values()) {
+            Observation o = item.observation;
+            JsonNode snapshot = o.snapshot();
+            if (snapshot == null) throw new IllegalStateException("missing source snapshot");
+            String key = o.articleId() + ":" + snapshot.path("bodyHash").asText();
+            ObjectNode source = sources.get(key);
+            if (source == null) {
+                source = result.addObject(); sources.put(key, source);
+                source.put("articleId", o.articleId());
+                for (String field : List.of("title", "url", "source", "publishedAt")) source.set(field, snapshot.path(field));
+                source.putArray("observations");
             }
+            ObjectNode observation = ((ArrayNode) source.get("observations")).addObject();
+            observation.put("text", o.text());
+            ArrayNode spans = observation.putArray("evidence");
+            snapshot.path("spans").fields().forEachRemaining(span -> spans.addObject().put("spanId", span.getKey()).put("text", span.getValue().asText()));
+        }
+        return result;
+    }
+
+    private ArrayNode publicPrinciples(Map<String, PrincipleChoice> principles) {
+        ArrayNode result = json.createArrayNode();
+        for (var choice : principles.values()) {
+            Principle p = choice.principle;
+            result.addObject().put("chunkId", p.chunkId()).put("source", p.source()).put("section", p.title());
         }
         return result;
     }
@@ -482,6 +769,8 @@ public class DailyBriefingService {
     }
 
     private DailyBriefingEntity succeed(DailyBriefingEntity run, ObjectNode result, Trace trace, UsageTracker usage) {
+        if (usage.costUsd() > appProperties.budget().dailyCostUsd())
+            throw new IllegalStateException("daily cost ceiling exceeded by actual usage");
         run.setStatus("SUCCESS"); run.setResultJson(write(result)); run.setTraceJson(write(trace.json(json)));
         run.setUsageJson(write(usage.json(json))); run.setFinishedAt(OffsetDateTime.now(KST));
         return briefings.save(run);
@@ -544,11 +833,14 @@ public class DailyBriefingService {
                           List<HistoryChoice> history, List<Relation> relations,
                           Map<String, PrincipleChoice> principleAliases) {}
 
-    private static final class Trace {
+    private final class Trace {
         int windowArticleCount;
         final List<String> prefilteredArticleIds = new ArrayList<>(), selectedArticleIds = new ArrayList<>(),
                 observationIds = new ArrayList<>(), historyCandidateIds = new ArrayList<>(), historyCandidatePairs = new ArrayList<>(), principleChunkIds = new ArrayList<>(),
                 usedHistoryObservationIds = new ArrayList<>(), usedPrincipleIds = new ArrayList<>();
+        final List<String> memoryArticleIds = new ArrayList<>();
+        final ArrayNode memoryDecisions = json.createArrayNode(), questionSearches = json.createArrayNode();
+        JsonNode selection, writing;
         ArrayNode plan;
         void plan(List<PlanFlow> flows, ObjectMapper json) {
             plan = json.createArrayNode();
@@ -559,6 +851,7 @@ public class DailyBriefingService {
                 ArrayNode principleIds = item.putArray("principleIds");
                 flow.principleIds().forEach(principleIds::add);
                 item.put("connection", flow.connection());
+                item.set("questions", json.valueToTree(flow.questions()));
             }
         }
         ObjectNode json(ObjectMapper json) {
@@ -569,6 +862,10 @@ public class DailyBriefingService {
             add(node, "principleChunkIds", principleChunkIds); add(node, "usedHistoryObservationIds", usedHistoryObservationIds);
             add(node, "usedPrincipleIds", usedPrincipleIds);
             if (plan != null) node.set("plan", plan);
+            if (selection != null) node.set("selection", selection);
+            if (writing != null) node.set("writing", writing);
+            add(node, "memoryArticleIds", memoryArticleIds);
+            node.set("memoryDecisions", memoryDecisions); node.set("questionSearches", questionSearches);
             return node;
         }
         private static void add(ObjectNode node, String name, List<String> values) { ArrayNode array = node.putArray(name); values.forEach(array::add); }
@@ -576,6 +873,7 @@ public class DailyBriefingService {
 
     private static final class UsageTracker {
         final Map<String, StageUsage> stages = new LinkedHashMap<>();
+        int extractionInput;
         int lunaInput, lunaCacheWrite, lunaCached, lunaOutput, terraInput, terraCacheWrite, terraCached, terraOutput, embeddingTokens;
         void luna(String stage, OpenAiClient.Usage usage) { add(stage, usage); lunaInput += usage.inputTokens(); lunaCacheWrite += usage.cacheWriteInputTokens(); lunaCached += usage.cachedInputTokens(); lunaOutput += usage.outputTokens(); }
         void terra(String stage, OpenAiClient.Usage usage) { add(stage, usage); terraInput += usage.inputTokens(); terraCacheWrite += usage.cacheWriteInputTokens(); terraCached += usage.cachedInputTokens(); terraOutput += usage.outputTokens(); }

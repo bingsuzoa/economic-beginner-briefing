@@ -72,6 +72,12 @@ public class YonhapArticleService {
             ArticleEntity article = articles.findBySourceAndSourceArticleId("연합뉴스", key)
                     .or(() -> articles.findByUrl(item.link())).orElseGet(ArticleEntity::new);
             boolean fresh = article.getId() == null;
+            if (!fresh && (!java.util.Objects.equals(article.getTitle(), clean(item.title()))
+                    || !java.util.Objects.equals(article.getSummary(), clean(stripHtml(item.description())))
+                    || !java.util.Objects.equals(article.getUrl(), item.link().strip())
+                    || !java.util.Objects.equals(article.getPublishedAt(), published(item)))) {
+                article.setBodyStatus("RSS_ONLY");
+            }
             if (fresh) article.setId(idFor(key));
             article.setSource("연합뉴스");
             article.setSourceArticleId(key);

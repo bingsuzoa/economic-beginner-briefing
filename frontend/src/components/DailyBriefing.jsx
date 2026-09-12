@@ -21,10 +21,20 @@ export default function DailyBriefing({ briefing }) {
           <h2>{flow.title}</h2>
           <p className={s.explanation}>{flow.explanation}</p>
 
-          {flow.watchPoints?.length > 0 && <aside className={s.watch}>
-            <strong>앞으로 확인할 것</strong>
-            <ul>{flow.watchPoints.map(item => <li key={item}>{item}</li>)}</ul>
-          </aside>}
+          {(flow.questions || []).map((item, questionIndex) => <section className={s.question} key={item.id || questionIndex}>
+            <h3>{item.question}</h3>
+            <p className={s.explanation}>{item.answer}</p>
+            {(item.sources?.length > 0 || item.principles?.length > 0) && <details className={s.answerSources}>
+              <summary>이 설명의 근거 보기</summary>
+              {(item.sources || []).map((source, sourceIndex) => <div className={s.source} key={`${source.articleId}-${sourceIndex}`}>
+                <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a>
+                <p className={s.meta}>{source.publishedAt && new Date(source.publishedAt).toLocaleString('ko-KR')}</p>
+                {(source.observations || []).flatMap(observation => observation.evidence || []).map((span, spanIndex) =>
+                  <blockquote key={`${span.spanId}-${spanIndex}`}>{span.text}</blockquote>)}
+              </div>)}
+              {(item.principles || []).map(principle => <p key={principle.chunkId}>{principle.source} · {principle.section}</p>)}
+            </details>}
+          </section>)}
 
           <details className={s.sources}>
             <summary>근거 기사와 원문 보기 ({flow.sources?.length || 0})</summary>

@@ -1,5 +1,7 @@
 # 경제흐름 LLM 프롬프트 설계 V1
 
+> 이 문서는 V1 기준선이다. 로컬 구현은 [V2 계약](ECONOMIC_FLOW_BEGINNER_MEMORY_DESIGN_V2.md)으로 변경했고 사용자 평가 중이다. `briefingArticles/memoryArticles`, 관측의 `remember/memoryReason`, 설계의 `questions`, 편집의 Q&A·근거 ID·`conflicts`가 추가됐다. `watchPoints`는 제거했다. 정확한 Structured Output 스키마는 `EconomicFlowLlm.java`, 운영 상태는 [운영 가이드](ECONOMIC_FLOW_OPERATIONS.md)를 따른다.
+
 - 상태: 2026-09-11 운영 구현·실제 Java E2E 통과
 - 기준 브랜치: `main`
 - 작업 브랜치: `codex/daily-economic-flow`

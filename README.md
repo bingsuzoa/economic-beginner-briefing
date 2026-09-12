@@ -4,16 +4,19 @@
 
 운영 구조와 개선 원칙은 [docs/ECONOMIC_FLOW_OPERATIONS.md](docs/ECONOMIC_FLOW_OPERATIONS.md)를 먼저 읽으세요. 상세 설계는 [docs/ECONOMIC_FLOW_DAILY_BRIEFING_FINAL_DESIGN_V1.md](docs/ECONOMIC_FLOW_DAILY_BRIEFING_FINAL_DESIGN_V1.md), 프롬프트 계약은 [docs/ECONOMIC_FLOW_LLM_PROMPT_DESIGN_V1.md](docs/ECONOMIC_FLOW_LLM_PROMPT_DESIGN_V1.md)에 있습니다.
 
+[V2 질문·기억 설계](docs/ECONOMIC_FLOW_BEGINNER_MEMORY_DESIGN_V2.md)를 구현하고 [기사별 사용자 평가](docs/ECONOMIC_FLOW_BEGINNER_MEMORY_REVIEW.md)를 진행하고 있습니다. V2.1과 Flyway V26은 DEV 배포 대상이며, PROD 반영과 기존 공개 결과 갱신은 별도입니다.
+
 ## 현재 구조
 
 ```text
 매시 05분 연합뉴스 RSS 수집
 → 매일 05:10 직전 24시간 제목 사전선별(Luna)
-→ 제목·요약 정밀선별(Luna)
-→ 선택 기사 원문 관측+근거 문단 추출(Luna)
+→ 오늘 브리핑·기억용 기사 정밀선별(Luna)
+→ 원문 관측·기억 여부·근거 스냅샷(Luna+코드)
 → 과거 관측·경제원리 검색(PostgreSQL/pgvector)
-→ 흐름 묶음과 인과 설계(Terra)
-→ 초보자용 설명 편집(Luna)
+→ 흐름·초보자 질문·검색 요청 설계(Terra)
+→ 질문별 과거 기사·경제원리 검색(코드)
+→ 쉬운 본문과 질문·답변 편집(Luna)
 → 코드 검증 후 날짜별 revision 저장·공개
 ```
 

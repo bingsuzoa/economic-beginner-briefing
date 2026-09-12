@@ -1,6 +1,7 @@
 package com.economicbriefing.article;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,15 @@ public class ParagraphSplitter {
                 && !value.contains("무단 전재")
                 && !value.contains("AI 학습")
                 && !EMAIL.matcher(value).matches();
+    }
+
+    public List<Map.Entry<String, String>> questionEvidence(Map<String, String> paragraphs, List<String> terms) {
+        List<Map.Entry<String, String>> usable = paragraphs.entrySet().stream().filter(p -> usableEvidence(p.getValue())).toList();
+        if (usable.stream().mapToInt(p -> p.getValue().length()).sum() <= 2000) return usable;
+        // ponytail: long articles keep six keyword-ranked paragraphs; evaluate missed spans before adding a ranker.
+        return usable.stream().sorted(Comparator.<Map.Entry<String, String>>comparingLong(p ->
+                -terms.stream().filter(t -> p.getValue().toLowerCase(java.util.Locale.ROOT)
+                        .contains(t.toLowerCase(java.util.Locale.ROOT))).count())).limit(6).toList();
     }
 
     public List<Map.Entry<String, String>> modelInput(Map<String, String> paragraphs, int maxChars) {

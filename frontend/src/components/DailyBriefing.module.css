@@ -8,8 +8,6 @@
 .number { margin: 0 0 6px; color: #a36a34; font-size: .82rem; font-weight: 800; }
 .flow h2 { margin: 0 0 16px; font-size: clamp(1.25rem, 3vw, 1.65rem); line-height: 1.35; }
 .explanation { margin: 0; font-size: 1.02rem; line-height: 1.85; white-space: pre-line; }
-.watch { margin-top: 20px; padding: 16px 18px; border-radius: 12px; background: #fff3cf; }
-.watch ul { margin: 8px 0 0; padding-left: 20px; line-height: 1.65; }
 .sources { margin-top: 20px; border-top: 1px solid #e7dfd2; padding-top: 16px; }
 .sources summary { cursor: pointer; font-weight: 750; color: #6f5238; }
 .source { margin-top: 16px; padding-top: 16px; border-top: 1px dashed #ddd2c3; }
@@ -18,3 +16,8 @@
 .source blockquote { margin: 10px 0; padding: 12px 14px; border-left: 3px solid #d5a85b; background: white; color: #51483f; line-height: 1.6; }
 .empty { margin: 40px 0; padding: 24px; border-radius: 14px; background: #fff8e8; text-align: center; line-height: 1.7; }
 @media (max-width: 700px) { .header { padding-top: 12px; } .flow { border-radius: 14px; } }
+
+.question { margin-top: 24px; padding-top: 20px; border-top: 1px solid #eee8dc; }
+.question h3 { margin: 0 0 10px; color: #6f5238; font-size: 1.08rem; line-height: 1.5; }
+.answerSources { margin-top: 12px; font-size: .9rem; }
+.answerSources summary { cursor: pointer; color: #6f5238; }
