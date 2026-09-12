@@ -12,6 +12,8 @@ import com.economicbriefing.briefing.EconomicFlowLlm.WrittenFlow;
 import com.economicbriefing.briefing.EconomicFlowLlm.Selection;
 import com.economicbriefing.briefing.EconomicFlowLlm.Question;
 import com.economicbriefing.briefing.EconomicFlowLlm.Writing;
+import com.economicbriefing.briefing.EconomicFlowLlm.WritingScope;
+import com.economicbriefing.briefing.EconomicFlowLlm.AnswerScope;
 import com.economicbriefing.briefing.ObservationStore.Observation;
 import com.economicbriefing.briefing.PrincipleStore.Principle;
 import com.economicbriefing.config.AppProperties;
@@ -47,8 +49,12 @@ import org.springframework.stereotype.Service;
 @Service
 public class DailyBriefingService {
     static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    static final String PIPELINE_VERSION = "daily-flow-v2.2";
+    static final String PIPELINE_VERSION = "daily-flow-v2.3";
     private static final int PLANNER_SUPPLEMENTAL_CHARS = 2500;
+    private static final int PLANNER_EVIDENCE_CHARS = 8500;
+    private static final int PLANNER_PRINCIPLE_CHARS = 1500;
+    private static final Pattern RELATION_CONTEXT = Pattern.compile(
+            "때문|하지만|다만|반면|지만|탓|영향|우려|의존|여전히|조건|제약|한계|대신|선호|희망|요구|반등|부담|유인|이유|만큼|앞두고");
     private static final Logger log = LoggerFactory.getLogger(DailyBriefingService.class);
     private static final Pattern THIN_BULLETIN = Pattern.compile("^\\[(?:속보|\\d+보)]");
     private static final Pattern HARD_SIGNAL = Pattern.compile(
@@ -135,6 +141,11 @@ public class DailyBriefingService {
             if (window.stream().anyMatch(a -> a.getPublishedAt().isBefore(windowStart) || !a.getPublishedAt().isBefore(windowEnd)))
                 throw new IllegalArgumentException("article outside briefing window");
             trace.windowArticleCount = window.size();
+            for (OffsetDateTime hour = windowStart; hour.isBefore(windowEnd); hour = hour.plusHours(1)) {
+                OffsetDateTime start = hour, end = hour.plusHours(1);
+                trace.articleCountsByHour.put(hour.toString(), window.stream()
+                        .filter(a -> !a.getPublishedAt().isBefore(start) && a.getPublishedAt().isBefore(end)).count());
+            }
             run.setInputHash(hash(window));
             if (window.isEmpty()) return noData(run, targetDate, trace, usage);
 
@@ -169,23 +180,49 @@ public class DailyBriefingService {
                     .map(item -> item.currentAlias() + "->" + item.observation().id()).toList());
             trace.principleChunkIds.addAll(context.principleAliases.values().stream()
                     .map(item -> item.principle.chunkId()).toList());
-            String plannerInput = plannerInput(context, selection.briefingArticles().stream().map(SelectedArticle::article).toList(), splitter);
+            List<ArticleEntity> briefingArticles = selection.briefingArticles().stream().map(SelectedArticle::article).toList();
+            int affordablePlannerInput = Math.min(appProperties.budget().synthesisInputTokens(),
+                    Math.max(0, (int) Math.floor((appProperties.budget().dailyCostUsd() - usage.costUsd()
+                            - .015 - EconomicFlowLlm.PLAN_MAX_OUTPUT_TOKENS * 12 / 1_000_000d) * 1_000_000d / 2 - 2500) - 1));
+            int evidenceChars = PLANNER_EVIDENCE_CHARS;
+            String plannerInput = plannerInput(context, briefingArticles, splitter, evidenceChars);
+            while (estimateTokens(plannerInput) > affordablePlannerInput && evidenceChars > 0) {
+                evidenceChars = Math.max(0, evidenceChars - 500);
+                plannerInput = plannerInput(context, briefingArticles, splitter, evidenceChars);
+            }
+            trace.plannerEvidenceCharsBudget = evidenceChars;
+            ensureInputBudget("Terra available cost budget", plannerInput, affordablePlannerInput);
             ensureInputBudget("Terra", plannerInput, appProperties.budget().synthesisInputTokens());
             ensureCost(usage, plannerInput, true, EconomicFlowLlm.PLAN_MAX_OUTPUT_TOKENS, .015);
             Call<List<PlanFlow>> planned = llm.plan(plannerInput);
             usage.terra("planner", planned.usage());
+            List<PlanFlow> normalized = includeQuestionEvidence(planned.value(), context);
+            for (int f = 0; f < normalized.size(); f++) {
+                var original = planned.value().get(f).observationIds();
+                for (String id : normalized.get(f).observationIds()) if (!original.contains(id))
+                    trace.questionEvidenceAdded.add("F%02d:%s".formatted(f + 1, id));
+            }
+            planned = new Call<>(normalized, planned.usage(), planned.raw());
             trace.plan(planned.value(), json);
             List<String> planErrors = validatePlan(planned.value(), context);
             if (!planErrors.isEmpty()) throw new IllegalStateException("invalid Terra plan: " + planErrors);
 
             Map<String, QuestionContext> questions = retrieveQuestions(planned.value(), context, windowStart, windowEnd, usage, trace);
-            String writerInput = writerInput(planned.value(), context, questions);
-            ensureInputBudget("writer", writerInput, appProperties.budget().synthesisInputTokens());
-            ensureCost(usage, writerInput, false, EconomicFlowLlm.WRITE_MAX_OUTPUT_TOKENS, 0);
-            Call<Writing> written = llm.write(writerInput, planned.value().size());
-            usage.luna("writer", written.usage());
-            trace.writing = written.raw();
-            Writing writing = completeNumberCitations(written.value(), questions);
+            List<WrittenFlow> writtenFlows = new ArrayList<>(); List<String> conflicts = new ArrayList<>();
+            List<WriterBatch> batches = writerBatches(planned.value(), context, questions, appProperties.budget().synthesisInputTokens());
+            int remainingOutput = EconomicFlowLlm.WRITE_MAX_OUTPUT_TOKENS;
+            int remainingWeight = batches.stream().mapToInt(WriterBatch::weight).sum();
+            for (WriterBatch batch : batches) {
+                int outputTokens = remainingOutput * batch.weight() / remainingWeight;
+                remainingOutput -= outputTokens; remainingWeight -= batch.weight();
+                ensureInputBudget("writer", batch.input(), appProperties.budget().synthesisInputTokens());
+                ensureCost(usage, batch.input(), false, outputTokens, remainingOutput * 1.2 / 1_000_000d);
+                Call<Writing> written = llm.write(batch.input(), batch.scopes(), outputTokens);
+                usage.luna("writer", written.usage());
+                writtenFlows.addAll(written.value().flows()); conflicts.addAll(written.value().conflicts());
+                trace.writing = json.valueToTree(new Writing(List.copyOf(writtenFlows), List.copyOf(conflicts)));
+            }
+            Writing writing = completeNumberCitations(new Writing(List.copyOf(writtenFlows), List.copyOf(conflicts)), questions);
             List<String> writingErrors = validateWriting(writing, planned.value(), context, questions);
             if (!writingErrors.isEmpty()) throw new IllegalStateException("invalid Luna writing: " + writingErrors);
 
@@ -264,7 +301,7 @@ public class DailyBriefingService {
             usage.extractionInput += estimateTokens(article.getBody());
             if (usage.extractionInput > appProperties.budget().extractionInputTokens())
                 throw new IllegalStateException("extraction input ceiling exceeded");
-            ensureCost(usage, article.getBody(), false, 1600, reserved);
+            ensureCost(usage, article.getBody(), false, EconomicFlowLlm.EXTRACT_MAX_OUTPUT_TOKENS, reserved);
             Call<List<ObservationStore.Draft>> call = llm.extract(item, paragraphs);
             usage.luna("observationExtraction", call.usage());
             ObjectNode decision = trace.memoryDecisions.addObject();
@@ -371,20 +408,39 @@ public class DailyBriefingService {
     }
 
     static String plannerInput(Context context, List<ArticleEntity> articles, ParagraphSplitter splitter) {
+        return plannerInput(context, articles, splitter, PLANNER_EVIDENCE_CHARS);
+    }
+
+    static String plannerInput(Context context, List<ArticleEntity> articles, ParagraphSplitter splitter, int evidenceChars) {
         StringBuilder value = new StringBuilder("<requiredArticles>\n");
-        context.current.values().stream().map(item -> item.observation.articleId()).distinct()
-                .forEach(id -> value.append(id).append('\n'));
+        Map<String, String> articleAliases = new LinkedHashMap<>();
+        context.current.values().stream().map(Evidence::observation).forEach(o -> {
+            if (!articleAliases.containsKey(o.articleId())) {
+                String alias = "A%02d".formatted(articleAliases.size() + 1);
+                articleAliases.put(o.articleId(), alias);
+                value.append(alias).append('\t').append(o.publishedAt()).append('\n');
+            }
+        });
         value.append("</requiredArticles>\n<current>\n");
-        context.current.forEach((id, item) -> value.append(id).append('\t').append(item.observation.articleId())
+        context.current.forEach((id, item) -> value.append(id).append('\t').append(articleAliases.get(item.observation.articleId()))
                 .append('\t').append(EconomicFlowLlm.clean(item.observation.text())).append('\n'));
         value.append("</current>\n<currentEvidence>\n");
         Set<String> seenSpans = new HashSet<>();
+        Map<String, List<String>> direct = new LinkedHashMap<>(), adjacent = new LinkedHashMap<>();
+        Map<String, List<String>> spanRefs = new LinkedHashMap<>();
+        context.current.forEach((id, item) -> {
+            Observation o = item.observation;
+            if (o.snapshot() != null) o.snapshot().path("spans").fieldNames().forEachRemaining(span ->
+                    spanRefs.computeIfAbsent(o.articleId() + ":" + o.snapshot().path("bodyHash").asText() + ":" + span,
+                            ignored -> new ArrayList<>()).add(id));
+        });
         context.current.forEach((id, item) -> {
             Observation o = item.observation;
             if (o.snapshot() != null) o.snapshot().path("spans").fields().forEachRemaining(span -> {
                 String key = o.articleId() + ":" + o.snapshot().path("bodyHash").asText() + ":" + span.getKey();
-                if (seenSpans.add(key)) value.append(o.articleId()).append('\t').append(span.getKey()).append('\t')
-                        .append(EconomicFlowLlm.clean(span.getValue().asText())).append('\n');
+                if (seenSpans.add(key)) direct.computeIfAbsent(o.articleId(), ignored -> new ArrayList<>())
+                        .add("refs=" + String.join(",", spanRefs.get(key)) + "\t" + articleAliases.get(o.articleId()) + "\t" + span.getKey() + "\t"
+                                + EconomicFlowLlm.clean(span.getValue().asText()) + "\n");
             });
         });
         int supplementalChars = 0;
@@ -405,13 +461,21 @@ public class DailyBriefingService {
                 boolean neighbor = (i > 0 && anchors.contains(paragraphs.get(i - 1).getKey()))
                         || (i + 1 < paragraphs.size() && anchors.contains(paragraphs.get(i + 1).getKey()));
                 if (!neighbor || seenSpans.contains(key) || !splitter.usableEvidence(paragraph.getValue())) continue;
-                String line = article.getId() + "\t" + paragraph.getKey() + "\t"
+                String line = articleAliases.get(article.getId()) + "\t" + paragraph.getKey() + "\t"
                         + EconomicFlowLlm.clean(paragraph.getValue()) + "\n";
                 if (supplementalChars + line.length() > PLANNER_SUPPLEMENTAL_CHARS) continue;
-                seenSpans.add(key); supplementalChars += line.length(); value.append(line);
+                seenSpans.add(key); supplementalChars += line.length();
+                adjacent.computeIfAbsent(article.getId(), ignored -> new ArrayList<>()).add(line);
             }
         }
-        value.append("</currentEvidence>\n<history>\n");
+        direct.replaceAll((id, lines) -> lines.stream()
+                .sorted(Comparator.comparingLong(DailyBriefingService::relationContextScore).reversed()).toList());
+        adjacent.replaceAll((id, lines) -> lines.stream()
+                .sorted(Comparator.comparingLong(DailyBriefingService::relationContextScore).reversed()).toList());
+        int directChars = appendBalancedEvidence(value, direct, Math.max(0, evidenceChars - 1000));
+        value.append("</currentEvidence>\n<currentAdjacentEvidence>\n");
+        appendBalancedEvidence(value, adjacent, evidenceChars - directChars);
+        value.append("</currentAdjacentEvidence>\n<history>\n");
         context.aliases.forEach((id, item) -> {
             if (item.historical) value.append(id).append('\t').append(item.currentAlias).append('\t')
                     .append(item.observation.publishedAt().toLocalDate()).append('\t')
@@ -422,10 +486,31 @@ public class DailyBriefingService {
                 .forEach(item -> value.append(item.leftAlias()).append('\t').append(item.rightAlias()).append('\t')
                         .append("%.3f".formatted(item.similarity())).append('\n'));
         value.append("</connectionCandidates>\n<principles>\n");
-        context.principleAliases.forEach((id, item) -> value.append(id).append('\t')
-                .append(EconomicFlowLlm.clean(item.principle.title())).append('\t')
-                .append(EconomicFlowLlm.clean(item.principle.text())).append('\n'));
+        int principleChars = 0;
+        for (var entry : context.principleAliases.entrySet()) {
+            Principle principle = entry.getValue().principle;
+            String line = entry.getKey() + "\t" + EconomicFlowLlm.clean(principle.title()) + "\t"
+                    + EconomicFlowLlm.clean(principle.text()) + "\n";
+            if (principleChars + line.length() > PLANNER_PRINCIPLE_CHARS) continue;
+            value.append(line); principleChars += line.length();
+        }
         return value.append("</principles>").toString();
+    }
+
+    // Keep every compressed observation; share the optional verbatim context across articles.
+    static int appendBalancedEvidence(StringBuilder target, Map<String, List<String>> groups, int maxChars) {
+        int used = 0, largest = groups.values().stream().mapToInt(List::size).max().orElse(0);
+        for (int index = 0; index < largest; index++) for (List<String> lines : groups.values()) {
+            if (index >= lines.size()) continue;
+            String line = lines.get(index);
+            if (used + line.length() > maxChars) continue;
+            target.append(line); used += line.length();
+        }
+        return used;
+    }
+
+    static long relationContextScore(String text) {
+        return RELATION_CONTEXT.matcher(text).results().count();
     }
 
     private Map<String, QuestionContext> retrieveQuestions(List<PlanFlow> plan, Context context,
@@ -435,7 +520,7 @@ public class DailyBriefingService {
         for (int f = 0; f < plan.size(); f++) for (int q = 0; q < plan.get(f).questions().size(); q++) {
             Question question = plan.get(f).questions().get(q);
             String id = "F%02d:Q%02d".formatted(f + 1, q + 1);
-            QuestionContext source = flowSources(plan.get(f), context);
+            QuestionContext source = questionSources(plan.get(f), question, context);
             result.put(id, source);
             if (question.articleQuery().isBlank() && question.principleQuery().isBlank()) continue;
             if (pending.size() >= 8) { source.status = "BUDGET_NOT_SEARCHED"; continue; }
@@ -567,7 +652,38 @@ public class DailyBriefingService {
         if (projected > appProperties.budget().dailyCostUsd()) throw new IllegalStateException("embedding cost ceiling exceeded");
     }
 
-    private String writerInput(List<PlanFlow> plan, Context context, Map<String, QuestionContext> questions) {
+    static List<WriterBatch> writerBatches(List<PlanFlow> plan, Context context, Map<String, QuestionContext> questions, int maxInputTokens) {
+        List<WriterBatch> result = new ArrayList<>();
+        for (int start = 0; start < plan.size();) {
+            int end = start + 1;
+            String input = writerInput(plan.subList(start, end), context, questions, start);
+            ensureInputBudget("single-flow writer", input, maxInputTokens);
+            while (end < plan.size()) {
+                String expanded = writerInput(plan.subList(start, end + 1), context, questions, start);
+                if (estimateTokens(expanded) > maxInputTokens) break;
+                input = expanded; end++;
+            }
+            int weight = plan.subList(start, end).stream().mapToInt(flow -> flow.questions().size() + 2).sum();
+            List<WritingScope> scopes = new ArrayList<>();
+            for (int index = start; index < end; index++) {
+                String flowId = "F%02d".formatted(index + 1); List<AnswerScope> answers = new ArrayList<>();
+                for (int q = 0; q < plan.get(index).questions().size(); q++) {
+                    String qid = "Q%02d".formatted(q + 1); QuestionContext allowed = questions.get(flowId + ":" + qid);
+                    answers.add(new AnswerScope(qid, List.copyOf(allowed.evidence.keySet()), List.copyOf(allowed.principles.keySet())));
+                }
+                scopes.add(new WritingScope(flowId, List.copyOf(answers)));
+            }
+            result.add(new WriterBatch(input, end - start, weight, List.copyOf(scopes))); start = end;
+        }
+        return result;
+    }
+
+    private static String writerInput(List<PlanFlow> plan, Context context, Map<String, QuestionContext> allQuestions, int offset) {
+        Map<String, QuestionContext> questions = new LinkedHashMap<>();
+        for (int i = 0; i < plan.size(); i++) {
+            String prefix = "F%02d:".formatted(offset + i + 1);
+            allQuestions.forEach((id, q) -> { if (id.startsWith(prefix)) questions.put(id, q); });
+        }
         Map<String, Evidence> evidence = new LinkedHashMap<>();
         Map<String, PrincipleChoice> principleCatalog = new LinkedHashMap<>();
         for (PlanFlow flow : plan) {
@@ -575,17 +691,12 @@ public class DailyBriefingService {
             evidence.putAll(base.evidence); principleCatalog.putAll(base.principles);
         }
         questions.values().forEach(q -> { evidence.putAll(q.evidence); principleCatalog.putAll(q.principles); });
-        StringBuilder value = new StringBuilder("<evidenceCatalog>\n");
-        evidence.forEach((id, item) -> {
-            value.append("allowedAnswers\t").append(questions.entrySet().stream().filter(q -> q.getValue().evidence.containsKey(id))
-                    .map(Map.Entry::getKey).collect(java.util.stream.Collectors.joining(","))).append('\n');
-            appendEvidence(value, id, item);
-        });
-        value.append("</evidenceCatalog>\n<principleCatalog>\n");
+        StringBuilder value = new StringBuilder(evidenceCatalog(evidence));
+        value.append("<principleCatalog>\n");
         principleCatalog.forEach((id, item) -> appendPrinciple(value, id, item));
         value.append("</principleCatalog>\n");
         for (int index = 0; index < plan.size(); index++) {
-            String flowId = "F%02d".formatted(index + 1);
+            String flowId = "F%02d".formatted(offset + index + 1);
             PlanFlow flow = plan.get(index);
             value.append('<').append(flowId).append(">\nconnection\t").append(flow.connection())
                     .append("\nflowEvidence\t").append(String.join(",", flow.observationIds()))
@@ -604,16 +715,39 @@ public class DailyBriefingService {
         return value.toString();
     }
 
-    private static void appendEvidence(StringBuilder value, String id, Evidence evidence) {
-        Observation o = evidence.observation;
-        value.append(id).append('\t').append(o.publishedAt()).append('\t').append(EconomicFlowLlm.clean(o.text())).append('\n');
-        if (o.number() != 0 && o.snapshot() != null) o.snapshot().path("spans").fields().forEachRemaining(span ->
-                value.append("  ").append(span.getKey()).append('\t').append(EconomicFlowLlm.clean(span.getValue().asText())).append('\n'));
+    static String evidenceCatalog(Map<String, Evidence> evidence) {
+        StringBuilder value = new StringBuilder("<evidenceCatalog>\n"), sources = new StringBuilder("<sourceCatalog>\n");
+        Map<String, String> aliases = new LinkedHashMap<>();
+        evidence.forEach((id, item) -> {
+            Observation o = item.observation;
+            value.append(id).append('\t').append(o.publishedAt()).append('\t').append(EconomicFlowLlm.clean(o.text()));
+            List<String> refs = new ArrayList<>();
+            if (o.number() != 0 && o.snapshot() != null) o.snapshot().path("spans").fields().forEachRemaining(span -> {
+                String key = o.articleId() + ":" + o.snapshot().path("bodyHash").asText() + ":" + span.getKey();
+                String alias = aliases.get(key);
+                if (alias == null) {
+                    alias = "S%03d".formatted(aliases.size() + 1); aliases.put(key, alias);
+                    sources.append(alias).append('\t').append(EconomicFlowLlm.clean(span.getValue().asText())).append('\n');
+                }
+                refs.add(alias);
+            });
+            value.append("\tsources=").append(String.join(",", refs)).append('\n');
+        });
+        return value.append("</evidenceCatalog>\n").append(sources).append("</sourceCatalog>\n").toString();
     }
 
     private static void appendPrinciple(StringBuilder value, String id, PrincipleChoice choice) {
         value.append(id).append('\t').append(EconomicFlowLlm.clean(choice.principle.title())).append('\t')
                 .append(EconomicFlowLlm.clean(choice.principle.text())).append('\n');
+    }
+
+    static List<PlanFlow> includeQuestionEvidence(List<PlanFlow> plan, Context context) {
+        return plan.stream().map(flow -> {
+            List<String> ids = new ArrayList<>(flow.observationIds());
+            flow.questions().stream().flatMap(q -> q.observationIds().stream())
+                    .filter(context.current::containsKey).forEach(id -> { if (!ids.contains(id)) ids.add(id); });
+            return new PlanFlow(List.copyOf(ids), flow.principleIds(), flow.connection(), flow.questions());
+        }).toList();
     }
 
     static List<String> validatePlan(List<PlanFlow> plan, Context context) {
@@ -733,6 +867,18 @@ public class DailyBriefingService {
     private static QuestionContext flowSources(PlanFlow flow, Context context) {
         QuestionContext result = new QuestionContext();
         flow.observationIds().forEach(id -> result.evidence.put(id, context.aliases.get(id)));
+        flow.principleIds().forEach(id -> result.principles.put(id, context.principleAliases.get(id)));
+        return result;
+    }
+
+    static QuestionContext questionSources(PlanFlow flow, Question question, Context context) {
+        QuestionContext result = new QuestionContext();
+        question.observationIds().forEach(id -> result.evidence.put(id, context.current.get(id)));
+        flow.observationIds().forEach(id -> {
+            Evidence evidence = context.aliases.get(id);
+            if (evidence.historical && question.observationIds().contains(evidence.currentAlias))
+                result.evidence.put(id, evidence);
+        });
         flow.principleIds().forEach(id -> result.principles.put(id, context.principleAliases.get(id)));
         return result;
     }
@@ -874,12 +1020,16 @@ public class DailyBriefingService {
     static record HistoryChoice(String currentAlias, Observation observation, double similarity) {}
     static record PrincipleChoice(Principle principle, double relationSimilarity) {}
     static record Relation(String leftAlias, String rightAlias, double similarity) {}
+    static record WriterBatch(String input, int flowCount, int weight, List<WritingScope> scopes) {}
     static record Context(Map<String, Evidence> current, Map<String, Evidence> aliases,
                           List<HistoryChoice> history, List<Relation> relations,
                           Map<String, PrincipleChoice> principleAliases) {}
 
     private final class Trace {
         int windowArticleCount;
+        int plannerEvidenceCharsBudget;
+        final Map<String, Long> articleCountsByHour = new LinkedHashMap<>();
+        final List<String> questionEvidenceAdded = new ArrayList<>();
         final List<String> prefilteredArticleIds = new ArrayList<>(), selectedArticleIds = new ArrayList<>(),
                 observationIds = new ArrayList<>(), historyCandidateIds = new ArrayList<>(), historyCandidatePairs = new ArrayList<>(), principleChunkIds = new ArrayList<>(),
                 usedHistoryObservationIds = new ArrayList<>(), usedPrincipleIds = new ArrayList<>();
@@ -901,6 +1051,9 @@ public class DailyBriefingService {
         }
         ObjectNode json(ObjectMapper json) {
             ObjectNode node = json.createObjectNode(); node.put("windowArticleCount", windowArticleCount);
+            node.put("plannerEvidenceCharsBudget", plannerEvidenceCharsBudget);
+            node.set("articleCountsByHour", json.valueToTree(articleCountsByHour));
+            add(node, "questionEvidenceAdded", questionEvidenceAdded);
             add(node, "prefilteredArticleIds", prefilteredArticleIds); add(node, "selectedArticleIds", selectedArticleIds);
             add(node, "observationIds", observationIds); add(node, "historyCandidateIds", historyCandidateIds);
             add(node, "historyCandidatePairs", historyCandidatePairs);

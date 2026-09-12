@@ -34,6 +34,132 @@ import org.junit.jupiter.api.Test;
 
 class EconomicFlowValidationTest {
     @Test
+    void explicitQuestionEvidenceCompletesParentScopeWithoutAcceptingUnknownIds() {
+        var a = new Observation("a:O1","a",1,"원인",List.of(),null,null,false,null);
+        var b = new Observation("b:O1","b",1,"반대 압력",List.of(),null,null,false,null);
+        var current = Map.of("C01",new Evidence(a,false,null,1),"C02",new Evidence(b,false,null,1));
+        var context = new Context(current,current,List.of(),List.of(),Map.of());
+        var question = new Question("왜 달라져요?","반대 압력",List.of("C02"),"","",List.of());
+        var flow = new PlanFlow(List.of("C01"),List.of(),"두 압력이 맞선다",List.of(question));
+        var completed = DailyBriefingService.includeQuestionEvidence(List.of(flow),context);
+        assertEquals(List.of("C01","C02"),completed.getFirst().observationIds());
+        assertTrue(DailyBriefingService.validatePlan(completed,context).isEmpty());
+        var unknown = new Question("왜 달라져요?","미확인",List.of("C99"),"","",List.of());
+        var invalid = DailyBriefingService.includeQuestionEvidence(List.of(
+                new PlanFlow(List.of("C01"),List.of(),"관계",List.of(unknown))),context);
+        assertEquals(List.of("C01"),invalid.getFirst().observationIds());
+        assertTrue(DailyBriefingService.validatePlan(invalid,context).contains("question outside flow evidence"));
+    }
+
+    @Test
+    void questionSourcesDoNotLeakLaterIndicatorsFromTheSameFlow() {
+        var ppi = new Observation("a:O1","a",1,"장중 PPI 경계",List.of(),null,null,false,null);
+        var cpi = new Observation("b:O1","b",1,"밤 CPI 결과",List.of(),null,null,false,null);
+        var history = new Observation("past:O1","past",1,"과거 PPI",List.of(),null,null,true,null);
+        var current = Map.of("C01",new Evidence(ppi,false,null,1),"C02",new Evidence(cpi,false,null,1));
+        var aliases = new LinkedHashMap<>(current); aliases.put("H01",new Evidence(history,true,"C01",1));
+        var context = new Context(current,aliases,List.of(),List.of(),Map.of());
+        var flow = new PlanFlow(List.of("C01","C02","H01"),List.of(),"물가와 시장",List.of());
+        var question = new Question("PPI가 왜 부담이에요?","높은 수준",List.of("C01"),"","",List.of());
+        var source = DailyBriefingService.questionSources(flow,question,context);
+        assertEquals(java.util.Set.of("C01","H01"),source.evidence.keySet());
+        assertTrue(!source.evidence.containsKey("C02"));
+    }
+
+    @Test
+    void writerSchemaRestrictsEvidenceForEachFlowAndQuestionIncludingEmptyScopes() {
+        var llm = new EconomicFlowLlm(mock(OpenAiClient.class),mock(OpenAiProperties.class),new ObjectMapper(),new ParagraphSplitter());
+        var scopes = List.of(new EconomicFlowLlm.WritingScope("F02",List.of(
+                new EconomicFlowLlm.AnswerScope("Q01",List.of("C02"),List.of()),
+                new EconomicFlowLlm.AnswerScope("Q02",List.of("C03"),List.of("K01")))),
+                new EconomicFlowLlm.WritingScope("F03",List.of()));
+        var flows = llm.writingSchema(scopes).path("properties").path("flows");
+        assertEquals(2,flows.path("minItems").asInt());
+        var choice = flows.path("items").path("anyOf").get(0).path("properties");
+        assertEquals("F02",choice.path("flowId").path("enum").get(0).asText());
+        var answers = choice.path("questions").path("items").path("anyOf");
+        assertEquals("C02",answers.get(0).path("properties").path("evidenceIds").path("items").path("enum").get(0).asText());
+        assertEquals(0,answers.get(0).path("properties").path("principleIds").path("maxItems").asInt(-1));
+        assertEquals("C03",answers.get(1).path("properties").path("evidenceIds").path("items").path("enum").get(0).asText());
+        assertEquals(0,flows.path("items").path("anyOf").get(1).path("properties").path("questions").path("maxItems").asInt(-1));
+    }
+
+    @Test
+    void moreShortRelationshipsShareTheOriginalTotalTextBudget() {
+        var json = new ObjectMapper(); var llm = new EconomicFlowLlm(mock(OpenAiClient.class),mock(OpenAiProperties.class),json,new ParagraphSplitter());
+        for (int length : List.of(110,120)) {
+            var raw = json.createArrayNode(); StringBuilder source = new StringBuilder();
+            for (String letter : List.of("가","나","다","라","마","바")) {
+                String text = letter.repeat(length); source.append(text);
+                var item = raw.addObject().put("text",text).put("remember",false).put("memoryReason","관계");
+                item.putArray("spanIds").add("P001");
+            }
+            var accepted = llm.validateObservations(raw,Map.of("P001",source.toString()));
+            assertEquals(length==110 ? 6 : 5,accepted.size());
+            assertTrue(accepted.stream().mapToInt(item->item.text().length()).sum()<=660);
+        }
+    }
+
+    @Test
+    void writerBatchesKeepGlobalFlowIdsAndOnlyTheirQuestionEvidence() {
+        var first = new Observation("a:O1","a",1,"첫 근거 ".repeat(250),List.of(),null,null,false,null);
+        var second = new Observation("b:O1","b",1,"둘째 근거 ".repeat(250),List.of(),null,null,false,null);
+        var evidence = Map.of("C01",new Evidence(first,false,null,1),"C02",new Evidence(second,false,null,1));
+        var context = new Context(evidence,evidence,List.of(),List.of(),Map.of());
+        var q1 = new Question("왜 올라요?","가격 형성",List.of("C01"),"","",List.of());
+        var q2 = new Question("왜 내려요?","반대 압력",List.of("C02"),"","",List.of());
+        var plan = List.of(new PlanFlow(List.of("C01"),List.of(),"첫 연결",List.of(q1)),
+                new PlanFlow(List.of("C02"),List.of(),"둘째 연결",List.of(q2)));
+        var source1 = new QuestionContext(); source1.evidence.put("C01",evidence.get("C01"));
+        var source2 = new QuestionContext(); source2.evidence.put("C02",evidence.get("C02"));
+        var questions = Map.of("F01:Q01",source1,"F02:Q01",source2);
+        var combined = DailyBriefingService.writerBatches(plan,context,questions,15000);
+        assertEquals(1,combined.size());
+        var separate = DailyBriefingService.writerBatches(plan,context,questions,1600);
+        assertEquals(2,separate.size());
+        assertTrue(separate.get(0).input().contains("<F01>") && !separate.get(0).input().contains("둘째 근거"));
+        assertTrue(separate.get(1).input().contains("<F02>") && !separate.get(1).input().contains("첫 근거"));
+        assertTrue(separate.stream().allMatch(batch -> DailyBriefingService.estimateTokens(batch.input()) <= 1600));
+        assertThrows(IllegalStateException.class, () -> DailyBriefingService.writerBatches(plan,context,questions,100));
+    }
+
+    @Test
+    void writerSharesIdenticalSourceSpansWithoutMergingEvidenceIds() {
+        var snapshot = new ObjectMapper().createObjectNode().put("bodyHash", "snapshot");
+        snapshot.putObject("spans").put("P001", "물가 우려와 금리 변화의 공통 근거 문단.");
+        var first = new Observation("a:O1", "a", 1, "물가 우려", List.of("P001"), null, null, false, snapshot);
+        var second = new Observation("a:O2", "a", 2, "금리 변화", List.of("P001"), null, null, false, snapshot);
+        var evidence = new LinkedHashMap<String,Evidence>();
+        evidence.put("C01", new Evidence(first,false,null,1)); evidence.put("C02", new Evidence(second,false,null,1));
+        String input = DailyBriefingService.evidenceCatalog(evidence);
+        assertEquals(1, input.split("공통 근거 문단", -1).length - 1);
+        assertEquals(2, input.split("sources=S001", -1).length - 1);
+        assertTrue(input.contains("C01\t") && input.contains("C02\t"));
+        var otherRevision = new ObjectMapper().createObjectNode().put("bodyHash", "changed");
+        otherRevision.putObject("spans").put("P001", "나중에 수정된 다른 근거.");
+        evidence.put("C03", new Evidence(new Observation("a:O3","a",3,"수정",List.of("P001"),null,null,false,otherRevision),false,null,1));
+        assertTrue(DailyBriefingService.evidenceCatalog(evidence).contains("sources=S002"));
+    }
+
+    @Test
+    void extractionSchemaOnlyAllowsIndividualVisibleSourceParagraphs() {
+        var json = new ObjectMapper(); var client = mock(OpenAiClient.class);
+        when(client.complete(any(), any(), any(), any(), any(), any(), any(), anyInt())).thenAnswer(call -> {
+            var allowed = call.getArgument(6, com.fasterxml.jackson.databind.JsonNode.class).path("properties")
+                    .path("observations").path("items").path("properties").path("spanIds").path("items").path("enum");
+            assertEquals(json.readTree("[\"P002\",\"P004\"]"), allowed);
+            assertTrue(!call.getArgument(2, String.class).contains("사진 설명"));
+            return new OpenAiClient.LlmResult(json.readTree("{\"observations\":[]}"), new OpenAiClient.Usage(0,0,0,0));
+        });
+        var llm = new EconomicFlowLlm(client, mock(OpenAiProperties.class), json, new ParagraphSplitter());
+        var article = new ArticleEntity(); article.setTitle("금리 상승");
+        var source = new LinkedHashMap<String,String>();
+        source.put("P001", "[사진 설명]"); source.put("P002", "발표 전 금리 인상을 우려했다.");
+        source.put("P003", "기자 reporter@example.com"); source.put("P004", "저녁에 물가가 발표됐다.");
+        llm.extract(new EconomicFlowLlm.SelectedArticle(article,"시장 변화"), source);
+    }
+
+    @Test
     void writerAcceptsLocalAndFlowQualifiedQuestionIds() {
         assertEquals("Q03", EconomicFlowLlm.localQuestionId("Q03"));
         assertEquals("Q03", EconomicFlowLlm.localQuestionId("F02:Q03"));
@@ -60,10 +186,13 @@ class EconomicFlowValidationTest {
         article.setBody("발표 후 국채 매도가 이어지면서 금리가 올랐다.\n채권 수익률이라는 용어가 등장했다.\n이 문단은 인접하지 않는다.");
         var snapshot = new ObjectMapper().createObjectNode().put("bodyHash", ObservationStore.bodyHash(article.getBody()));
         snapshot.putObject("spans").put("P001", "발표 후 국채 매도가 이어지면서 금리가 올랐다.");
-        var observation = new Observation("a:O1", "a", 1, "금리가 올랐다.", List.of("P001"), null, null, false, snapshot);
+        var publication = OffsetDateTime.parse("2026-09-11T23:02:52+09:00");
+        var observation = new Observation("a:O1", "a", 1, "금리가 올랐다.", List.of("P001"), publication, null, false, snapshot);
         var current = Map.of("C01", new Evidence(observation, false, null, 1), "C02", new Evidence(observation, false, null, 1));
         var context = new Context(current, current, List.of(), List.of(), Map.of());
         String input = DailyBriefingService.plannerInput(context, List.of(article), new ParagraphSplitter());
+        assertTrue(input.contains("A01\t2026-09-11T23:02:52+09:00\n"));
+        assertEquals(1, input.split("2026-09-11T23:02:52", -1).length - 1);
         assertTrue(input.contains("국채 매도가 이어지면서"));
         assertEquals(1, input.split("P001", -1).length - 1);
         assertTrue(input.contains("채권 수익률이라는 용어"));
@@ -73,6 +202,16 @@ class EconomicFlowValidationTest {
         article.setBody("발표 후 국채 매도가 이어지면서 금리가 올랐다.\n" + "긴 문단".repeat(1000));
         snapshot.put("bodyHash", ObservationStore.bodyHash(article.getBody()));
         assertTrue(!DailyBriefingService.plannerInput(context, List.of(article), new ParagraphSplitter()).contains("긴 문단"));
+    }
+
+    @Test
+    void plannerSharesBoundedVerbatimContextAcrossArticlesWithoutSplittingParagraphs() {
+        var groups = new LinkedHashMap<String,List<String>>();
+        groups.put("long", List.of("first\n", "second paragraph\n", "third\n"));
+        groups.put("short", List.of("other\n"));
+        var value = new StringBuilder();
+        assertEquals(12, DailyBriefingService.appendBalancedEvidence(value, groups, 12));
+        assertEquals("first\nother\n", value.toString());
     }
 
     @Test
