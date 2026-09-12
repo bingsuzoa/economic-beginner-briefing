@@ -1,4 +1,12 @@
+import { useMemo } from 'react'
 import s from './DailyBriefing.module.css'
+
+const QUESTION_IMAGES = [
+  '/images/question-toth-1.png',
+  '/images/question-toth-2.png',
+  '/images/question-toth-3.png',
+  '/images/question-toth-4.png',
+]
 
 const dateLabel = (value) => new Intl.DateTimeFormat('ko-KR', {
   timeZone: 'Asia/Seoul', month: 'long', day: 'numeric',
@@ -9,10 +17,25 @@ function Explanation({ text }) {
   return <div className={s.explanation}>{paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
 }
 
+function shuffledQuestionImages(questionCount) {
+  const shuffled = [...QUESTION_IMAGES]
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1))
+    const currentImage = shuffled[index]
+    shuffled[index] = shuffled[randomIndex]
+    shuffled[randomIndex] = currentImage
+  }
+  return Array.from({ length: questionCount }, (_, index) => shuffled[index % shuffled.length])
+}
+
 export default function DailyBriefing({ briefing, onPrevious, onNext, onSelectFlow, onReturnToList, selectedFlowIndex, navigationLoading, previousAvailable, nextAvailable, previousError }) {
   const flows = briefing.flows || []
   const selectedFlow = selectedFlowIndex === null ? null : flows[selectedFlowIndex]
   const questions = selectedFlow?.questions || []
+  const questionImages = useMemo(
+    () => shuffledQuestionImages(questions.length),
+    [selectedFlow?.id, questions.length],
+  )
   const heading = (
     <header className={s.header}>
       <p><img src="/images/news-icon.png" alt="" /> 데일리</p>
@@ -49,7 +72,7 @@ export default function DailyBriefing({ briefing, onPrevious, onNext, onSelectFl
             <div className={s.questionList}>
               {questions.map((item, questionIndex) => <article className={s.questionCard} key={item.id || questionIndex}>
                 <div className={s.questionHeading}>
-                  <span className={s.questionNumber}>Q{questionIndex + 1}</span>
+                  <img src={questionImages[questionIndex]} alt="" aria-hidden="true" className={s.questionImage} />
                   <h3>{item.question}</h3>
                 </div>
                 <div className={s.answer}>

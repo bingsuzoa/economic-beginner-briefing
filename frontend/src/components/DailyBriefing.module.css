@@ -30,7 +30,7 @@
 .questionList { display: grid; gap: 14px; }
 .questionCard { padding: clamp(18px, 3vw, 24px); border: 1px solid #cbe5d9; border-radius: 14px; background: #e9f6ef; box-shadow: 0 2px 8px rgba(47, 96, 72, .06); }
 .questionHeading { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #cbe5d9; }
-.questionNumber { flex: 0 0 auto; min-width: 35px; padding: 4px 7px; border-radius: 7px; background: #287b55; color: #fff; font-size: .78rem; font-weight: 850; line-height: 1.35; text-align: center; }
+.questionImage { flex: 0 0 auto; width: 44px; height: 44px; border: 2px solid rgba(40, 123, 85, .18); border-radius: 12px; background: #fff; object-fit: cover; object-position: center; }
 .questionHeading h3 { margin: 0; color: #24523b; font-size: clamp(1.04rem, 2.5vw, 1.18rem); line-height: 1.55; }
 .answer { margin-top: 14px; }
 .answer .explanation { font-size: 1.02rem; }
@@ -55,6 +55,7 @@
   .questions { margin: 20px 0; }
   .questionCard { padding: 18px 16px; }
   .questionHeading { gap: 10px; }
+  .questionImage { width: 40px; height: 40px; border-radius: 10px; }
   .referenceCard { margin: 20px 0; padding: 18px; border-radius: 14px; }
 }
 
