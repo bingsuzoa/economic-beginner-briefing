@@ -42,15 +42,10 @@ export default function DailyBriefing({ briefing, onPrevious, onNext, onSelectFl
               <p className={s.studyEyebrow}>DAILY STUDY</p>
               <h2 id="study-invite-title">토트와 함께 더 자세히 공부하기</h2>
               <p>뉴스 뒤에 숨은 이유를 질문으로 하나씩 짚어봐요.</p>
-              <a className={s.studyCta} href="#daily-questions">질문으로 시작하기 <span aria-hidden="true">↓</span></a>
             </div>
           </aside>
 
-          <section id="daily-questions" className={s.questions} aria-labelledby="daily-questions-title">
-            <header className={s.questionsHeader}>
-              <p>토트의 경제 공부</p>
-              <h2 id="daily-questions-title">궁금했던 질문부터 살펴봐요</h2>
-            </header>
+          <section id="daily-questions" className={s.questions} aria-label="토트가 답하는 경제 질문">
             <div className={s.questionList}>
               {questions.map((item, questionIndex) => <article className={s.questionCard} key={item.id || questionIndex}>
                 <div className={s.questionHeading}>
@@ -58,7 +53,6 @@ export default function DailyBriefing({ briefing, onPrevious, onNext, onSelectFl
                   <h3>{item.question}</h3>
                 </div>
                 <div className={s.answer}>
-                  <p className={s.answerLabel}>토트의 답</p>
                   <Explanation text={item.answer} />
                 </div>
                 {(item.sources?.length > 0 || item.principles?.length > 0) && <details className={s.answerSources}>
