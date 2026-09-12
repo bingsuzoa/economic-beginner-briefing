@@ -5,6 +5,7 @@ import com.economicbriefing.article.ArticleRepository;
 import com.economicbriefing.article.ParagraphSplitter;
 import com.economicbriefing.article.YonhapBodyFetcher;
 import com.economicbriefing.briefing.EconomicFlowLlm.Call;
+import com.economicbriefing.briefing.EconomicFlowLlm.Answer;
 import com.economicbriefing.briefing.EconomicFlowLlm.PlanFlow;
 import com.economicbriefing.briefing.EconomicFlowLlm.SelectedArticle;
 import com.economicbriefing.briefing.EconomicFlowLlm.WrittenFlow;
@@ -183,10 +184,11 @@ public class DailyBriefingService {
             Call<Writing> written = llm.write(writerInput, planned.value().size());
             usage.luna("writer", written.usage());
             trace.writing = written.raw();
-            List<String> writingErrors = validateWriting(written.value(), planned.value(), context, questions);
+            Writing writing = completeNumberCitations(written.value(), questions);
+            List<String> writingErrors = validateWriting(writing, planned.value(), context, questions);
             if (!writingErrors.isEmpty()) throw new IllegalStateException("invalid Luna writing: " + writingErrors);
 
-            ObjectNode result = publicResult(run.getId(), targetDate, planned.value(), written.value().flows(), context, questions);
+            ObjectNode result = publicResult(run.getId(), targetDate, planned.value(), writing.flows(), context, questions);
             trace.usedHistoryObservationIds.addAll(planned.value().stream().flatMap(flow -> flow.observationIds().stream())
                     .filter(id -> id.startsWith("H")).map(context.aliases::get).map(item -> item.observation.id()).distinct().toList());
             trace.usedPrincipleIds.addAll(planned.value().stream().flatMap(flow -> flow.principleIds().stream())
@@ -682,6 +684,49 @@ public class DailyBriefingService {
         source.principles.values().forEach(p -> allowed.append(p.principle.title()).append(' ').append(p.principle.text()).append(' '));
         Set<String> extra = numbers(text); extra.removeAll(numbers(allowed.toString()));
         if (!extra.isEmpty()) errors.add(id + ": numbers outside evidence=" + extra);
+    }
+
+    static Writing completeNumberCitations(Writing writing, Map<String, QuestionContext> questions) {
+        List<WrittenFlow> flows = new ArrayList<>();
+        for (int f = 0; f < writing.flows().size(); f++) {
+            WrittenFlow flow = writing.flows().get(f);
+            List<Answer> answers = new ArrayList<>();
+            for (int q = 0; q < flow.questions().size(); q++) {
+                Answer answer = flow.questions().get(q);
+                QuestionContext allowed = questions.get("F%02d:Q%02d".formatted(f + 1, q + 1));
+                LinkedHashSet<String> evidenceIds = new LinkedHashSet<>(answer.evidenceIds());
+                LinkedHashSet<String> principleIds = new LinkedHashSet<>(answer.principleIds());
+                Set<String> missing = numbers(answer.answer());
+                evidenceIds.stream().filter(allowed.evidence::containsKey)
+                        .forEach(id -> missing.removeAll(numbers(evidenceText(allowed.evidence.get(id)))));
+                principleIds.stream().filter(allowed.principles::containsKey)
+                        .forEach(id -> missing.removeAll(numbers(principleText(allowed.principles.get(id)))));
+                allowed.evidence.forEach((id, source) -> {
+                    if (!java.util.Collections.disjoint(missing, numbers(evidenceText(source)))) {
+                        evidenceIds.add(id); missing.removeAll(numbers(evidenceText(source)));
+                    }
+                });
+                allowed.principles.forEach((id, source) -> {
+                    if (!java.util.Collections.disjoint(missing, numbers(principleText(source)))) {
+                        principleIds.add(id); missing.removeAll(numbers(principleText(source)));
+                    }
+                });
+                answers.add(new Answer(answer.questionId(), answer.answer(), List.copyOf(evidenceIds), List.copyOf(principleIds)));
+            }
+            flows.add(new WrittenFlow(flow.flowId(), flow.title(), flow.explanation(), List.copyOf(answers)));
+        }
+        return new Writing(List.copyOf(flows), writing.conflicts());
+    }
+
+    private static String evidenceText(Evidence evidence) {
+        StringBuilder value = new StringBuilder(evidence.observation.text());
+        if (evidence.observation.snapshot() != null) evidence.observation.snapshot().path("spans")
+                .forEach(span -> value.append(' ').append(span.asText()));
+        return value.toString();
+    }
+
+    private static String principleText(PrincipleChoice choice) {
+        return choice.principle.title() + " " + choice.principle.text();
     }
 
     private static QuestionContext flowSources(PlanFlow flow, Context context) {

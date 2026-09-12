@@ -165,6 +165,19 @@ class EconomicFlowValidationTest {
     }
 
     @Test
+    void writerAddsAnAllowedSourceWhenItsNumberWasNotCited() {
+        Observation general = new Observation("a:O1", "a", 1, "탄소포집을 활용한다", List.of("P001"), null, null, true, null);
+        Observation named = new Observation("a:O2", "a", 2, "SAN-7 사업이다", List.of("P002"), null, null, true, null);
+        QuestionContext source = new QuestionContext();
+        source.evidence.put("C01", new Evidence(general, false, null, 1));
+        source.evidence.put("C02", new Evidence(named, false, null, 1));
+        Writing raw = new Writing(List.of(new WrittenFlow("F01", "제목", "설명", List.of(
+                new Answer("Q01", "SAN-7에서 활용해요.", List.of("C01"), List.of())))), List.of());
+        Writing completed = DailyBriefingService.completeNumberCitations(raw, Map.of("F01:Q01", source));
+        assertEquals(List.of("C01", "C02"), completed.flows().getFirst().questions().getFirst().evidenceIds());
+    }
+
+    @Test
     void memoryKeepsExactSourceWhenArticleChanges() {
         ArticleEntity article = new ArticleEntity(); article.setId("a"); article.setSource("연합뉴스");
         article.setTitle("투자"); article.setUrl("https://example.com/article");
