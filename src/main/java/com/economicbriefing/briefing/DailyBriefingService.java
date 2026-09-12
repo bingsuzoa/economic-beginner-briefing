@@ -47,7 +47,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class DailyBriefingService {
     static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    static final String PIPELINE_VERSION = "daily-flow-v2.1";
+    static final String PIPELINE_VERSION = "daily-flow-v2.2";
     private static final int PLANNER_SUPPLEMENTAL_CHARS = 2500;
     private static final Logger log = LoggerFactory.getLogger(DailyBriefingService.class);
     private static final Pattern THIN_BULLETIN = Pattern.compile("^\\[(?:속보|\\d+보)]");
