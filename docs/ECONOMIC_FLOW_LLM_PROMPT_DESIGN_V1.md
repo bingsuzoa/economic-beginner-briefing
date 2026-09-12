@@ -1,5 +1,7 @@
 # 경제흐름 LLM 프롬프트 설계 V1
 
+> V2.3 변경: 관계 중심 선별·추출, 직접 문단의 관측별 refs와 제한된 설계 문맥, 출처 문단 공유, 입력 초과 시 편집 묶음 분할을 도입했다. 아래 V1의 고정 문장 수·writer 단일 호출 설명은 현재 계약이 아니다. 현재 상한과 근거 범위는 [운영 가이드](ECONOMIC_FLOW_OPERATIONS.md), 평가 결과는 [9월 12일 학습 평가](ECONOMIC_FLOW_LEARNING_REVIEW_20260912.md)를 따른다.
+
 > 이 문서는 V1 기준선이다. 로컬 구현은 [V2 계약](ECONOMIC_FLOW_BEGINNER_MEMORY_DESIGN_V2.md)으로 변경했고 사용자 평가 중이다. `briefingArticles/memoryArticles`, 관측의 `remember/memoryReason`, 설계의 `questions`, 편집의 Q&A·근거 ID·`conflicts`가 추가됐다. `watchPoints`는 제거했다. 정확한 Structured Output 스키마는 `EconomicFlowLlm.java`, 운영 상태는 [운영 가이드](ECONOMIC_FLOW_OPERATIONS.md)를 따른다.
 
 - 상태: 2026-09-11 운영 구현·실제 Java E2E 통과
