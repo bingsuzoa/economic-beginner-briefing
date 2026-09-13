@@ -310,6 +310,23 @@ class EconomicFlowValidationTest {
     }
 
     @Test
+    void writerAllowsKoreanOrdinalWithoutNumericEvidence() {
+        Observation o = new Observation("a:O1", "a", 1, "현지통화 결제는 환전 단계를 줄일 수 있다.",
+                List.of("P001"), null, null, true, null);
+        Map<String, Evidence> evidence = Map.of("C01", new Evidence(o, false, null, 1));
+        Context context = new Context(evidence, evidence, List.of(), List.of(), Map.of());
+        Question q = new Question("왜?", "원리가 필요하다", List.of("C01"), "", "", List.of());
+        List<PlanFlow> plan = List.of(new PlanFlow(List.of("C01"), List.of(), "연결", List.of(q)));
+        QuestionContext source = new QuestionContext(); source.evidence.putAll(evidence);
+        Map<String, QuestionContext> questions = Map.of("F01:Q01", source);
+        Writing writing = new Writing(List.of(new WrittenFlow("F01", "현지통화 결제", "설명",
+                List.of(new Answer("Q01", "달러 같은 제3의 통화를 거치지 않을 수 있어요.",
+                        List.of("C01"), List.of())))), List.of());
+
+        assertTrue(DailyBriefingService.validateWriting(writing, plan, context, questions).isEmpty());
+    }
+
+    @Test
     void writerAddsAnAllowedSourceWhenItsNumberWasNotCited() {
         Observation general = new Observation("a:O1", "a", 1, "탄소포집을 활용한다", List.of("P001"), null, null, true, null);
         Observation named = new Observation("a:O2", "a", 2, "SAN-7 사업이다", List.of("P002"), null, null, true, null);
