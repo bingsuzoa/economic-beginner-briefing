@@ -49,7 +49,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class DailyBriefingService {
     static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    static final String PIPELINE_VERSION = "daily-flow-v2.3";
+    static final String PIPELINE_VERSION = "daily-flow-v2.4";
     private static final int PLANNER_SUPPLEMENTAL_CHARS = 2500;
     private static final int PLANNER_EVIDENCE_CHARS = 8500;
     private static final int PLANNER_PRINCIPLE_CHARS = 1500;
@@ -61,7 +61,10 @@ public class DailyBriefingService {
             "소비자물가|생산자물가|\\bCPI\\b|\\bPPI\\b|기준금리|국채금리|채권금리|대출금리|환율|취업자|실업률|고용률|\\bGDP\\b|경제성장률|가계대출|가계부채|국제유가|브렌트유|\\bWTI\\b|천연가스",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern NUMBER = Pattern.compile("\\d[\\d,.]*(?:%|％)?");
-    private static final Pattern KOREAN_ORDINAL = Pattern.compile("제\\s*\\d+\\s*의");
+    // ponytail: only reviewed non-quantitative phrases; extend after confirming a new false positive.
+    private static final Pattern NON_QUANTITATIVE_PHRASE = Pattern.compile(
+            "(?<![\\p{L}\\p{N}_])제\\h*3\\h*(?:의\\h+통화|자)"
+                    + "(?=(?:에게|에서|으로|[은는이가을를의와과도만로에])*(?:$|[\\s\\p{P}]))");
 
     private final ArticleRepository articles;
     private final DailyBriefingRepository briefings;
@@ -1005,8 +1008,8 @@ public class DailyBriefingService {
         } catch (Exception e) { throw new IllegalStateException(e); }
     }
     private static Set<String> numbers(String value) {
-        String withoutKoreanOrdinals = KOREAN_ORDINAL.matcher(value).replaceAll("");
-        Set<String> result = new HashSet<>(); var matcher = NUMBER.matcher(withoutKoreanOrdinals.replace(",", ""));
+        String quantitativeText = NON_QUANTITATIVE_PHRASE.matcher(value).replaceAll(" ");
+        Set<String> result = new HashSet<>(); var matcher = NUMBER.matcher(quantitativeText.replace(",", ""));
         while (matcher.find()) result.add(matcher.group()); return result;
     }
     private static float[] normalized(float[] value) {

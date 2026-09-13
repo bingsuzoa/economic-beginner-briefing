@@ -310,7 +310,7 @@ class EconomicFlowValidationTest {
     }
 
     @Test
-    void writerAllowsKoreanOrdinalWithoutNumericEvidence() {
+    void writerExemptsOnlyKnownNonQuantitativePhrases() {
         Observation o = new Observation("a:O1", "a", 1, "현지통화 결제는 환전 단계를 줄일 수 있다.",
                 List.of("P001"), null, null, true, null);
         Map<String, Evidence> evidence = Map.of("C01", new Evidence(o, false, null, 1));
@@ -319,11 +319,62 @@ class EconomicFlowValidationTest {
         List<PlanFlow> plan = List.of(new PlanFlow(List.of("C01"), List.of(), "연결", List.of(q)));
         QuestionContext source = new QuestionContext(); source.evidence.putAll(evidence);
         Map<String, QuestionContext> questions = Map.of("F01:Q01", source);
-        Writing writing = new Writing(List.of(new WrittenFlow("F01", "현지통화 결제", "설명",
-                List.of(new Answer("Q01", "달러 같은 제3의 통화를 거치지 않을 수 있어요.",
-                        List.of("C01"), List.of())))), List.of());
+        for (String text : List.of("달러 같은 제3의 통화를 거치지 않을 수 있어요.",
+                "제 3 의 통화로 결제해요.", "제3자에게 지급해요.", "제3자의 개입이에요.", "(제3자)")) {
+            Writing writing = new Writing(List.of(new WrittenFlow("F01", text, text,
+                    List.of(new Answer("Q01", text, List.of("C01"), List.of())))), List.of());
+            assertTrue(DailyBriefingService.validateWriting(writing, plan, context, questions).isEmpty(), text);
+        }
+        for (String text : List.of("제4의 통화", "제30의 통화", "제3의 통화량", "제3자산", "경제3의 통화",
+                "3개 통화", "3개월", "3분기", "세계 3위", "제3차 회의", "제3의 통화를 거치면 수수료가 3% 줄어요.")) {
+            Writing writing = new Writing(List.of(new WrittenFlow("F01", text, text,
+                    List.of(new Answer("Q01", text, List.of("C01"), List.of())))), List.of());
+            var errors = DailyBriefingService.validateWriting(writing, plan, context, questions);
+            assertTrue(errors.stream().anyMatch(e -> e.startsWith("F01: numbers outside evidence=")), text);
+            assertTrue(errors.stream().anyMatch(e -> e.startsWith("F01:Q01: numbers outside evidence=")), text);
+        }
+    }
 
-        assertTrue(DailyBriefingService.validateWriting(writing, plan, context, questions).isEmpty());
+    @Test
+    void nonQuantitativePhrasesNeitherSupplyNumbersNorAddCitations() {
+        Observation general = new Observation("a:O1", "a", 1, "현지통화 결제를 설명한다.",
+                List.of("P001"), null, null, true, null);
+        var snapshot = new ObjectMapper().createObjectNode();
+        snapshot.putObject("spans").put("P002", "제3자에게 지급한다. 제3의 통화를 거칠 수 있다.");
+        Observation phrase = new Observation("a:O2", "a", 2, "제3자와 제3의 통화를 설명한다.",
+                List.of("P002"), null, null, true, snapshot);
+        Observation quantity = new Observation("a:O3", "a", 3, "3개 통화를 사용하고 수수료는 3%다.",
+                List.of("P003"), null, null, true, null);
+        QuestionContext source = new QuestionContext();
+        source.evidence.put("C01", new Evidence(general, false, null, 1));
+        source.evidence.put("C02", new Evidence(phrase, false, null, 1));
+        Context context = new Context(source.evidence, source.evidence, List.of(), List.of(), Map.of());
+        List<PlanFlow> plan = List.of(new PlanFlow(List.of("C01"), List.of(), "연결", List.of(
+                new Question("왜?", "원리", List.of("C01"), "", "", List.of()))));
+        Map<String, QuestionContext> questions = Map.of("F01:Q01", source);
+        for (String text : List.of("제3자에게 지급해요.", "제3의 통화를 거쳐요.", "3개 통화를 사용해요.",
+                "제3의 통화를 거치면 수수료가 3% 줄어요.")) {
+            Writing raw = new Writing(List.of(new WrittenFlow("F01", "제목", "설명", List.of(
+                    new Answer("Q01", text, List.of("C01"), List.of())))), List.of());
+            Writing completed = DailyBriefingService.completeNumberCitations(raw, questions);
+            assertEquals(List.of("C01"), completed.flows().getFirst().questions().getFirst().evidenceIds(), text);
+        }
+        Writing unsupported = new Writing(List.of(new WrittenFlow("F01", "제목", "설명", List.of(
+                new Answer("Q01", "3개 통화를 사용해요.", List.of("C02"), List.of())))), List.of());
+        assertTrue(DailyBriefingService.validateWriting(unsupported, plan, context, questions).stream()
+                .anyMatch(e -> e.equals("F01:Q01: numbers outside evidence=[3]")));
+        source.evidence.put("C03", new Evidence(quantity, false, null, 1));
+        Writing completed = DailyBriefingService.completeNumberCitations(unsupported, questions);
+        assertEquals(List.of("C02", "C03"), completed.flows().getFirst().questions().getFirst().evidenceIds());
+        assertTrue(DailyBriefingService.validateWriting(completed, plan, context, questions).isEmpty());
+        for (String text : List.of("제3자에게 지급해요.", "제3의 통화를 거쳐요.", "제3의 통화를 거치며 수수료는 3%예요.")) {
+            Writing raw = new Writing(List.of(new WrittenFlow("F01", "제목", "설명", List.of(
+                    new Answer("Q01", text, List.of("C01"), List.of())))), List.of());
+            Writing cited = DailyBriefingService.completeNumberCitations(raw, questions);
+            assertEquals(text.contains("3%") ? List.of("C01", "C03") : List.of("C01"),
+                    cited.flows().getFirst().questions().getFirst().evidenceIds(), text);
+            assertTrue(DailyBriefingService.validateWriting(cited, plan, context, questions).isEmpty(), text);
+        }
     }
 
     @Test
