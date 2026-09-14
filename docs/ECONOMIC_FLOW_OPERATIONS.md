@@ -2,9 +2,9 @@
 
 - 최종 갱신: 2026-09-14
 - 대상: 운영 서버에서 이 저장소를 이어서 관리하는 Codex와 운영자
-- 확인한 DEV 공개 기준선: 2026-09-14 revision 3의 `daily-flow-v2.4`, Flyway V26. 로컬 검증 대상은 V2.6이며 PROD 반영·기존 공개 결과 갱신은 별도다. 아래 V1 기준선은 이전 실행 결과다.
-- 관측 추출 지침: 로컬 V2.6은 `observation-memory-v5` (이전 DEV 기준 v4). 제안의 구체적인 필요성에 더해 시장의 중간 원인·반대 압력·예외와 국가 간 협상 조건을 보존한다. [9월 12일 학습 평가](ECONOMIC_FLOW_LEARNING_REVIEW_20260912.md)에 단계별 실패와 재검증을 기록한다.
-- V2.6 로컬 변경: 기업·업종 수혜주와 기관 입찰을 데일리에서 제외하고 국가 성장·자금 이동·전략기술 관계를 우선한다. 자원 수송로 분쟁은 제목에 경제 수치가 없어도 원문 확인 후보로 남긴다. 추출은 근거 문단만 입력하여 제목 수치의 잘못된 문단 인용을 줄이고, 상대 입장·과거 발언 시점·협정 선택 조건을 기억 text에 보존한다. 넓은 주제만으로 별개 동인을 합치지 않으며 본문·Q&A 문단에 한 문장 소제목을 붙인다. [9월 14일 학습 평가](ECONOMIC_FLOW_LEARNING_REVIEW_20260914.md)에 고정 날짜 반복·비용·잔여 한계를 기록한다. 공개 결과 갱신·DEV/PROD 배포는 이 로컬 변경과 별도다.
+- 확인한 DEV 공개 기준선: 2026-09-14 revision 4의 `daily-flow-v2.6`, Flyway V26. 9월 14일 교정본만 새 revision으로 반영했고 이전 날짜와 기존 revision은 보존했다. PROD는 변경하지 않았다. 반영 이력은 17절에 기록한다. 아래 V1 기준선은 이전 실행 결과다.
+- 관측 추출 지침: DEV V2.6은 `observation-memory-v5` (이전 DEV 기준 v4). 제안의 구체적인 필요성에 더해 시장의 중간 원인·반대 압력·예외와 국가 간 협상 조건을 보존한다. [9월 12일 학습 평가](ECONOMIC_FLOW_LEARNING_REVIEW_20260912.md)에 단계별 실패와 재검증을 기록한다.
+- V2.6 변경: 기업·업종 수혜주와 기관 입찰을 데일리에서 제외하고 국가 성장·자금 이동·전략기술 관계를 우선한다. 자원 수송로 분쟁은 제목에 경제 수치가 없어도 원문 확인 후보로 남긴다. 추출은 근거 문단만 입력하여 제목 수치의 잘못된 문단 인용을 줄이고, 상대 입장·과거 발언 시점·협정 선택 조건을 기억 text에 보존한다. 넓은 주제만으로 별개 동인을 합치지 않으며 본문·Q&A 문단에 한 문장 소제목을 붙인다. [9월 14일 학습 평가](ECONOMIC_FLOW_LEARNING_REVIEW_20260914.md)에 고정 날짜 반복·비용·잔여 한계를 기록한다. PROD 배포는 별도다.
 - 상세 설계: [ECONOMIC_FLOW_DAILY_BRIEFING_FINAL_DESIGN_V1.md](ECONOMIC_FLOW_DAILY_BRIEFING_FINAL_DESIGN_V1.md)
 - 프롬프트 계약: [ECONOMIC_FLOW_LLM_PROMPT_DESIGN_V1.md](ECONOMIC_FLOW_LLM_PROMPT_DESIGN_V1.md)
 - V2 구현 계약: [초보자 질문·과거 기사 기억](ECONOMIC_FLOW_BEGINNER_MEMORY_DESIGN_V2.md). 기사 한 편 사용자 평가 진행 중이다. 질문·기억 개선 시 [사용자 평가 기록](ECONOMIC_FLOW_BEGINNER_MEMORY_REVIEW.md)을 함께 읽는다. 품질 수용·운영 전환은 아직 완료하지 않았다.
@@ -371,3 +371,11 @@ economic_briefing_pre_daily_flow_20260911_0450.dump
 ```
 
 이 파일은 로컬 검증용이며 운영 Windows DB 백업을 대신하지 않는다. 운영에서는 배포 직전 새 dump를 만들고 복원 명령과 PostgreSQL 버전을 함께 기록한다. V24 이전으로 되돌려야 하면 서비스를 먼저 중지하고 DB dump 전체를 복원한 뒤 이전 JAR과 frontend를 배포한다.
+
+## 17. 2026-09-14 DEV 반영 이력
+
+사용자 요청으로 코드 `4b286a23e2ac3722ff9f04da4257601b2c4dbfa1`을 main에 병합·푸시했다. [DEV workflow 34840483270](https://github.com/bingsuzoa/economic-beginner-briefing/actions/runs/34840483270)이 테스트·빌드·배포에 성공했고, 실제 DEV JAR의 V2.6/v5 문자열과 HTTP로 제공하는 프런트엔드 파일을 확인했다.
+
+20:57 KST에 원문 대조 교정본 `12-source-reviewed/result.json`을 DEV의 9월 14일 revision 4 (`182345d1-3d31-4790-9cc0-b92d7147ecfe`, `EDITORIAL_IMPORT`)로 반영했다. 기존 17행의 전체 행 해시가 그대로이며 다른 날짜 14행도 변경되지 않았다. 날짜별·최신 공개 API가 교정본의 7개 흐름·24개 질문과 정확히 일치하고 health는 UP이다. 격리 평가 DB의 관측 기억은 이 결과 교체에 함께 이관하지 않았다. 원본 평가 usage와 trace, 9개 필드 교정 내역 및 반영 출처를 보존했으며 이관 자체의 추가 API 비용은 0이다.
+
+교체 전 DEV `daily_briefings`의 PostgreSQL 17 custom dump는 `C:\economic-beginner-briefing\backups\daily-20260914-4b286a2\daily_briefings_before.dump`에 있다. 로컬 검증 파일은 `pipeline-debug/flow-learning-20260914/dev-release/`에 보존했다. 서버·로컬 백업 SHA-256 일치와 archive 읽기를 확인했다. PROD 서비스·DB는 변경하지 않았다.

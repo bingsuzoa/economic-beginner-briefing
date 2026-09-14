@@ -97,4 +97,6 @@
 - 920px 본문 영역·390px 휴대폰 폭에서 실제 컴포넌트를 확인했고, 기존 글 표시도 유지했다. 미리보기는 실제 교정본을 표시한다.
 - 코드와 평가 산출물만 수정했다. **커밋·push·DEV/PROD 배포·기존 공개 날짜 결과 갱신은 하지 않았다.** 원격 DB 조회와 덤프는 읽기 전용이며, 시험 데이터 쓰기는 명시된 격리 평가 DB에만 했다.
 
+위 적용 범위는 평가 완료 시점의 기록이다. 이후 사용자 요청에 따라 main 반영·DEV 배포와 **9월 14일 교정본만 revision 4로 교체**를 완료했다. 다른 날짜와 기존 revision은 보존했고 PROD는 변경하지 않았다. 실제 반영·백업·API 대조 결과는 [운영 가이드 17절](ECONOMIC_FLOW_OPERATIONS.md#17-2026-09-14-dev-반영-이력)에 기록했다.
+
 재검토할 때는 `final-validation-summary.json`, 각 실행의 `result.json`에 든 usage·trace, 요청·원문 캐시를 먼저 확인한다. 형식은 `node scripts/check-briefing-paragraphs.mjs <result.json> ...`로 다시 검사할 수 있다. 새 평가 날짜는 `DAILY_LEARNING_DATE`로 지정하고 `DAILY_LEARNING_DB`는 `economic_briefing_review_...` 이름의 격리 DB만 사용한다.
