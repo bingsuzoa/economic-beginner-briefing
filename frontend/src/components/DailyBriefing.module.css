@@ -17,8 +17,9 @@
 .number { margin: 0 0 6px; color: #a36a34; font-size: .82rem; font-weight: 800; }
 .flow h2 { margin: 0 0 16px; font-size: clamp(1.25rem, 3vw, 1.65rem); line-height: 1.35; }
 .explanation { margin: 0; font-size: 1.02rem; line-height: 1.85; white-space: pre-line; }
-.explanation > p { margin: 0; }
-.explanation > p + p { margin-top: 1em; }
+.paragraph > p { margin: 0; }
+.paragraph + .paragraph { margin-top: 1.2em; }
+.paragraphHeading { margin: 0 0 .35em; font-size: 1em; font-weight: 800; line-height: 1.6; }
 .studyInvite { display: grid; grid-template-columns: minmax(220px, .9fr) minmax(0, 1.1fr); margin: 28px 0; overflow: hidden; border: 1px solid #f0d99b; border-radius: 18px; background: #fffdf7; box-shadow: var(--shadow); }
 .studyImageWrap { min-height: 236px; overflow: hidden; background: #e9c16e; }
 .studyImage { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 39% center; }

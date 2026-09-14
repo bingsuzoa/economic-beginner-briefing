@@ -5,9 +5,35 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
+import java.util.List;
+import java.util.Date;
+import java.time.Instant;
+import com.economicbriefing.collector.parser.RssItem;
+import com.economicbriefing.collector.parser.RssParser;
+import org.mockito.ArgumentCaptor;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyString;
 import org.junit.jupiter.api.Test;
 
 class ArticleIngestionTest {
+    @Test
+    void recoversRetainedArticlesAfterAnOutageWithoutCollectingOlderDaysOrFeedDuplicates() {
+        var rss = mock(RssParser.class);
+        var repository = mock(ArticleRepository.class);
+        var items = new java.util.ArrayList<RssItem>();
+        for (int hours : List.of(3, 25, 27)) {
+            String url = "https://www.yna.co.kr/view/AKR20260913%04d00009".formatted(hours);
+            items.add(new RssItem("국가 간 교역 변화 " + hours, url, "",
+                    Date.from(Instant.now().minusSeconds(hours * 3600L)), "관세와 시장 접근", null, url));
+        }
+        when(rss.parse(anyString())).thenReturn(items);
+        assertEquals(2, new YonhapArticleService(rss, repository).collectRecent());
+        var saved = ArgumentCaptor.forClass(ArticleEntity.class);
+        verify(repository, times(2)).save(saved.capture());
+        assertEquals(List.of("YONHAP:AKR202609130025", "YONHAP:AKR202609130003"),
+                saved.getAllValues().stream().map(ArticleEntity::getId).toList());
+    }
+
     @Test
     void keepsStableParagraphIdsAndRejectsCaptionsAsEvidence() {
         ParagraphSplitter splitter = new ParagraphSplitter();

@@ -121,6 +121,14 @@ class EconomicFlowValidationTest {
         assertTrue(separate.get(1).input().contains("<F02>") && !separate.get(1).input().contains("첫 근거"));
         assertTrue(separate.stream().allMatch(batch -> DailyBriefingService.estimateTokens(batch.input()) <= 1600));
         assertThrows(IllegalStateException.class, () -> DailyBriefingService.writerBatches(plan,context,questions,100));
+        var moreEvidence = new LinkedHashMap<>(evidence);
+        moreEvidence.put("C03",new Evidence(new Observation("a:O2","a",2,"별도 원인",List.of(),null,null,false,null),false,null,1));
+        moreEvidence.put("C04",new Evidence(new Observation("a:O3","a",3,"상대의 조건",List.of(),null,null,false,null),false,null,1));
+        var detailed = List.of(new PlanFlow(List.of("C01","C03","C04"),List.of(),"첫 연결",List.of(q1)),plan.get(1));
+        var weighted = DailyBriefingService.writerBatches(detailed,
+                new Context(moreEvidence,moreEvidence,List.of(),List.of(),Map.of()),questions,1600);
+        assertEquals(2,weighted.size());
+        assertTrue(weighted.get(0).weight() > weighted.get(1).weight());
     }
 
     @Test
@@ -152,11 +160,10 @@ class EconomicFlowValidationTest {
             return new OpenAiClient.LlmResult(json.readTree("{\"observations\":[]}"), new OpenAiClient.Usage(0,0,0,0));
         });
         var llm = new EconomicFlowLlm(client, mock(OpenAiProperties.class), json, new ParagraphSplitter());
-        var article = new ArticleEntity(); article.setTitle("금리 상승");
         var source = new LinkedHashMap<String,String>();
         source.put("P001", "[사진 설명]"); source.put("P002", "발표 전 금리 인상을 우려했다.");
         source.put("P003", "기자 reporter@example.com"); source.put("P004", "저녁에 물가가 발표됐다.");
-        llm.extract(new EconomicFlowLlm.SelectedArticle(article,"시장 변화"), source);
+        llm.extract(source);
     }
 
     @Test
@@ -320,13 +327,13 @@ class EconomicFlowValidationTest {
         QuestionContext source = new QuestionContext(); source.evidence.putAll(evidence);
         Map<String, QuestionContext> questions = Map.of("F01:Q01", source);
         for (String text : List.of("달러 같은 제3의 통화를 거치지 않을 수 있어요.",
-                "제 3 의 통화로 결제해요.", "제3자에게 지급해요.", "제3자의 개입이에요.", "(제3자)")) {
+                "제 3 의 통화로 결제해요.", "제3자에게 지급해요.", "제3자의 개입이에요.", "(제3자)", "제3국 기업과 거래해요.", "제 3 국의 금융기관이에요.")) {
             Writing writing = new Writing(List.of(new WrittenFlow("F01", text, text,
                     List.of(new Answer("Q01", text, List.of("C01"), List.of())))), List.of());
             assertTrue(DailyBriefingService.validateWriting(writing, plan, context, questions).isEmpty(), text);
         }
         for (String text : List.of("제4의 통화", "제30의 통화", "제3의 통화량", "제3자산", "경제3의 통화",
-                "3개 통화", "3개월", "3분기", "세계 3위", "제3차 회의", "제3의 통화를 거치면 수수료가 3% 줄어요.")) {
+                "제3국채", "3개국", "제3국과 3개국이 거래해요.", "제3국 거래가 3% 늘어요.", "3개 통화", "3개월", "3분기", "세계 3위", "제3차 회의", "제3의 통화를 거치면 수수료가 3% 줄어요.")) {
             Writing writing = new Writing(List.of(new WrittenFlow("F01", text, text,
                     List.of(new Answer("Q01", text, List.of("C01"), List.of())))), List.of());
             var errors = DailyBriefingService.validateWriting(writing, plan, context, questions);
@@ -340,7 +347,7 @@ class EconomicFlowValidationTest {
         Observation general = new Observation("a:O1", "a", 1, "현지통화 결제를 설명한다.",
                 List.of("P001"), null, null, true, null);
         var snapshot = new ObjectMapper().createObjectNode();
-        snapshot.putObject("spans").put("P002", "제3자에게 지급한다. 제3의 통화를 거칠 수 있다.");
+        snapshot.putObject("spans").put("P002", "제3자에게 지급한다. 제3국에서 제3의 통화를 거칠 수 있다.");
         Observation phrase = new Observation("a:O2", "a", 2, "제3자와 제3의 통화를 설명한다.",
                 List.of("P002"), null, null, true, snapshot);
         Observation quantity = new Observation("a:O3", "a", 3, "3개 통화를 사용하고 수수료는 3%다.",
@@ -352,7 +359,7 @@ class EconomicFlowValidationTest {
         List<PlanFlow> plan = List.of(new PlanFlow(List.of("C01"), List.of(), "연결", List.of(
                 new Question("왜?", "원리", List.of("C01"), "", "", List.of()))));
         Map<String, QuestionContext> questions = Map.of("F01:Q01", source);
-        for (String text : List.of("제3자에게 지급해요.", "제3의 통화를 거쳐요.", "3개 통화를 사용해요.",
+        for (String text : List.of("제3자에게 지급해요.", "제3국에 지급해요.", "제3의 통화를 거쳐요.", "3개 통화를 사용해요.",
                 "제3의 통화를 거치면 수수료가 3% 줄어요.")) {
             Writing raw = new Writing(List.of(new WrittenFlow("F01", "제목", "설명", List.of(
                     new Answer("Q01", text, List.of("C01"), List.of())))), List.of());
@@ -367,7 +374,7 @@ class EconomicFlowValidationTest {
         Writing completed = DailyBriefingService.completeNumberCitations(unsupported, questions);
         assertEquals(List.of("C02", "C03"), completed.flows().getFirst().questions().getFirst().evidenceIds());
         assertTrue(DailyBriefingService.validateWriting(completed, plan, context, questions).isEmpty());
-        for (String text : List.of("제3자에게 지급해요.", "제3의 통화를 거쳐요.", "제3의 통화를 거치며 수수료는 3%예요.")) {
+        for (String text : List.of("제3자에게 지급해요.", "제3국에 지급해요.", "제3의 통화를 거쳐요.", "제3의 통화를 거치며 수수료는 3%예요.")) {
             Writing raw = new Writing(List.of(new WrittenFlow("F01", "제목", "설명", List.of(
                     new Answer("Q01", text, List.of("C01"), List.of())))), List.of());
             Writing cited = DailyBriefingService.completeNumberCitations(raw, questions);

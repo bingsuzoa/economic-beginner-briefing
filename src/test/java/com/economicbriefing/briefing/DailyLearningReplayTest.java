@@ -30,7 +30,7 @@ class DailyLearningReplayTest {
         var json=new ObjectMapper().findAndRegisterModules();
         var jdbc=new JdbcTemplate(new DriverManagerDataSource("jdbc:postgresql://localhost:5432/"+db+"?stringtype=unspecified",
                 System.getenv("PGUSER"),System.getenv("PGPASSWORD")));
-        LocalDate date=LocalDate.parse("2026-09-12");
+        LocalDate date=LocalDate.parse(System.getenv().getOrDefault("DAILY_LEARNING_DATE","2026-09-12"));
         List<ArticleEntity> window=new ArrayList<>();
         for(var value:json.readTree(base.resolve("window.json").toFile())) window.add(article(value));
         List<ArticleEntity> feedback=new ArrayList<>();
@@ -71,7 +71,7 @@ class DailyLearningReplayTest {
             } else if ("extraction".equals(mode)) {
                 var extracted=summary.putArray("extractions");
                 for(var a:feedback) {
-                    var result=llm.extract(new EconomicFlowLlm.SelectedArticle(a,"오늘 경제흐름의 원인·행동·반대 압력·제약을 설명하는 원문"),splitter.split(a.getBody()));
+                    var result=llm.extract(splitter.split(a.getBody()));
                     var item=extracted.addObject().put("articleId",a.getId()); item.set("call",json.valueToTree(result));
                 }
             } else {

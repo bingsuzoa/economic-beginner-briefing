@@ -49,7 +49,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class DailyBriefingService {
     static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    static final String PIPELINE_VERSION = "daily-flow-v2.4";
+    static final String PIPELINE_VERSION = "daily-flow-v2.6";
     private static final int PLANNER_SUPPLEMENTAL_CHARS = 2500;
     private static final int PLANNER_EVIDENCE_CHARS = 8500;
     private static final int PLANNER_PRINCIPLE_CHARS = 1500;
@@ -63,7 +63,7 @@ public class DailyBriefingService {
     private static final Pattern NUMBER = Pattern.compile("\\d[\\d,.]*(?:%|％)?");
     // ponytail: only reviewed non-quantitative phrases; extend after confirming a new false positive.
     private static final Pattern NON_QUANTITATIVE_PHRASE = Pattern.compile(
-            "(?<![\\p{L}\\p{N}_])제\\h*3\\h*(?:의\\h+통화|자)"
+            "(?<![\\p{L}\\p{N}_])제\\h*3\\h*(?:의\\h+통화|자|국)"
                     + "(?=(?:에게|에서|으로|[은는이가을를의와과도만로에])*(?:$|[\\s\\p{P}]))");
 
     private final ArticleRepository articles;
@@ -306,7 +306,7 @@ public class DailyBriefingService {
             if (usage.extractionInput > appProperties.budget().extractionInputTokens())
                 throw new IllegalStateException("extraction input ceiling exceeded");
             ensureCost(usage, article.getBody(), false, EconomicFlowLlm.EXTRACT_MAX_OUTPUT_TOKENS, reserved);
-            Call<List<ObservationStore.Draft>> call = llm.extract(item, paragraphs);
+            Call<List<ObservationStore.Draft>> call = llm.extract(paragraphs);
             usage.luna("observationExtraction", call.usage());
             ObjectNode decision = trace.memoryDecisions.addObject();
             decision.put("articleId", article.getId()); decision.set("raw", call.raw());
@@ -667,7 +667,9 @@ public class DailyBriefingService {
                 if (estimateTokens(expanded) > maxInputTokens) break;
                 input = expanded; end++;
             }
-            int weight = plan.subList(start, end).stream().mapToInt(flow -> flow.questions().size() + 2).sum();
+            // ponytail: evidence count approximates body length; revise only if replay still shows uneven truncation.
+            int weight = plan.subList(start, end).stream()
+                    .mapToInt(flow -> Math.max(2, flow.observationIds().size()) + 2 * flow.questions().size()).sum();
             List<WritingScope> scopes = new ArrayList<>();
             for (int index = start; index < end; index++) {
                 String flowId = "F%02d".formatted(index + 1); List<AnswerScope> answers = new ArrayList<>();

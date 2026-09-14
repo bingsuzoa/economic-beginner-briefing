@@ -41,7 +41,8 @@ public class YonhapArticleService {
 
     public int collectRecent() {
         OffsetDateTime end = OffsetDateTime.now(KST);
-        return collect(end.minusHours(2), end);
+        // ponytail: recover the daily window + overlap only while RSS retains it; older gaps need an archive.
+        return collect(end.minusHours(26), end);
     }
 
     public int collect(OffsetDateTime start, OffsetDateTime end) {

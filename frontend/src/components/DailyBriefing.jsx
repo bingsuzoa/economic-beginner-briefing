@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { briefingParagraphs } from './briefingText.js'
 import s from './DailyBriefing.module.css'
 
 const QUESTION_IMAGES = [
@@ -12,9 +13,12 @@ const dateLabel = (value) => new Intl.DateTimeFormat('ko-KR', {
   timeZone: 'Asia/Seoul', month: 'long', day: 'numeric',
 }).format(new Date(`${value}T12:00:00+09:00`))
 
-function Explanation({ text }) {
-  const paragraphs = (text || '').replace(/\r\n?/g, '\n').split(/\n\s*\n/).map(value => value.trim()).filter(Boolean)
-  return <div className={s.explanation}>{paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
+function Explanation({ text, headingTag: Heading = 'h3' }) {
+  return <div className={s.explanation}>{briefingParagraphs(text).map(({ heading, body }, index) =>
+    <div className={s.paragraph} key={index}>
+      {heading && <Heading className={s.paragraphHeading}>{heading}</Heading>}
+      <p>{body}</p>
+    </div>)}</div>
 }
 
 function shuffledQuestionImages(questionCount) {
@@ -76,7 +80,7 @@ export default function DailyBriefing({ briefing, onPrevious, onNext, onSelectFl
                   <h3>{item.question}</h3>
                 </div>
                 <div className={s.answer}>
-                  <Explanation text={item.answer} />
+                  <Explanation text={item.answer} headingTag="h4" />
                 </div>
                 {(item.sources?.length > 0 || item.principles?.length > 0) && <details className={s.answerSources}>
                   <summary>이 설명의 근거 보기</summary>
