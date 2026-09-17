@@ -95,6 +95,19 @@ high 선별·8,000 출력 및 설계 4,500까지 축소하는 실험은 채택�
 응답 미완료·파싱 실패 호출 3건의 사용량은 클라이언트가 회수하지 못해 이 합계에 포함되지
 않았다. 이는 전체 청구액이 아니다. 실행별 USD 0.14 가드와 원문·숫자 검증은 유지했다.
 
-반영 대상은 DEV이며 결과는 `EDITORIAL_IMPORT`의 새 revision으로 기록한다.
-이전 revision과 다른 날짜 결과, PROD는 보존한다. 검증 산출물은
-`pipeline-debug/macro-user-feedback-20260917/editorial-reviewed/` 및 동일 폴더의 배포 기록에 남긴다.
+## DEV 반영 확인
+
+23:45 KST에 `EDITORIAL_IMPORT`로 9월 17일 revision 4를 추가했다.
+ID는 `c4b2d9ae-2a7d-419b-8cdc-17ec9fa50321`이며 버전은
+`daily-flow-v2.8-editorial`이다. 8개 흐름·20개 질문과 10시 마감 정보가
+최신·날짜별 공개 API에서 검증 원고와 완전히 일치했다.
+
+코드 커밋 `e0ab2d30afb01477cf3906b065ff27c98d750a33`의
+[DEV 배포 워크플로](https://github.com/bingsuzoa/economic-beginner-briefing/actions/runs/35235602995)가
+성공했고, 배포 JAR의 v2.8 코드와 HTTP로 제공되는 프런트엔드의 마감 표시를 확인했다.
+health는 UP이다. 반영 전 DEV DB 전체 백업을 보존했으며 기존 23개 결과 행의 전체 해시가
+모두 동일하다. 새 결과 1행만 추가했고 격리 DB의 관측 기억은 이관하지 않았다.
+PROD의 3000 포트 PID는 전후 모두 11220으로 유지됐으며 PROD에 배포하지 않았다.
+
+검증 산출물과 이관 SQL·반영 전후 해시·공개 API 응답·배포 증거는
+`pipeline-debug/macro-user-feedback-20260917/editorial-reviewed/` 및 상위 폴더에 보관한다.
