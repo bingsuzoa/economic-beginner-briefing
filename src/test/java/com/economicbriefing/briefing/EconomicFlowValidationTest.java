@@ -247,6 +247,49 @@ class EconomicFlowValidationTest {
     }
 
     @Test
+    void plannerCanDropWholeLowerRankedHistoryWithoutDroppingCurrentFacts() {
+        var published = OffsetDateTime.parse("2026-09-17T04:00:00+09:00");
+        var now = new Observation("a:O1", "a", 1, "현재 결정과 조건을 전부 보존한다.", List.of(), published, null, false, null);
+        var current = Map.of("C01", new Evidence(now, false, null, 1));
+        var aliases = new LinkedHashMap<>(current);
+        var higher = new Observation("old:O1", "old", 1, "관련성이 높은 과거 근거. ".repeat(20), List.of(), published.minusDays(1), null, true, null);
+        var lower = new Observation("older:O1", "older", 1, "관련성이 낮은 과거 근거. ".repeat(20), List.of(), published.minusDays(2), null, true, null);
+        aliases.put("H01", new Evidence(higher, true, "C01", .8));
+        var highOnly = new Context(current, new LinkedHashMap<>(aliases), List.of(), List.of(), Map.of());
+        aliases.put("H02", new Evidence(lower, true, "C01", .6));
+        var context = new Context(current, aliases, List.of(), List.of(), Map.of());
+        var splitter = new ParagraphSplitter();
+        String original = DailyBriefingService.plannerInput(context, List.of(), splitter);
+        assertEquals(original, DailyBriefingService.packPlannerInput(context, List.of(), splitter, 15000).input());
+        int budget = DailyBriefingService.estimateTokens(DailyBriefingService.plannerInput(highOnly, List.of(), splitter));
+        var packed = DailyBriefingService.packPlannerInput(context, List.of(), splitter, budget);
+        assertTrue(DailyBriefingService.estimateTokens(packed.input()) <= budget);
+        assertEquals(1, packed.historyLimit());
+        assertTrue(packed.input().contains(now.text().strip()) && packed.input().contains(higher.text().strip()));
+        assertTrue(packed.input().contains("A01\t" + published));
+        assertTrue(!packed.input().contains("H02\t") && !packed.input().contains(lower.text().strip()));
+    }
+
+    @Test
+    void plannerDropsWholeOptionalPrinciplesButCannotFitByErasingRequiredObservations() {
+        var now = new Observation("a:O1", "a", 1, "현재 사실과 반대 근거. ".repeat(25), List.of(),
+                OffsetDateTime.parse("2026-09-17T04:00:00+09:00"), null, false, null);
+        var current = Map.of("C01", new Evidence(now, false, null, 1));
+        var principle = new PrincipleStore.Principle("p", "textbook", "일반 원리", "선택적 일반 원리. ".repeat(70), .9);
+        var context = new Context(current, current, List.of(), List.of(),
+                Map.of("K01", new DailyBriefingService.PrincipleChoice(principle, .9)));
+        var noPrinciples = new Context(current, current, List.of(), List.of(), Map.of());
+        var splitter = new ParagraphSplitter();
+        int budget = DailyBriefingService.estimateTokens(DailyBriefingService.plannerInput(noPrinciples, List.of(), splitter));
+        var packed = DailyBriefingService.packPlannerInput(context, List.of(), splitter, budget);
+        assertTrue(DailyBriefingService.estimateTokens(packed.input()) <= budget);
+        assertTrue(packed.input().contains(now.text().strip()) && !packed.input().contains("K01\t"));
+        var impossible = DailyBriefingService.packPlannerInput(context, List.of(), splitter, 1);
+        assertTrue(impossible.input().contains(now.text().strip()));
+        assertTrue(DailyBriefingService.estimateTokens(impossible.input()) > 1);
+    }
+
+    @Test
     void questionRetrievalKeepsLateReasonsInShortArticles() {
         var splitter = new ParagraphSplitter();
         var paragraphs = splitter.split("[사진 설명]\n정책 발표를 전했다.\n시장 반응을 전했다.\n시행 시점을 전했다.\n거래 규모를 전했다.\n후속 일정을 전했다.\n추가 발언을 전했다.\n앞선 장관 발언이 기대를 키웠다고 설명했다.");

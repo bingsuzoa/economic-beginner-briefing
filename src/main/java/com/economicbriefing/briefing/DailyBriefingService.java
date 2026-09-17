@@ -190,13 +190,11 @@ public class DailyBriefingService {
             int affordablePlannerInput = Math.min(appProperties.budget().synthesisInputTokens(),
                     Math.max(0, (int) Math.floor((appProperties.budget().dailyCostUsd() - usage.costUsd()
                             - .015 - EconomicFlowLlm.PLAN_MAX_OUTPUT_TOKENS * 12 / 1_000_000d) * 1_000_000d / 2 - 2500) - 1));
-            int evidenceChars = PLANNER_EVIDENCE_CHARS;
-            String plannerInput = plannerInput(context, briefingArticles, splitter, evidenceChars);
-            while (estimateTokens(plannerInput) > affordablePlannerInput && evidenceChars > 0) {
-                evidenceChars = Math.max(0, evidenceChars - 500);
-                plannerInput = plannerInput(context, briefingArticles, splitter, evidenceChars);
-            }
-            trace.plannerEvidenceCharsBudget = evidenceChars;
+            PackedPlannerInput packed = packPlannerInput(context, briefingArticles, splitter, affordablePlannerInput);
+            String plannerInput = packed.input();
+            trace.plannerEvidenceCharsBudget = packed.evidenceChars();
+            trace.plannerHistoryLimit = packed.historyLimit();
+            trace.plannerPrincipleCharsBudget = packed.principleChars();
             ensureInputBudget("Terra available cost budget", plannerInput, affordablePlannerInput);
             ensureInputBudget("Terra", plannerInput, appProperties.budget().synthesisInputTokens());
             ensureCost(usage, plannerInput, true, EconomicFlowLlm.PLAN_MAX_OUTPUT_TOKENS, .015);
@@ -437,6 +435,34 @@ public class DailyBriefingService {
     }
 
     static String plannerInput(Context context, List<ArticleEntity> articles, ParagraphSplitter splitter, int evidenceChars) {
+        return plannerInput(context, articles, splitter, evidenceChars, Integer.MAX_VALUE, PLANNER_PRINCIPLE_CHARS);
+    }
+
+    static PackedPlannerInput packPlannerInput(Context context, List<ArticleEntity> articles,
+                                               ParagraphSplitter splitter, int maxTokens) {
+        int evidenceChars = PLANNER_EVIDENCE_CHARS;
+        int historyLimit = (int) context.aliases.values().stream().filter(Evidence::historical).count();
+        int principleChars = PLANNER_PRINCIPLE_CHARS;
+        String input = plannerInput(context, articles, splitter, evidenceChars, historyLimit, principleChars);
+        while (estimateTokens(input) > maxTokens && evidenceChars > 0) {
+            evidenceChars = Math.max(0, evidenceChars - 500);
+            input = plannerInput(context, articles, splitter, evidenceChars, historyLimit, principleChars);
+        }
+        // Retrieved background is optional too. Keep every current observation and required article.
+        // Whole history candidates retain their relevance order; never truncate evidence text.
+        while (estimateTokens(input) > maxTokens && historyLimit > 0) {
+            historyLimit--;
+            input = plannerInput(context, articles, splitter, evidenceChars, historyLimit, principleChars);
+        }
+        while (estimateTokens(input) > maxTokens && principleChars > 0) {
+            principleChars = Math.max(0, principleChars - 500);
+            input = plannerInput(context, articles, splitter, evidenceChars, historyLimit, principleChars);
+        }
+        return new PackedPlannerInput(input, evidenceChars, historyLimit, principleChars);
+    }
+
+    private static String plannerInput(Context context, List<ArticleEntity> articles, ParagraphSplitter splitter,
+                                       int evidenceChars, int historyLimit, int principleLimit) {
         StringBuilder value = new StringBuilder("<requiredArticles>\n");
         Map<String, String> articleAliases = new LinkedHashMap<>();
         context.current.values().stream().map(Evidence::observation).forEach(o -> {
@@ -501,8 +527,9 @@ public class DailyBriefingService {
         value.append("</currentEvidence>\n<currentAdjacentEvidence>\n");
         appendBalancedEvidence(value, adjacent, evidenceChars - directChars);
         value.append("</currentAdjacentEvidence>\n<history>\n");
-        context.aliases.forEach((id, item) -> {
-            if (item.historical) value.append(id).append('\t').append(item.currentAlias).append('\t')
+        context.aliases.entrySet().stream().filter(entry -> entry.getValue().historical).limit(historyLimit).forEach(entry -> {
+            Evidence item = entry.getValue();
+            value.append(entry.getKey()).append('\t').append(item.currentAlias).append('\t')
                     .append(item.observation.publishedAt().toLocalDate()).append('\t')
                     .append(EconomicFlowLlm.clean(item.observation.text())).append('\n');
         });
@@ -516,7 +543,7 @@ public class DailyBriefingService {
             Principle principle = entry.getValue().principle;
             String line = entry.getKey() + "\t" + EconomicFlowLlm.clean(principle.title()) + "\t"
                     + EconomicFlowLlm.clean(principle.text()) + "\n";
-            if (principleChars + line.length() > PLANNER_PRINCIPLE_CHARS) continue;
+            if (principleChars + line.length() > principleLimit) continue;
             value.append(line); principleChars += line.length();
         }
         return value.append("</principles>").toString();
@@ -1056,6 +1083,7 @@ public class DailyBriefingService {
     static record PrincipleChoice(Principle principle, double relationSimilarity) {}
     static record Relation(String leftAlias, String rightAlias, double similarity) {}
     static record WriterBatch(String input, int flowCount, int weight, List<WritingScope> scopes) {}
+    static record PackedPlannerInput(String input, int evidenceChars, int historyLimit, int principleChars) {}
     static record Context(Map<String, Evidence> current, Map<String, Evidence> aliases,
                           List<HistoryChoice> history, List<Relation> relations,
                           Map<String, PrincipleChoice> principleAliases) {}
@@ -1063,6 +1091,8 @@ public class DailyBriefingService {
     private final class Trace {
         int windowArticleCount;
         int plannerEvidenceCharsBudget;
+        int plannerHistoryLimit;
+        int plannerPrincipleCharsBudget;
         final Map<String, Long> articleCountsByHour = new LinkedHashMap<>();
         final List<String> questionEvidenceAdded = new ArrayList<>();
         final List<String> prefilteredArticleIds = new ArrayList<>(), selectedArticleIds = new ArrayList<>(),
@@ -1095,6 +1125,8 @@ public class DailyBriefingService {
         ObjectNode json(ObjectMapper json) {
             ObjectNode node = json.createObjectNode(); node.put("windowArticleCount", windowArticleCount);
             node.put("plannerEvidenceCharsBudget", plannerEvidenceCharsBudget);
+            node.put("plannerHistoryLimit", plannerHistoryLimit);
+            node.put("plannerPrincipleCharsBudget", plannerPrincipleCharsBudget);
             node.set("articleCountsByHour", json.valueToTree(articleCountsByHour));
             add(node, "questionEvidenceAdded", questionEvidenceAdded);
             add(node, "prefilteredArticleIds", prefilteredArticleIds); add(node, "selectedArticleIds", selectedArticleIds);
