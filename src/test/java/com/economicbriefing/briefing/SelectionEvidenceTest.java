@@ -8,6 +8,24 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SelectionEvidenceTest {
+    @Test void capitalMovementInInterviewTailSurvivesGenericMarketCommentary() {
+        String lead="재무장관이 청문회에서 채권시장 상황을 설명했다.";
+        String filler="물가와 금리에 대한 우려가 시장에 영향을 미쳤다고 전망했다.";
+        String tail="엔화 강세는 수출에 유리하고 일본의 달러 자산 매각을 줄여 자금 회수 부담을 낮춘다고 설명했다.";
+        var a=article(lead+"\n"+(filler+"\n").repeat(30)+tail);
+        String excerpt=SelectionEvidence.excerpt(a,new ParagraphSplitter(),400);
+        assertTrue(excerpt.contains(tail));
+        assertTrue(excerpt.contains(lead));
+        assertTrue(excerpt.length()<=400);
+    }
+
+    @Test void selectionKeepsCalendarDateAndKstWhenDatabaseReturnsUtc() {
+        var a=article("중앙은행은 기준금리를 인상했다.");
+        a.setPublishedAt(OffsetDateTime.parse("2026-09-16T18:01:02Z"));
+        String input=EconomicFlowLlm.selectionInput(LocalDate.of(2026,9,17),List.of(a));
+        assertTrue(input.contains("09-17 03:01 KST"));
+        assertFalse(input.contains("\t18:01\t"));
+    }
     @Test void explanatoryTailSurvivesPriceListsWithoutInventingOrTruncatingEvidence() {
         String lead = "중앙은행의 정책 결정을 앞두고 채권시장이 움직였다.";
         String tail = "정책금리를 동결할 경우 물가 대응 신뢰가 약해져 장기금리가 오를 수 있다는 전망이다.";

@@ -13,6 +13,10 @@ const dateLabel = (value) => new Intl.DateTimeFormat('ko-KR', {
   timeZone: 'Asia/Seoul', month: 'long', day: 'numeric',
 }).format(new Date(`${value}T12:00:00+09:00`))
 
+const cutoffLabel = (value) => new Intl.DateTimeFormat('ko-KR', {
+  timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+}).format(new Date(value))
+
 function Explanation({ text, headingTag: Heading = 'h3' }) {
   return <div className={s.explanation}>{briefingParagraphs(text).map(({ heading, body }, index) =>
     <div className={s.paragraph} key={index}>
@@ -44,6 +48,7 @@ export default function DailyBriefing({ briefing, onPrevious, onNext, onSelectFl
     <header className={s.header}>
       <p><img src="/images/news-icon.png" alt="" /> 데일리</p>
       <h1 id="daily-briefing-title">{dateLabel(briefing.targetDate)} 토트</h1>
+      {briefing.windowEnd && <p>{cutoffLabel(briefing.windowEnd)}까지의 기사 기준</p>}
     </header>
   )
 

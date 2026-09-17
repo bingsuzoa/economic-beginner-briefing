@@ -16,6 +16,8 @@ public class YonhapBodyFetcher {
     private static final Pattern BODY = Pattern.compile("class=\"story-news article\"(.*?)<p class=\"txt-copyright", Pattern.DOTALL);
     private static final Pattern PARAGRAPH = Pattern.compile("<p(?:\\s[^>]*)?>(.*?)</p>", Pattern.DOTALL);
     private static final Pattern PAGE_DATE = Pattern.compile("\"(datePublished|dateModified)\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern HEADLINE = Pattern.compile("<h1(?:\\s[^>]*)?>(.*?)</h1>", Pattern.DOTALL);
+    private static final Pattern BULLETIN = Pattern.compile("^\\[(?:속보|\\d+보)]\\s*.+");
     private final HttpClient http;
     private final AppProperties properties;
 
@@ -70,7 +72,17 @@ public class YonhapBodyFetcher {
             if (!text.isBlank() && !boilerplate(text)) paragraphs.add(text);
         }
         String result = String.join("\n", paragraphs).strip();
-        if (paragraphs.size() < 2 || result.length() < 250) throw new IllegalArgumentException("Yonhap article body too short");
+        if (paragraphs.size() < 2 || result.length() < 250) {
+            // Some wire bulletins publish the entire confirmed event in the headline only.
+            // Preserve that exact, page-verified headline as explicitly labelled evidence;
+            // never promote an RSS summary, image caption, or later article into its body.
+            var headline = HEADLINE.matcher(html);
+            if (headline.find()) {
+                String title = clean(headline.group(1));
+                if (BULLETIN.matcher(title).matches()) return "속보 제목: " + title;
+            }
+            throw new IllegalArgumentException("Yonhap article body too short");
+        }
         return result;
     }
 

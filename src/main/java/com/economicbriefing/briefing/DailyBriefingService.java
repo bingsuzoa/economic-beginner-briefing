@@ -49,14 +49,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class DailyBriefingService {
     static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    static final String PIPELINE_VERSION = "daily-flow-v2.7-macro";
+    static final String PIPELINE_VERSION = "daily-flow-v2.8-events";
     private static final int PLANNER_SUPPLEMENTAL_CHARS = 2500;
     private static final int PLANNER_EVIDENCE_CHARS = 8500;
     private static final int PLANNER_PRINCIPLE_CHARS = 1500;
     private static final Pattern RELATION_CONTEXT = Pattern.compile(
             "때문|하지만|다만|반면|지만|탓|영향|우려|의존|여전히|조건|제약|한계|대신|선호|희망|요구|반등|부담|유인|이유|만큼|앞두고");
     private static final Logger log = LoggerFactory.getLogger(DailyBriefingService.class);
-    private static final Pattern THIN_BULLETIN = Pattern.compile("^\\[(?:속보|\\d+보)]");
     private static final Pattern HARD_SIGNAL = Pattern.compile(
             "소비자물가|생산자물가|수출물가|수입물가|\\bCPI\\b|\\bPPI\\b|기준금리|통화정책|금통위|국채금리|채권금리|대출금리|은행채|회사채|신용스프레드|환율|취업자|실업률|고용률|\\bGDP\\b|경제성장률|가계대출|가계부채|국제유가|브렌트유|\\bWTI\\b|천연가스|원유|송유관",
             Pattern.CASE_INSENSITIVE);
@@ -97,15 +96,25 @@ public class DailyBriefingService {
     }
 
     public Optional<DailyBriefingEntity> run(LocalDate targetDate, String triggerType, boolean force) {
+        return run(targetDate, triggerType, force, null);
+    }
+
+    public Optional<DailyBriefingEntity> run(LocalDate targetDate, String triggerType, boolean force, OffsetDateTime cutoff) {
+        OffsetDateTime end = windowEnd(targetDate, cutoff, OffsetDateTime.now(KST));
         if (!running.compareAndSet(false, true)) return Optional.empty();
-        try { return Optional.of(runLocked(targetDate, triggerType, force)); }
+        try { return Optional.of(runLocked(targetDate, triggerType, force, null, end)); }
         finally { running.set(false); }
     }
 
     public boolean startAsync(LocalDate targetDate) {
+        return startAsync(targetDate, null);
+    }
+
+    public boolean startAsync(LocalDate targetDate, OffsetDateTime cutoff) {
+        OffsetDateTime end = windowEnd(targetDate, cutoff, OffsetDateTime.now(KST));
         if (!running.compareAndSet(false, true)) return false;
         Thread.startVirtualThread(() -> {
-            try { runLocked(targetDate, "MANUAL", true); }
+            try { runLocked(targetDate, cutoff == null ? "MANUAL" : "MANUAL_UPDATED", true, null, end); }
             catch (RuntimeException e) { log.error("Manual daily briefing failed: targetDate={}", targetDate, e); }
             finally { running.set(false); }
         });
@@ -130,6 +139,20 @@ public class DailyBriefingService {
     }
 
     private DailyBriefingEntity runLocked(LocalDate targetDate, String triggerType, boolean force, List<ArticleEntity> reviewWindow) {
+        return runLocked(targetDate, triggerType, force, reviewWindow, windowEnd(targetDate, null, OffsetDateTime.now(KST)));
+    }
+
+    static OffsetDateTime windowEnd(LocalDate date, OffsetDateTime cutoff, OffsetDateTime now) {
+        OffsetDateTime regular = date.atTime(5, 0).atZone(KST).toOffsetDateTime();
+        if (cutoff == null) return regular;
+        OffsetDateTime local = cutoff.atZoneSameInstant(KST).toOffsetDateTime();
+        if (!local.toLocalDate().equals(date) || local.isBefore(regular) || local.isAfter(now))
+            throw new IllegalArgumentException("수정본 마감은 대상일 05시 이후이며 현재 시각 이전이어야 합니다.");
+        return local;
+    }
+
+    private DailyBriefingEntity runLocked(LocalDate targetDate, String triggerType, boolean force,
+            List<ArticleEntity> reviewWindow, OffsetDateTime windowEnd) {
         if (!force) {
             Optional<DailyBriefingEntity> existing = briefings.findFirstByTargetDateAndStatusOrderByRevisionDesc(targetDate, "SUCCESS");
             if (existing.isPresent()) return existing.get();
@@ -139,7 +162,8 @@ public class DailyBriefingService {
         DailyBriefingEntity run = startRun(targetDate, triggerType);
         try {
             OffsetDateTime windowStart = targetDate.minusDays(1).atTime(5, 0).atZone(KST).toOffsetDateTime();
-            OffsetDateTime windowEnd = targetDate.atTime(5, 0).atZone(KST).toOffsetDateTime();
+            trace.windowStart = windowStart;
+            trace.windowEnd = windowEnd;
             List<ArticleEntity> window = reviewWindow == null ? canonical(articles
                     .findByPublishedAtGreaterThanEqualAndPublishedAtLessThanOrderByPublishedAtAsc(windowStart, windowEnd)) : reviewWindow;
             if (window.stream().anyMatch(a -> a.getPublishedAt().isBefore(windowStart) || !a.getPublishedAt().isBefore(windowEnd)))
@@ -165,7 +189,7 @@ public class DailyBriefingService {
             } else {
                 prepareSelectionEvidence(prefiltered, windowEnd, trace);
                 // Charge the same bounded source context that is sent to the existing LLM call.
-                ensureCost(usage, EconomicFlowLlm.selectionInput(targetDate, prefiltered), false, 2500, .09);
+                ensureCost(usage, EconomicFlowLlm.selectionInput(targetDate, prefiltered), false, EconomicFlowLlm.SELECTION_MAX_OUTPUT_TOKENS, .09);
                 Call<Selection> call = llm.select(targetDate, prefiltered);
                 selection = call.value();
                 usage.luna("articleSelection", call.usage());
@@ -187,18 +211,19 @@ public class DailyBriefingService {
             trace.principleChunkIds.addAll(context.principleAliases.values().stream()
                     .map(item -> item.principle.chunkId()).toList());
             List<ArticleEntity> briefingArticles = selection.briefingArticles().stream().map(SelectedArticle::article).toList();
-            int affordablePlannerInput = Math.min(appProperties.budget().synthesisInputTokens(),
-                    Math.max(0, (int) Math.floor((appProperties.budget().dailyCostUsd() - usage.costUsd()
-                            - .015 - EconomicFlowLlm.PLAN_MAX_OUTPUT_TOKENS * 12 / 1_000_000d) * 1_000_000d / 2 - 2500) - 1));
-            PackedPlannerInput packed = packPlannerInput(context, briefingArticles, splitter, affordablePlannerInput);
+            PlannerAllocation allocation = allocatePlanner(context, briefingArticles, splitter,
+                    appProperties.budget().synthesisInputTokens(), appProperties.budget().dailyCostUsd() - usage.costUsd());
+            int affordablePlannerInput = allocation.maxInputTokens();
+            PackedPlannerInput packed = allocation.packed();
             String plannerInput = packed.input();
             trace.plannerEvidenceCharsBudget = packed.evidenceChars();
             trace.plannerHistoryLimit = packed.historyLimit();
             trace.plannerPrincipleCharsBudget = packed.principleChars();
+            trace.plannerMaxOutputTokens = allocation.maxOutputTokens();
             ensureInputBudget("Terra available cost budget", plannerInput, affordablePlannerInput);
             ensureInputBudget("Terra", plannerInput, appProperties.budget().synthesisInputTokens());
-            ensureCost(usage, plannerInput, true, EconomicFlowLlm.PLAN_MAX_OUTPUT_TOKENS, .015);
-            Call<List<PlanFlow>> planned = llm.plan(plannerInput);
+            ensureCost(usage, plannerInput, true, allocation.maxOutputTokens(), .015);
+            Call<List<PlanFlow>> planned = llm.plan(plannerInput, allocation.maxOutputTokens());
             usage.terra("planner", planned.usage());
             List<PlanFlow> normalized = includeQuestionEvidence(planned.value(), context);
             for (int f = 0; f < normalized.size(); f++) {
@@ -436,6 +461,19 @@ public class DailyBriefingService {
 
     static String plannerInput(Context context, List<ArticleEntity> articles, ParagraphSplitter splitter, int evidenceChars) {
         return plannerInput(context, articles, splitter, evidenceChars, Integer.MAX_VALUE, PLANNER_PRINCIPLE_CHARS);
+    }
+
+    static PlannerAllocation allocatePlanner(Context context, List<ArticleEntity> articles,
+            ParagraphSplitter splitter, int inputCeiling, double remainingCostUsd) {
+        // Preserve current facts and reserve writer cost. Infeasible allocations still fail.
+        for (int output = EconomicFlowLlm.PLAN_MAX_OUTPUT_TOKENS; output >= 5000; output -= 250) {
+            int input = Math.min(inputCeiling, Math.max(0, (int) Math.floor(
+                    (remainingCostUsd - .015 - output * 12 / 1_000_000d) * 1_000_000d / 2 - 2500) - 1));
+            PackedPlannerInput packed = packPlannerInput(context, articles, splitter, input);
+            if (estimateTokens(packed.input()) <= input || output == 5000)
+                return new PlannerAllocation(packed, input, output);
+        }
+        throw new IllegalStateException("invalid planner output budget");
     }
 
     static PackedPlannerInput packPlannerInput(Context context, List<ArticleEntity> articles,
@@ -1023,6 +1061,8 @@ public class DailyBriefingService {
     private DailyBriefingEntity succeed(DailyBriefingEntity run, ObjectNode result, Trace trace, UsageTracker usage) {
         if (usage.costUsd() > appProperties.budget().dailyCostUsd())
             throw new IllegalStateException("daily cost ceiling exceeded by actual usage");
+        result.put("windowStart", trace.windowStart.toString());
+        result.put("windowEnd", trace.windowEnd.toString());
         run.setStatus("SUCCESS"); run.setResultJson(write(result)); run.setTraceJson(write(trace.json(json)));
         run.setUsageJson(write(usage.json(json))); run.setFinishedAt(OffsetDateTime.now(KST));
         return briefings.save(run);
@@ -1040,10 +1080,9 @@ public class DailyBriefingService {
         result.putArray("flows"); return result;
     }
 
-    private List<ArticleEntity> canonical(List<ArticleEntity> source) {
+    static List<ArticleEntity> canonical(List<ArticleEntity> source) {
         Map<String, ArticleEntity> latest = new LinkedHashMap<>();
         for (ArticleEntity article : source) {
-            if (THIN_BULLETIN.matcher(article.getTitle()).find()) continue;
             String key = article.getSourceArticleId() == null ? article.getUrl() : article.getSourceArticleId();
             latest.merge(key, article, (left, right) -> left.getPublishedAt().isAfter(right.getPublishedAt()) ? left : right);
         }
@@ -1088,11 +1127,15 @@ public class DailyBriefingService {
                           List<HistoryChoice> history, List<Relation> relations,
                           Map<String, PrincipleChoice> principleAliases) {}
 
+    static record PlannerAllocation(PackedPlannerInput packed, int maxInputTokens, int maxOutputTokens) {}
+
     private final class Trace {
+        OffsetDateTime windowStart, windowEnd;
         int windowArticleCount;
         int plannerEvidenceCharsBudget;
         int plannerHistoryLimit;
         int plannerPrincipleCharsBudget;
+        int plannerMaxOutputTokens;
         final Map<String, Long> articleCountsByHour = new LinkedHashMap<>();
         final List<String> questionEvidenceAdded = new ArrayList<>();
         final List<String> prefilteredArticleIds = new ArrayList<>(), selectedArticleIds = new ArrayList<>(),
@@ -1124,9 +1167,12 @@ public class DailyBriefingService {
         }
         ObjectNode json(ObjectMapper json) {
             ObjectNode node = json.createObjectNode(); node.put("windowArticleCount", windowArticleCount);
+            if (windowStart != null) node.put("windowStart", windowStart.toString());
+            if (windowEnd != null) node.put("windowEnd", windowEnd.toString());
             node.put("plannerEvidenceCharsBudget", plannerEvidenceCharsBudget);
             node.put("plannerHistoryLimit", plannerHistoryLimit);
             node.put("plannerPrincipleCharsBudget", plannerPrincipleCharsBudget);
+            node.put("plannerMaxOutputTokens", plannerMaxOutputTokens);
             node.set("articleCountsByHour", json.valueToTree(articleCountsByHour));
             add(node, "questionEvidenceAdded", questionEvidenceAdded);
             add(node, "prefilteredArticleIds", prefilteredArticleIds); add(node, "selectedArticleIds", selectedArticleIds);

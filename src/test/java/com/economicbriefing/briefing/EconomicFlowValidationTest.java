@@ -328,6 +328,26 @@ class EconomicFlowValidationTest {
     }
 
     @Test
+    void plannerAllocatesOutputWithinSameCostCeilingWithoutErasingFacts() {
+        var observation = new Observation("a:O1", "a", 1, "정책 결정과 자금 이동 근거. ".repeat(450), List.of(),
+                OffsetDateTime.parse("2026-09-17T04:00:00+09:00"), null, false, null);
+        var current = Map.of("C01", new Evidence(observation, false, null, 1));
+        var context = new Context(current, current, List.of(), List.of(), Map.of());
+        var splitter = new ParagraphSplitter();
+        assertEquals(6000, DailyBriefingService.allocatePlanner(context, List.of(), splitter, 15000, .14).maxOutputTokens());
+        var tight = DailyBriefingService.allocatePlanner(context, List.of(), splitter, 15000, .098);
+        assertTrue(tight.maxOutputTokens() < 6000 && tight.maxOutputTokens() >= 5000);
+        assertTrue(tight.packed().input().contains(observation.text().strip()));
+        assertTrue(DailyBriefingService.estimateTokens(tight.packed().input()) <= tight.maxInputTokens());
+        double reserved = (DailyBriefingService.estimateTokens(tight.packed().input()) + 2500) * 2 / 1_000_000d
+                + tight.maxOutputTokens() * 12 / 1_000_000d + .015;
+        assertTrue(reserved <= .098);
+        var impossible = DailyBriefingService.allocatePlanner(context, List.of(), splitter, 15000, .03);
+        assertTrue(impossible.packed().input().contains(observation.text().strip()));
+        assertTrue(DailyBriefingService.estimateTokens(impossible.packed().input()) > impossible.maxInputTokens());
+    }
+
+    @Test
     void readsStoredPgVectorForRetryReuse() {
         assertArrayEquals(new float[] { .25f, -.5f }, ObservationStore.parseVector("[0.25,-0.5]"));
     }

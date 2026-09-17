@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
 final class SelectionEvidence {
     private static final int MAX_CHARS = 900;
     private static final Pattern RELATION = Pattern.compile(
-            "때문|영향|반면|다만|하지만|따라|부담|우려|전망|예상|신뢰|물가|금리|환율|수요|공급|차환|예금|조건|경우|의사록|계약통화");
+            "때문|영향|반면|다만|하지만|따라|부담|우려|전망|예상|신뢰|물가|금리|환율|수요|공급|차환|예금|조건|경우|의사록|계약통화|자산|자금|매각|보유|회수|의존|통항|달러|엔화|수출|제재|매입|준비금");
     private SelectionEvidence() {}
 
     static String excerpt(ArticleEntity article, ParagraphSplitter splitter) {

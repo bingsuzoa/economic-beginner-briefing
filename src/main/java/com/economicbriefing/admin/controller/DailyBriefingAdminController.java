@@ -6,10 +6,12 @@ import com.economicbriefing.briefing.DailyBriefingEntity;
 import com.economicbriefing.briefing.DailyBriefingRepository;
 import com.economicbriefing.briefing.DailyBriefingService;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.Map;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -48,8 +50,13 @@ public class DailyBriefingAdminController {
     }
 
     @PostMapping("/{date}/run")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> start(@PathVariable LocalDate date) {
-        boolean started = service.startAsync(date);
+    public ResponseEntity<ApiResponse<Map<String, Object>>> start(@PathVariable LocalDate date,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime cutoff) {
+        boolean started;
+        try { started = service.startAsync(date, cutoff); }
+        catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("INVALID_CUTOFF", e.getMessage()));
+        }
         return ResponseEntity.status(started ? HttpStatus.ACCEPTED : HttpStatus.CONFLICT)
                 .body(started ? ApiResponse.ok(Map.of("accepted", true, "targetDate", date))
                         : ApiResponse.error("ALREADY_RUNNING", "이미 경제흐름 분석이 실행 중입니다."));
