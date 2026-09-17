@@ -33,6 +33,12 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class EconomicFlowValidationTest {
+    @Test void promptVersionsFitPersistentColumns() {
+        // V24 stores both version fields as VARCHAR(32); overly long tags fail before planning.
+        assertTrue(EconomicFlowLlm.EXTRACTION_PROMPT_VERSION.length() <= 32);
+        assertTrue(DailyBriefingService.PIPELINE_VERSION.length() <= 32);
+    }
+
     @Test
     void explicitQuestionEvidenceCompletesParentScopeWithoutAcceptingUnknownIds() {
         var a = new Observation("a:O1","a",1,"원인",List.of(),null,null,false,null);
@@ -82,6 +88,25 @@ class EconomicFlowValidationTest {
         assertEquals(0,answers.get(0).path("properties").path("principleIds").path("maxItems").asInt(-1));
         assertEquals("C03",answers.get(1).path("properties").path("evidenceIds").path("items").path("enum").get(0).asText());
         assertEquals(0,flows.path("items").path("anyOf").get(1).path("properties").path("questions").path("maxItems").asInt(-1));
+    }
+
+    @Test
+    void writerNumberHintsDoNotBorrowDatesFromAnotherObservationOfTheSameArticle() {
+        var current = new Observation("a:O1", "a", 1, "석유가 경제 수입의 90%를 차지한다.", List.of(), null, null, false, null);
+        var background = new Observation("a:O2", "a", 2, "2011년 이후 생산이 반복 중단됐다.", List.of(), null, null, false, null);
+        var evidence = Map.of("C01", new Evidence(current, false, null, 1), "C02", new Evidence(background, false, null, 1));
+        var context = new Context(evidence, evidence, List.of(), List.of(), Map.of());
+        var question = new Question("생산 중단이 왜 큰 충격인가요?", "수입 의존", List.of("C01"), "", "", List.of());
+        var plan = List.of(new PlanFlow(List.of("C01", "C02"), List.of(), "국가 수입과 공급 위험", List.of(question)));
+        var source = DailyBriefingService.questionSources(plan.getFirst(), question, context);
+        var questions = Map.of("F01:Q01", source);
+        String input = DailyBriefingService.writerBatches(plan, context, questions, 15000).getFirst().input();
+        assertTrue(input.contains("flowNumbers\t2011,90%"));
+        assertTrue(input.contains("questionNumbers\t90%\n</Q01>"));
+        var unsupported = new Writing(List.of(new WrittenFlow("F01", "생산 중단", "국가 수입에 충격이에요.",
+                List.of(new Answer("Q01", "2011년 이후 반복됐어요.", List.of("C01"), List.of())))), List.of());
+        assertTrue(DailyBriefingService.validateWriting(unsupported, plan, context, questions).stream()
+                .anyMatch(error -> error.equals("F01:Q01: numbers outside evidence=[2011]")));
     }
 
     @Test
@@ -327,13 +352,15 @@ class EconomicFlowValidationTest {
         QuestionContext source = new QuestionContext(); source.evidence.putAll(evidence);
         Map<String, QuestionContext> questions = Map.of("F01:Q01", source);
         for (String text : List.of("달러 같은 제3의 통화를 거치지 않을 수 있어요.",
-                "제 3 의 통화로 결제해요.", "제3자에게 지급해요.", "제3자의 개입이에요.", "(제3자)", "제3국 기업과 거래해요.", "제 3 국의 금융기관이에요.")) {
+                "제 3 의 통화로 결제해요.", "제3자에게 지급해요.", "제3자의 개입이에요.", "(제3자)", "제3국 기업과 거래해요.", "제 3 국의 금융기관이에요.",
+                "커넥터 국가는 생산과 교역으로 이어 주는 제3국이에요.", "특정 제3국이나 경로에 집중돼 있어요.")) {
             Writing writing = new Writing(List.of(new WrittenFlow("F01", text, text,
                     List.of(new Answer("Q01", text, List.of("C01"), List.of())))), List.of());
             assertTrue(DailyBriefingService.validateWriting(writing, plan, context, questions).isEmpty(), text);
         }
         for (String text : List.of("제4의 통화", "제30의 통화", "제3의 통화량", "제3자산", "경제3의 통화",
-                "제3국채", "3개국", "제3국과 3개국이 거래해요.", "제3국 거래가 3% 늘어요.", "3개 통화", "3개월", "3분기", "세계 3위", "제3차 회의", "제3의 통화를 거치면 수수료가 3% 줄어요.")) {
+                "제3국채", "3개국", "제3국과 3개국이 거래해요.", "제3국 거래가 3% 늘어요.", "제3국이에요. 수수료는 3%예요.",
+                "제3국이나 3개국에 지급해요.", "제3국이나무", "제3국이에요라는새단위", "3개 통화", "3개월", "3분기", "세계 3위", "제3차 회의", "제3의 통화를 거치면 수수료가 3% 줄어요.")) {
             Writing writing = new Writing(List.of(new WrittenFlow("F01", text, text,
                     List.of(new Answer("Q01", text, List.of("C01"), List.of())))), List.of());
             var errors = DailyBriefingService.validateWriting(writing, plan, context, questions);

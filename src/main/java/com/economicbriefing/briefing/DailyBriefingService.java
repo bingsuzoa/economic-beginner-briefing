@@ -49,7 +49,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class DailyBriefingService {
     static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    static final String PIPELINE_VERSION = "daily-flow-v2.6";
+    static final String PIPELINE_VERSION = "daily-flow-v2.7-macro";
     private static final int PLANNER_SUPPLEMENTAL_CHARS = 2500;
     private static final int PLANNER_EVIDENCE_CHARS = 8500;
     private static final int PLANNER_PRINCIPLE_CHARS = 1500;
@@ -58,13 +58,13 @@ public class DailyBriefingService {
     private static final Logger log = LoggerFactory.getLogger(DailyBriefingService.class);
     private static final Pattern THIN_BULLETIN = Pattern.compile("^\\[(?:속보|\\d+보)]");
     private static final Pattern HARD_SIGNAL = Pattern.compile(
-            "소비자물가|생산자물가|\\bCPI\\b|\\bPPI\\b|기준금리|국채금리|채권금리|대출금리|환율|취업자|실업률|고용률|\\bGDP\\b|경제성장률|가계대출|가계부채|국제유가|브렌트유|\\bWTI\\b|천연가스",
+            "소비자물가|생산자물가|수출물가|수입물가|\\bCPI\\b|\\bPPI\\b|기준금리|통화정책|금통위|국채금리|채권금리|대출금리|은행채|회사채|신용스프레드|환율|취업자|실업률|고용률|\\bGDP\\b|경제성장률|가계대출|가계부채|국제유가|브렌트유|\\bWTI\\b|천연가스|원유|송유관",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern NUMBER = Pattern.compile("\\d[\\d,.]*(?:%|％)?");
     // ponytail: only reviewed non-quantitative phrases; extend after confirming a new false positive.
     private static final Pattern NON_QUANTITATIVE_PHRASE = Pattern.compile(
             "(?<![\\p{L}\\p{N}_])제\\h*3\\h*(?:의\\h+통화|자|국)"
-                    + "(?=(?:에게|에서|으로|[은는이가을를의와과도만로에])*(?:$|[\\s\\p{P}]))");
+                    + "(?=(?:에게|에서|으로|이나|[은는이가을를의와과도만로에])*(?:이에요)?(?:$|[\\s\\p{P}]))");
 
     private final ArticleRepository articles;
     private final DailyBriefingRepository briefings;
@@ -153,7 +153,7 @@ public class DailyBriefingService {
             run.setInputHash(hash(window));
             if (window.isEmpty()) return noData(run, targetDate, trace, usage);
 
-            List<ArticleEntity> prefiltered = reviewWindow == null ? prefilter(targetDate, windowStart, window, usage) : window;
+            List<ArticleEntity> prefiltered = reviewWindow == null ? prefilter(targetDate, windowStart, window, usage, trace) : window;
             trace.prefilteredArticleIds.addAll(prefiltered.stream().map(ArticleEntity::getId).toList());
             if (prefiltered.isEmpty()) return succeed(run, emptyResult(targetDate), trace, usage);
 
@@ -163,7 +163,9 @@ public class DailyBriefingService {
                         "사용자가 지정한 기사. 원문에 근거한 경제 관측을 검토한다.")), List.of());
                 trace.selection = json.createObjectNode().put("mode", "USER_SELECTED_FOR_REVIEW");
             } else {
-                ensureCost(usage, windowText(prefiltered), false, 2500, .09);
+                prepareSelectionEvidence(prefiltered, windowEnd, trace);
+                // Charge the same bounded source context that is sent to the existing LLM call.
+                ensureCost(usage, EconomicFlowLlm.selectionInput(targetDate, prefiltered), false, 2500, .09);
                 Call<Selection> call = llm.select(targetDate, prefiltered);
                 selection = call.value();
                 usage.luna("articleSelection", call.usage());
@@ -173,7 +175,7 @@ public class DailyBriefingService {
             trace.memoryArticleIds.addAll(selection.memoryArticles().stream().map(item -> item.article().getId()).toList());
             if (selection.all().isEmpty()) return succeed(run, emptyResult(targetDate), trace, usage);
 
-            List<Observation> extracted = extract(selection.all(), usage, trace, .09);
+            List<Observation> extracted = extract(selection.all(), usage, trace, .09, windowEnd);
             List<Observation> embedded = embed(extracted.stream().filter(o -> o.remember() || trace.selectedArticleIds.contains(o.articleId())).toList(), usage);
             List<Observation> current = embedded.stream().filter(o -> trace.selectedArticleIds.contains(o.articleId())).toList();
             if (current.isEmpty()) return succeed(run, emptyResult(targetDate), trace, usage);
@@ -247,7 +249,7 @@ public class DailyBriefingService {
         }
     }
 
-    private List<ArticleEntity> prefilter(LocalDate date, OffsetDateTime start, List<ArticleEntity> window, UsageTracker usage) {
+    private List<ArticleEntity> prefilter(LocalDate date, OffsetDateTime start, List<ArticleEntity> window, UsageTracker usage, Trace trace) {
         LinkedHashSet<String> ids = new LinkedHashSet<>();
         Map<String, ArticleEntity> byId = new LinkedHashMap<>();
         window.forEach(item -> byId.put(item.getId(), item));
@@ -264,19 +266,38 @@ public class DailyBriefingService {
             ensureCost(usage, windowText(group), false, 2000, .09);
             Call<List<String>> call = llm.prefilter(date, group, 40);
             usage.luna("titlePrefilter", call.usage());
+            trace.prefilterRound("sixHourWindow", group.size(), 40, call.value());
             ids.addAll(call.value());
         }
         if (ids.size() > 80) {
             ensureCost(usage, windowText(ids.stream().map(byId::get).toList()), false, 2000, .09);
             Call<List<String>> call = llm.prefilter(date, ids.stream().map(byId::get).toList(), 80);
             usage.luna("titlePrefilter", call.usage());
+            trace.prefilterRound("dailyMerge", ids.size(), 80, call.value());
             ids = new LinkedHashSet<>(call.value());
         }
-        for (ArticleEntity item : window) if (HARD_SIGNAL.matcher(item.getTitle()).find()) ids.add(item.getId());
+        // Recall safeguard only; every rescued article still passes the same semantic selection gate.
+        for (ArticleEntity item : window) if (HARD_SIGNAL.matcher(item.getTitle()).find() && ids.add(item.getId()))
+            trace.hardSignalRescuedArticleIds.add(item.getId());
         return ids.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
     }
 
-    private List<Observation> extract(List<SelectedArticle> selected, UsageTracker usage, Trace trace, double reserved) {
+    private void prepareSelectionEvidence(List<ArticleEntity> candidates, OffsetDateTime cutoff, Trace trace) {
+        for (ArticleEntity article : candidates) {
+            if (!"FULL_TEXT".equals(article.getBodyStatus()) || article.getBody() == null || article.getBody().isBlank()) {
+                try {
+                    bodyFetcher.markSuccess(article, bodyFetcher.fetchBefore(article.getUrl(), cutoff));
+                    articles.save(article);
+                } catch (RuntimeException e) {
+                    trace.selectionBodyUnavailableArticleIds.add(article.getId());
+                    continue; // Title/RSS remain usable; failure is not evidence of irrelevance.
+                }
+            }
+            trace.selectionEvidenceHashes.put(article.getId(), ObservationStore.bodyHash(article.getBody()));
+        }
+    }
+
+    private List<Observation> extract(List<SelectedArticle> selected, UsageTracker usage, Trace trace, double reserved, OffsetDateTime cutoff) {
         List<Observation> result = new ArrayList<>();
         for (SelectedArticle item : selected) {
             ArticleEntity article = item.article();
@@ -291,7 +312,7 @@ public class DailyBriefingService {
             }
             if (!"FULL_TEXT".equals(article.getBodyStatus()) || article.getBody() == null || article.getBody().isBlank()) {
                 try {
-                    bodyFetcher.markSuccess(article, bodyFetcher.fetch(article.getUrl()));
+                    bodyFetcher.markSuccess(article, bodyFetcher.fetchBefore(article.getUrl(), cutoff));
                     articles.save(article);
                 } catch (RuntimeException e) {
                     article.setBodyStatus("FETCH_FAILED");
@@ -706,7 +727,8 @@ public class DailyBriefingService {
             PlanFlow flow = plan.get(index);
             value.append('<').append(flowId).append(">\nconnection\t").append(flow.connection())
                     .append("\nflowEvidence\t").append(String.join(",", flow.observationIds()))
-                    .append("\nflowPrinciples\t").append(String.join(",", flow.principleIds())).append("\n");
+                    .append("\nflowPrinciples\t").append(String.join(",", flow.principleIds()))
+                    .append("\nflowNumbers\t").append(String.join(",", allowedNumbers(flowSources(flow, context)))).append("\n");
             for (int q = 0; q < flow.questions().size(); q++) {
                 String qid = "Q%02d".formatted(q + 1);
                 QuestionContext sources = questions.get(flowId + ":" + qid);
@@ -714,6 +736,7 @@ public class DailyBriefingService {
                         .append("\nsearchStatus\t").append(sources.status)
                         .append("\nquestionEvidence\t").append(String.join(",", sources.evidence.keySet()))
                         .append("\nquestionPrinciples\t").append(String.join(",", sources.principles.keySet()))
+                        .append("\nquestionNumbers\t").append(String.join(",", allowedNumbers(sources)))
                         .append("\n</").append(qid).append(">\n");
             }
             value.append("</").append(flowId).append(">\n");
@@ -816,6 +839,12 @@ public class DailyBriefingService {
     }
 
     private static void checkNumbers(String id, String text, QuestionContext source, List<String> errors) {
+        Set<String> extra = numbers(text); extra.removeAll(allowedNumbers(source));
+        if (!extra.isEmpty()) errors.add(id + ": numbers outside evidence=" + extra);
+    }
+
+    // The writer sees the same per-scope constraint as the validator, without gaining new evidence.
+    private static Set<String> allowedNumbers(QuestionContext source) {
         StringBuilder allowed = new StringBuilder();
         for (Evidence evidence : source.evidence.values()) {
             Observation o = evidence.observation;
@@ -823,8 +852,7 @@ public class DailyBriefingService {
             if (o.snapshot() != null) o.snapshot().path("spans").forEach(span -> allowed.append(span.asText()).append(' '));
         }
         source.principles.values().forEach(p -> allowed.append(p.principle.title()).append(' ').append(p.principle.text()).append(' '));
-        Set<String> extra = numbers(text); extra.removeAll(numbers(allowed.toString()));
-        if (!extra.isEmpty()) errors.add(id + ": numbers outside evidence=" + extra);
+        return new java.util.TreeSet<>(numbers(allowed.toString()));
     }
 
     static Writing completeNumberCitations(Writing writing, Map<String, QuestionContext> questions) {
@@ -1041,9 +1069,17 @@ public class DailyBriefingService {
                 observationIds = new ArrayList<>(), historyCandidateIds = new ArrayList<>(), historyCandidatePairs = new ArrayList<>(), principleChunkIds = new ArrayList<>(),
                 usedHistoryObservationIds = new ArrayList<>(), usedPrincipleIds = new ArrayList<>();
         final List<String> memoryArticleIds = new ArrayList<>();
+        final List<String> hardSignalRescuedArticleIds = new ArrayList<>();
+        final List<String> selectionBodyUnavailableArticleIds = new ArrayList<>();
+        final Map<String,String> selectionEvidenceHashes = new LinkedHashMap<>();
+        final ArrayNode prefilterRounds = json.createArrayNode();
         final ArrayNode memoryDecisions = json.createArrayNode(), questionSearches = json.createArrayNode();
         JsonNode selection, writing;
         ArrayNode plan;
+        void prefilterRound(String stage, int inputCount, int limit, List<String> selectedIds) {
+            ObjectNode round = prefilterRounds.addObject().put("stage", stage).put("inputCount", inputCount).put("limit", limit);
+            add(round, "selectedArticleIds", selectedIds);
+        }
         void plan(List<PlanFlow> flows, ObjectMapper json) {
             plan = json.createArrayNode();
             for (PlanFlow flow : flows) {
@@ -1062,6 +1098,10 @@ public class DailyBriefingService {
             node.set("articleCountsByHour", json.valueToTree(articleCountsByHour));
             add(node, "questionEvidenceAdded", questionEvidenceAdded);
             add(node, "prefilteredArticleIds", prefilteredArticleIds); add(node, "selectedArticleIds", selectedArticleIds);
+            node.set("prefilterRounds", prefilterRounds);
+            add(node, "hardSignalRescuedArticleIds", hardSignalRescuedArticleIds);
+            add(node, "selectionBodyUnavailableArticleIds", selectionBodyUnavailableArticleIds);
+            node.set("selectionEvidenceHashes", json.valueToTree(selectionEvidenceHashes));
             add(node, "observationIds", observationIds); add(node, "historyCandidateIds", historyCandidateIds);
             add(node, "historyCandidatePairs", historyCandidatePairs);
             add(node, "principleChunkIds", principleChunkIds); add(node, "usedHistoryObservationIds", usedHistoryObservationIds);

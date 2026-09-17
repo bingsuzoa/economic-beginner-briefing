@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 public class YonhapBodyFetcher {
     private static final Pattern BODY = Pattern.compile("class=\"story-news article\"(.*?)<p class=\"txt-copyright", Pattern.DOTALL);
     private static final Pattern PARAGRAPH = Pattern.compile("<p(?:\\s[^>]*)?>(.*?)</p>", Pattern.DOTALL);
+    private static final Pattern PAGE_DATE = Pattern.compile("\"(datePublished|dateModified)\"\\s*:\\s*\"([^\"]+)\"");
     private final HttpClient http;
     private final AppProperties properties;
 
@@ -25,12 +26,32 @@ public class YonhapBodyFetcher {
     }
 
     public String fetch(String url) {
+        return extract(fetchHtml(url));
+    }
+
+    public String fetchBefore(String url, OffsetDateTime cutoff) {
+        return extractBefore(fetchHtml(url), cutoff);
+    }
+
+    static String extractBefore(String html, OffsetDateTime cutoff) {
+        var dates = PAGE_DATE.matcher(html);
+        boolean published = false;
+        while (dates.find()) {
+            if ("datePublished".equals(dates.group(1))) published = true;
+            if (!OffsetDateTime.parse(dates.group(2)).isBefore(cutoff))
+                throw new IllegalArgumentException("article page version is outside briefing cutoff");
+        }
+        if (!published) throw new IllegalArgumentException("article page publication time unavailable");
+        return extract(html);
+    }
+
+    private String fetchHtml(String url) {
         try {
             var request = HttpRequest.newBuilder(URI.create(url)).timeout(properties.timeouts().rssHttp())
                     .header("User-Agent", "EconomicBriefing/1.0").GET().build();
             var response = http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() >= 400) throw new IllegalStateException("HTTP " + response.statusCode());
-            return extract(response.body());
+            return response.body();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("article fetch interrupted", e);

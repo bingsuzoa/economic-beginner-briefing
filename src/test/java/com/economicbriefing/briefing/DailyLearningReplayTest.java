@@ -90,10 +90,10 @@ class DailyLearningReplayTest {
                     jdbc.update("UPDATE articles SET body=?,body_status=?,body_fetched_at=? WHERE id=?",a.getBody(),a.getBodyStatus(),a.getBodyFetchedAt(),a.getId()); return a;
                 });
                 var bodyCache=base.resolve("body-cache");Files.createDirectories(bodyCache);
-                var fetcher=new YonhapBodyFetcher(app){@Override public String fetch(String url){
-                    try {var file=bodyCache.resolve(ObservationStore.bodyHash(url)+".txt");
+                var fetcher=new YonhapBodyFetcher(app){@Override public String fetchBefore(String url, OffsetDateTime cutoff){
+                    try {var file=bodyCache.resolve(ObservationStore.bodyHash(url+"|"+cutoff)+".txt");
                         if(Files.exists(file))return Files.readString(file);
-                        String body=super.fetch(url);Files.writeString(file,body);return body;
+                        String body=super.fetchBefore(url,cutoff);Files.writeString(file,body);return body;
                     }catch(Exception e){throw new IllegalStateException(e);}
                 }};
                 var briefings=mock(DailyBriefingRepository.class);var latest=new AtomicReference<DailyBriefingEntity>();
